@@ -364,13 +364,9 @@ const processAudioJob = async (
   );
   for (const variant of [1, 2] as const) {
     if (completedVariants.has(variant)) continue;
-    // A instrução da variante vem ANTES da letra: o filtro de segurança de áudio do
-    // Gemini interpreta texto após a letra como conteúdo cantável e pode bloquear.
-    const prompt =
-      variant === 1
-        ? 'Versão principal: arranjo fiel à direção musical.\n' + basePrompt
-        : 'Segunda versão: andamento levemente diferente, mesma letra.\n' + basePrompt;
-    const generation = await music.generate(prompt);
+    // Instruções extras (prefixos de variante) aumentam falsos positivos do filtro
+    // de áudio; o modelo já produz faixas distintas a cada chamada (sem seed fixa).
+    const generation = await music.generate(basePrompt);
     const { mime, ext } = detectAudioMime(generation.bytes);
     const key = `orders/${order.public_id}/audio-${variant}.${ext}`;
     await writeLocalAsset(config.storagePath, key, generation.bytes);

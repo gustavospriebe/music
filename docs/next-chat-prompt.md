@@ -1,67 +1,63 @@
-# Prompt para retomar em outro chat
+# Handoff — Música da Resenha (sessão de 03/09/2026)
 
-Continue o desenvolvimento do projeto em:
+> Este documento substitui o handoff antigo (descrevia estado pré-MVP com providers fake, que **não existe mais**).
 
-`/home/gustavo/projects/music`
+## O que é o projeto
 
-Você tem permissão full access para ler, criar, editar arquivos, instalar dependências, subir Docker/PostgreSQL, executar migrations, testes, build e E2E. Não faça deploy, commit/push, compras ou chamadas pagas reais sem confirmação explícita.
+MVP brasileiro de músicas personalizadas: o cliente conta uma história (resenha), a IA gera a letra, ele revisa/aprova, paga e recebe 2 versões de áudio em página privada com link de entrega.
 
-## Objetivo
+- Monorepo Turborepo + pnpm, TypeScript estrito ESM: `apps/web` (React 19/Vite), `apps/api` (Fastify 5), `apps/worker` (fila em PostgreSQL via `SELECT … FOR UPDATE SKIP LOCKED`), `packages/{contracts,domain,database,providers,config}`.
+- Convenções e regras de trabalho: **`AGENTS.md` na raiz (ler primeiro)**. Docs: `README.md`, `ARCHITECTURE.md`, `docs/providers.md`, `docs/provider-setup.md`, `docs/production-checklist.md`.
+- **Não é repositório git** (decidir se versiona antes de acumular mais histórico).
 
-Entregar o MVP completo “Música da Resenha”: aplicação brasileira de músicas personalizadas por IA, com React/Vite, Fastify, worker PostgreSQL, providers fake locais completos e adapters reais preparados/documentados para OpenRouter, Mercado Pago, Resend e S3.
+## Estado atual — funcionando e VALIDADO com chamadas reais
 
-A especificação integral original está em:
+Fluxo completo provado ponta a ponta várias vezes (pedidos reais no banco): história → letra (OpenRouter, JSON estruturado) → aprovação → pagamento dev → worker gera 2 MP3 reais → `delivered` → link `/entrega/:token` tocando/baixando → painel admin com player, editor de letra aprovada e "reproduzir versões".
 
-`/home/gustavo/.codex/attachments/3226c6de-7c6d-4eae-9560-fd2aa239da7d/pasted-text-1.txt`
+- **Serviços dev**: Postgres container `music-postgres-1` (`:5433`), API `:3001`, web `:5175` (vite), worker tsx watch. Logs em `var/logs/*.log`. CI (GitHub Actions) com `resenha_test` migrou e verde.
+- **Admin local**: `http://localhost:5175/admin/login` — `admin@resenha.local` / `resenha123` (plaintext no `.env` por decisão explícita do dono; NÃO "consertar" de volta para hash sem pedir).
+- **Comandos**: `docker compose up -d`, `pnpm db:migrate`, `pnpm db:seed`, `pnpm dev` (tudo junto), `pnpm check` (format+lint+typecheck+test+build).
+- **Banco hoje tem dados de teste** (19 pedidos: 9 draft, 2 lyrics_ready, 6 delivered, 1 failed). Dono quer resetar quando começar a avaliar de verdade (pedir antes de apagar).
 
-Leia-a inteira antes de continuar. Ela é a fonte de verdade para requisitos, arquitetura, testes e Definition of Done.
+## Modelos e custos (chaves no `.env`, não expor)
 
-## Estado atual
+| Etapa | Modelo OpenRouter | Custo |
+| --- | --- | --- |
+| Letra | `google/gemini-3-flash-preview` | ≈US$ 0,003 |
+| Áudio (2 faixas/pedido) | `google/lyria-3-pro-preview` | US$ 0,08/faixa |
+| **Total por venda** | | **≈US$ 0,165 (R$ 0,90 / R$ 49,90 ≈ 1,8%)** |
 
-O repositório foi iniciado, mas está incompleto.
+Key atual: limite mensal US$ 25, usados **US$ 21,23** (reabastecer antes de testar mais). Áudio bloqueado pelo filtro não cobra.
 
-Já existem:
+## Providers: o que é real, o que é fallback, o que falta
 
-- Configuração inicial pnpm workspace/Turborepo/TypeScript/ESLint/Prettier.
-- `apps/api`, `apps/worker`, `packages/contracts`, `packages/domain`, `packages/database`.
-- `.env.example`, Docker Compose e documentação inicial.
-- Providers fake de letra e geração local de WAV no worker.
-- Parte das rotas Fastify.
-- Documentação: `README.md`, `AGENTS.md`, `docs/architecture.md`, `docs/product.md`, `docs/providers.md`, `docs/runbook.md` e `docs/implementation-plan.md`.
-- Um subagente pode ter começado `apps/web`; inspecione o estado real antes de editar.
+- **OpenRouter (letra+música): REAL e validado.**
+- **Mercado Pago: adapter implementado** (Checkout Pro preference + webhook com assinatura HMAC `ts/v1`, `x-request-id`, dedupe em `payment_webhook_events`, conferência valor/moeda/external_reference) **mas sem credenciais** — dono decide depois.
+- **Resend: implementado** (e-mail de entrega com link, `Idempotency-Key`, registro em `email_deliveries`) **sem credenciais**.
+- **Fallback de desenvolvimento (fora de `production`, só quando a credencial não existe)**: checkout cria pagamento `dev` + endpoint `/dev/payments/:id/approve` (404 em prod; web aprova sozinho e navega); e-mail vira arquivo em `var/emails/<publicId>-entrega.txt` com o link privado real. Em `production` as chaves são obrigatórias (parseEnv + worker falham no boot).
+- Storage: disco local em `LOCAL_STORAGE_PATH` — **precisa ser absoluto** senão API e worker divergem.
 
-Importante: não há repositório Git inicializado nessa pasta.
+## Lições duras desta sessão (não regredir)
 
-## Problema conhecido
+1. **Filtro de áudio do Lyria é probabilístico e sensível ao prompt.** Linhas de instrução de pronúncia (`Notas de pronúncia: X: y-z-a`) e prefixes de variante quase sempre disparavam `PROHIBITED_CONTENT` (30/30 bloqueios num pedido; texto idêntico sem essas linhas passava). `makeMusicPrompt` (domain) é deliberadamente mínimo — não adicionar texto "inocente" de volta sem testar. Bloqueio persistente: admin edita a letra (mantendo os fatos literais, exigência de `validateLyrics`) e usa "reproduzir".
+2. Worker grava contêiner real detectado dos bytes (Lyria devolve **MP3 com C2PA mesmo pedindo `format:wav`**).
+3. `retryJob` precisa de cast `::job_status` no CASE (enum Postgres). Job esgotado marca pedido `failed` (senão fica preso em `audio_generating`).
+4. Clientes HTTP não devem mandar `content-type: application/json` sem body (Fastify rejeita); parser JSON custom da API tolera body vazio.
+5. O form web precisa enviar todos os campos do contrato (`relationship`, `traits`, `biggestStory`, `safetyConfirmed`, ≥2 facts literais — validado no client E no server; erros Zod agora citam o campo).
+6. `tsx watch` recarrega código, **não recarrega `.env`** — mudar env exige matar e subir de novo (e matar TODOS os watchers, senão processo velho com env velho segura a porta).
+7. Builds de packages emitiam `.js/.d.ts` dentro de `src/` sombreando `.ts` — corrigido com `outDir: dist`; manter limpo.
 
-`pnpm install` foi concluído usando `pnpm` diretamente. `corepack pnpm` usa versão incorreta neste ambiente; prefira:
+## O que o dono pediu para a PRÓXIMA sessão (objetivos)
 
-```sh
-pnpm install
-pnpm typecheck
-```
-
-O typecheck estava falhando em `apps/api/src/providers.ts` com `TS1005: ',' expected`. Corrija isso primeiro e depois execute todas as validações. Também foi adicionado `@types/node` ao `packages/domain`.
-
-## Segurança e IA
-
-Não versione nem exiba chaves. Uma chave Gemini foi compartilhada no chat anterior, portanto trate-a como exposta e recomende rotação. Ela não foi salva em `.env`.
-
-Não use essa chave para chamadas pagas ou geração real sem necessidade explícita. OpenRouter requer chave própria; chave Gemini não é compatível com OpenRouter.
-
-Os adapters reais devem existir e ser documentados, mas só podem ser declarados “validados” após chamada real autorizada e bem-sucedida.
+1. **Avaliar o fluxo de usuário de ponta a ponta**: navegar como cliente (e como admin), apontar o que não faz sentido para o produto, com opinião — o fluxo hoje: `/criar` (form único, só friend_roast no form web) → letra → revisão/edição → checkout (dev auto-aprova) → status com stepper → entrega com 2 faixas.
+2. **Testar de verdade**: rodar `pnpm check` + e2e, criar pedidos reais via browser, validar casos de borda (rate limit de geração é 5/h — pode incomodar; limites de versão de letra; sessão admin 8h).
+3. **Propor funcionalidades/ajustes para o MVP** — pensado em lançar este produto E reusar a "carcaça" (auth admin env-based, fila retomável, providers por variável, observabilidade) em vários MVPs pequenos.
+4. **Separação de ambiente explícita** (pedido do dono): hoje = NODE_ENV + presença de credenciais. Ele quer um modo "homologação" com toggle/flag para testar checkout/e-mail sem depender de meios de pagamento reais — avaliar sandbox do Mercado Pago (credencial de teste + `MERCADO_PAGO_WEBHOOK_URL` pública via túnel), e/ou flag `SIMULATE_PAYMENTS` explicita; propor a forma correta sem reconstruir o "modo fake" que foi removido por decisão dele.
+5. **Observabilidade de custos de IA (pedido forte)**: OpenRouter devolve `usage.cost` em toda resposta (e `/api/v1/generation?id=` para reconsultar). Persistir custo por geração (letra e cada faixa: model, tokens, custo, latência, status, se bloqueou), somar por pedido/dia, expor no admin (custo por venda, total no mês, comparado ao limite da key) e erro visível com `requestId`. Escolher solução leve (tabela `ai_usage` + tela) — evitar SaaS/otel completo num MVP, mas deixar interface de extração simples para virar shell reutilizável.
+6. **Pendências conhecidas**: credenciais MP+Resend (homologa quando o dono fornecer), reset dos dados de teste, `git init` (permissível ao dono), terms/privacidade reais, limite de key (recarregar), e-mail de entrega em manual-mode só sai quando admin aprova (decidir se precisa).
 
 ## Como trabalhar
 
-1. Inspecione o estado atual antes de modificar arquivos.
-2. Atualize `docs/implementation-plan.md` conforme as fases forem concluídas.
-3. Use subagentes para tarefas independentes, sem edições concorrentes nos mesmos arquivos.
-4. Priorize o fluxo local fake completamente funcional: landing, formulário adaptativo com autosave, geração/edição/aprovação de letra, checkout fake, pagamento idempotente, worker PostgreSQL, duas WAVs locais, entrega privada, e-mail console e administração.
-5. Implemente adapters reais seguindo documentação oficial atual, sem inventar contratos.
-6. Crie migrations reproduzíveis e seed idempotente.
-7. Implemente testes unitários, integração com PostgreSQL real, frontend e Playwright E2E.
-8. Crie GitHub Actions sem deploy.
-9. Rode e corrija `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build` e `pnpm test:e2e`.
-10. Não finalize até auditar todos os itens do Definition of Done da especificação original.
+Inspecione antes de mudar. Cada mudança de comportamento: schema Zod em contracts + regra em domain + handler fino + teste (`fastify.inject` p/ HTTP, `flow.test.ts` contra Postgres real para fluxos). Rode `pnpm check` (e `pnpm test:e2e` quando mexer no web). Não declare provider validado sem chamada real autorizada. Não faça deploy, não registre segredos em logs/docs, não exponha a key em output.
 
-Ao terminar, entregue relatório factual: arquivos criados, decisões, comandos executados, resultados das validações, URLs locais, credenciais apenas de desenvolvimento, variáveis necessárias, providers realmente validados e limitações restantes.
+Entregue relatório factual: o que avaliou, o que testou (com evidência), propostas priorizadas com custo/benefício, e o que precisa de decisão do dono.

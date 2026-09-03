@@ -91,6 +91,6 @@ describe('lyrics and generation rules', () => {
   it('makes a bounded retry delay and a safe music prompt', () => {
     expect(retryDelayMs(3, 1_000, 60_000, () => 0)).toBe(3_000);
     expect(calculatePriceCents(4_990, [500, 250])).toBe(5_740);
-    expect(makeMusicPrompt(lyrics)).toContain('Não imite artistas.');
+    expect(makeMusicPrompt(lyrics)).toContain('100% original');
   });
 });

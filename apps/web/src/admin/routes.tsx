@@ -160,12 +160,9 @@ export function AdminOrderDetail() {
     );
   const value = detail.data;
   const approved = value.lyrics.find((lyric) => lyric.approvedAt) ?? value.lyrics[0];
-  const canRebuild = [
-    'failed',
-    'review_required',
-    'delivered',
-    'audio_queued',
-  ].includes(value.order.status);
+  const canRebuild = ['failed', 'review_required', 'delivered', 'audio_queued'].includes(
+    value.order.status,
+  );
   return (
     <main className="admin">
       <Link to="/admin/pedidos">← Pedidos</Link>

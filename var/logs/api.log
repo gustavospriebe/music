@@ -350,3 +350,49 @@
 {"level":30,"time":1788445450944,"pid":1069517,"hostname":"srv1543950","reqId":"JM1nBQOJllcr","res":{"statusCode":200},"responseTime":38.963452999989386,"msg":"request completed"}
 {"level":30,"time":1788445460900,"pid":1069517,"hostname":"srv1543950","reqId":"ZTHUrTP_nVg0","req":{"method":"GET","url":"/api/v1/admin/orders/fce5f1eb-f604-49dd-9021-82c5df40166d","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":60884},"msg":"incoming request"}
 {"level":30,"time":1788445460910,"pid":1069517,"hostname":"srv1543950","reqId":"ZTHUrTP_nVg0","res":{"statusCode":200},"responseTime":9.77579600000172,"msg":"request completed"}
+{"level":30,"time":1788445498904,"pid":1069517,"hostname":"srv1543950","reqId":"AiaZZcx6pns8","req":{"method":"GET","url":"/api/v1/admin/orders/fce5f1eb-f604-49dd-9021-82c5df40166d","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":36486},"msg":"incoming request"}
+{"level":30,"time":1788445498941,"pid":1069517,"hostname":"srv1543950","reqId":"AiaZZcx6pns8","res":{"statusCode":200},"responseTime":36.60708899999736,"msg":"request completed"}
+{"level":30,"time":1788445718745,"pid":1069517,"hostname":"srv1543950","reqId":"qM0-w8jQuxq-","req":{"method":"POST","url":"/api/v1/admin/session","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":44378},"msg":"incoming request"}
+{"level":30,"time":1788445718774,"pid":1069517,"hostname":"srv1543950","reqId":"qM0-w8jQuxq-","res":{"statusCode":200},"responseTime":27.94292800000403,"msg":"request completed"}
+{"level":30,"time":1788445719024,"pid":1069517,"hostname":"srv1543950","reqId":"Bwz62J8z6Kei","req":{"method":"GET","url":"/api/v1/admin/orders/62e90be3-5ed1-4b2a-8eac-0a1a7b02880a","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":44382},"msg":"incoming request"}
+{"level":30,"time":1788445719043,"pid":1069517,"hostname":"srv1543950","reqId":"Bwz62J8z6Kei","res":{"statusCode":200},"responseTime":18.526057999988552,"msg":"request completed"}
+{"level":30,"time":1788445719191,"pid":1069517,"hostname":"srv1543950","reqId":"5JmuY59RZJHK","req":{"method":"PATCH","url":"/api/v1/admin/orders/62e90be3-5ed1-4b2a-8eac-0a1a7b02880a/lyrics","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":44394},"msg":"incoming request"}
+{"level":30,"time":1788445719219,"pid":1069517,"hostname":"srv1543950","reqId":"5JmuY59RZJHK","res":{"statusCode":200},"responseTime":27.662257999996655,"msg":"request completed"}
+{"level":30,"time":1788445719240,"pid":1069517,"hostname":"srv1543950","reqId":"RXKjjUMBbK7J","req":{"method":"POST","url":"/api/v1/admin/orders/62e90be3-5ed1-4b2a-8eac-0a1a7b02880a/audio/rebuild","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":44398},"msg":"incoming request"}
+{"level":30,"time":1788445719255,"pid":1069517,"hostname":"srv1543950","reqId":"RXKjjUMBbK7J","res":{"statusCode":200},"responseTime":14.464372000016738,"msg":"request completed"}
+11:40:47 AM [tsx] change in ./../../packages/domain/src/index.ts Restarting...
+{"level":30,"time":1788446449527,"pid":1100685,"hostname":"srv1543950","msg":"Server listening at http://127.0.0.1:3001"}
+{"level":30,"time":1788446449528,"pid":1100685,"hostname":"srv1543950","msg":"Server listening at http://187.127.5.24:3001"}
+{"level":30,"time":1788446449528,"pid":1100685,"hostname":"srv1543950","msg":"Server listening at http://172.20.0.1:3001"}
+{"level":30,"time":1788446449528,"pid":1100685,"hostname":"srv1543950","msg":"Server listening at http://100.74.121.80:3001"}
+{"level":30,"time":1788446449528,"pid":1100685,"hostname":"srv1543950","msg":"Server listening at http://172.21.0.1:3001"}
+{"level":30,"time":1788446495778,"pid":1100685,"hostname":"srv1543950","reqId":"UaxXxiWPnfz-","req":{"method":"POST","url":"/api/v1/admin/orders//audio/rebuild","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":38316},"msg":"incoming request"}
+{"level":30,"time":1788446495826,"pid":1100685,"hostname":"srv1543950","reqId":"UaxXxiWPnfz-","res":{"statusCode":500},"responseTime":47.715535999996064,"msg":"request completed"}
+{"level":30,"time":1788446528728,"pid":1100685,"hostname":"srv1543950","reqId":"HRMz1YOGKEGN","req":{"method":"GET","url":"/api/v1/health/live","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":49190},"msg":"incoming request"}
+{"level":30,"time":1788446528730,"pid":1100685,"hostname":"srv1543950","reqId":"HRMz1YOGKEGN","res":{"statusCode":200},"responseTime":1.0801059999939753,"msg":"request completed"}
+{"level":30,"time":1788446529065,"pid":1100685,"hostname":"srv1543950","reqId":"Uwf_X1DFHRmD","req":{"method":"POST","url":"/api/v1/admin/orders/62e90be3-5ed1-4b2a-8eac-0a1a7b02880a/audio/rebuild","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":49204},"msg":"incoming request"}
+{"level":30,"time":1788446529109,"pid":1100685,"hostname":"srv1543950","reqId":"Uwf_X1DFHRmD","res":{"statusCode":200},"responseTime":43.311054999998305,"msg":"request completed"}
+11:51:56 AM [tsx] change in ./../../packages/domain/src/index.ts Restarting...
+{"level":30,"time":1788447118239,"pid":1118896,"hostname":"srv1543950","msg":"Server listening at http://127.0.0.1:3001"}
+{"level":30,"time":1788447118240,"pid":1118896,"hostname":"srv1543950","msg":"Server listening at http://187.127.5.24:3001"}
+{"level":30,"time":1788447118240,"pid":1118896,"hostname":"srv1543950","msg":"Server listening at http://172.20.0.1:3001"}
+{"level":30,"time":1788447118240,"pid":1118896,"hostname":"srv1543950","msg":"Server listening at http://100.74.121.80:3001"}
+{"level":30,"time":1788447118240,"pid":1118896,"hostname":"srv1543950","msg":"Server listening at http://172.21.0.1:3001"}
+{"level":30,"time":1788447568150,"pid":1118896,"hostname":"srv1543950","reqId":"u_8bJKw9qnxg","req":{"method":"POST","url":"/api/v1/admin/orders/62e90be3-5ed1-4b2a-8eac-0a1a7b02880a/audio/rebuild","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":40828},"msg":"incoming request"}
+{"level":30,"time":1788447568197,"pid":1118896,"hostname":"srv1543950","reqId":"u_8bJKw9qnxg","res":{"statusCode":200},"responseTime":45.57948399998713,"msg":"request completed"}
+{"level":30,"time":1788448105714,"pid":1118896,"hostname":"srv1543950","reqId":"PUumYqjMOR8a","req":{"method":"GET","url":"/api/v1/health/ready","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":40642},"msg":"incoming request"}
+{"level":30,"time":1788448105730,"pid":1118896,"hostname":"srv1543950","reqId":"PUumYqjMOR8a","res":{"statusCode":200},"responseTime":15.740465000038967,"msg":"request completed"}
+{"level":30,"time":1788448132369,"pid":1118896,"hostname":"srv1543950","reqId":"lFKajYwcZybO","req":{"method":"PATCH","url":"/api/v1/admin/orders/62e90be3-5ed1-4b2a-8eac-0a1a7b02880a/lyrics","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":56934},"msg":"incoming request"}
+{"level":30,"time":1788448132409,"pid":1118896,"hostname":"srv1543950","reqId":"lFKajYwcZybO","res":{"statusCode":200},"responseTime":38.95082699996419,"msg":"request completed"}
+{"level":30,"time":1788448132424,"pid":1118896,"hostname":"srv1543950","reqId":"DWcr189OH8lI","req":{"method":"POST","url":"/api/v1/admin/orders/62e90be3-5ed1-4b2a-8eac-0a1a7b02880a/audio/rebuild","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":56942},"msg":"incoming request"}
+{"level":30,"time":1788448132434,"pid":1118896,"hostname":"srv1543950","reqId":"DWcr189OH8lI","res":{"statusCode":200},"responseTime":10.098271999973804,"msg":"request completed"}
+12:18:01 PM [tsx] change in ./../../packages/domain/src/index.ts Restarting...
+{"level":30,"time":1788448685360,"pid":1163901,"hostname":"srv1543950","msg":"Server listening at http://127.0.0.1:3001"}
+{"level":30,"time":1788448685360,"pid":1163901,"hostname":"srv1543950","msg":"Server listening at http://187.127.5.24:3001"}
+{"level":30,"time":1788448685360,"pid":1163901,"hostname":"srv1543950","msg":"Server listening at http://172.20.0.1:3001"}
+{"level":30,"time":1788448685360,"pid":1163901,"hostname":"srv1543950","msg":"Server listening at http://100.74.121.80:3001"}
+{"level":30,"time":1788448685360,"pid":1163901,"hostname":"srv1543950","msg":"Server listening at http://172.21.0.1:3001"}
+{"level":30,"time":1788448700181,"pid":1163901,"hostname":"srv1543950","reqId":"PEPL9G3ZCPC4","req":{"method":"POST","url":"/api/v1/admin/orders/62e90be3-5ed1-4b2a-8eac-0a1a7b02880a/audio/rebuild","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":33520},"msg":"incoming request"}
+{"level":30,"time":1788448700271,"pid":1163901,"hostname":"srv1543950","reqId":"PEPL9G3ZCPC4","res":{"statusCode":200},"responseTime":89.56137899999885,"msg":"request completed"}
+{"level":30,"time":1788448795042,"pid":1163901,"hostname":"srv1543950","reqId":"QEsBa04j7hRP","req":{"method":"GET","url":"/api/v1/deliveries/Ta7zOXJhpKJuM4k1Q4nhqgNQRK_bfhk8IS_n19QNDfk","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":58766},"msg":"incoming request"}
+{"level":30,"time":1788448795070,"pid":1163901,"hostname":"srv1543950","reqId":"QEsBa04j7hRP","res":{"statusCode":200},"responseTime":27.827861999991,"msg":"request completed"}

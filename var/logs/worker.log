@@ -365,3 +365,255 @@ worker stopped
   jobId: '6953722e-b10c-40a5-980d-cd856fc10841',
   error: 'OpenRouter music returned no audio: Gemini blocked the request: PROHIBITED_CONTENT'
 } worker job permanently failed
+{ orderPublicId: 'fAznEUplF1Yy7YlO' } e-mail de entrega registrado localmente (sem RESEND_API_KEY)
+{ jobId: '47c14aca-d1b8-4b7f-ae36-473a33b375bc' } worker job completed
+{ sing: 1, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 2, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 3, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 4, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 5, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{
+  jobId: '40b62ff8-6dcc-4edb-a967-af5066927c3a',
+  attempts: 1,
+  error: 'OpenRouter music returned no audio: Gemini blocked the request: PROHIBITED_CONTENT'
+} worker job retry scheduled
+{ sing: 1, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 2, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 3, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 4, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 5, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{
+  jobId: '40b62ff8-6dcc-4edb-a967-af5066927c3a',
+  attempts: 2,
+  error: 'OpenRouter music returned no audio: Gemini blocked the request: PROHIBITED_CONTENT'
+} worker job retry scheduled
+{ sing: 1, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 2, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 3, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 4, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 5, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{
+  jobId: '40b62ff8-6dcc-4edb-a967-af5066927c3a',
+  attempts: 3,
+  error: 'OpenRouter music returned no audio: Gemini blocked the request: PROHIBITED_CONTENT'
+} worker job retry scheduled
+{ sing: 1, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 2, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 3, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 4, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 5, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{
+  jobId: '40b62ff8-6dcc-4edb-a967-af5066927c3a',
+  attempts: 4,
+  error: 'OpenRouter music returned no audio: Gemini blocked the request: PROHIBITED_CONTENT'
+} worker job retry scheduled
+{ sing: 1, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 2, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 3, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 4, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 5, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{
+  jobId: '40b62ff8-6dcc-4edb-a967-af5066927c3a',
+  attempts: 5,
+  error: 'OpenRouter music returned no audio: Gemini blocked the request: PROHIBITED_CONTENT'
+} worker job retry scheduled
+{ sing: 1, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 2, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 3, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 4, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 5, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{
+  jobId: '40b62ff8-6dcc-4edb-a967-af5066927c3a',
+  error: 'OpenRouter music returned no audio: Gemini blocked the request: PROHIBITED_CONTENT'
+} worker job permanently failed
+11:40:47 AM [tsx] change in ./../../packages/domain/src/index.ts Restarting...
+{ signal: 'SIGTERM' } worker stopping
+worker stopped
+{ sing: 1, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 2, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 3, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 4, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 5, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{
+  jobId: 'eb2df4ef-9df2-4def-8c52-29460e085e6e',
+  attempts: 1,
+  error: 'OpenRouter music returned no audio: Gemini blocked the request: PROHIBITED_CONTENT'
+} worker job retry scheduled
+{ sing: 1, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 2, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 3, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 4, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 5, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{
+  jobId: 'eb2df4ef-9df2-4def-8c52-29460e085e6e',
+  attempts: 2,
+  error: 'OpenRouter music returned no audio: Gemini blocked the request: PROHIBITED_CONTENT'
+} worker job retry scheduled
+{ sing: 1, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 2, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 3, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 4, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 5, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{
+  jobId: 'eb2df4ef-9df2-4def-8c52-29460e085e6e',
+  attempts: 3,
+  error: 'OpenRouter music returned no audio: Gemini blocked the request: PROHIBITED_CONTENT'
+} worker job retry scheduled
+{ sing: 1, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 2, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 3, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 4, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 5, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{
+  jobId: 'eb2df4ef-9df2-4def-8c52-29460e085e6e',
+  attempts: 4,
+  error: 'OpenRouter music returned no audio: Gemini blocked the request: PROHIBITED_CONTENT'
+} worker job retry scheduled
+{ sing: 1, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 2, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 3, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 4, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 5, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{
+  jobId: 'eb2df4ef-9df2-4def-8c52-29460e085e6e',
+  attempts: 5,
+  error: 'OpenRouter music returned no audio: Gemini blocked the request: PROHIBITED_CONTENT'
+} worker job retry scheduled
+{ sing: 1, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 2, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 3, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 4, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 5, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{
+  jobId: 'eb2df4ef-9df2-4def-8c52-29460e085e6e',
+  error: 'OpenRouter music returned no audio: Gemini blocked the request: PROHIBITED_CONTENT'
+} worker job permanently failed
+11:51:56 AM [tsx] change in ./../../packages/domain/src/index.ts Restarting...
+{ signal: 'SIGTERM' } worker stopping
+worker stopped
+11:56:47 AM [tsx] change in ./src/worker.ts Restarting...
+{ signal: 'SIGTERM' } worker stopping
+worker stopped
+{ sing: 1, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 2, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 3, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 4, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 5, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{
+  jobId: '5257c020-e2a8-44bc-a2e4-98f0045c1fe2',
+  attempts: 1,
+  error: 'OpenRouter music returned no audio: Gemini blocked the request: PROHIBITED_CONTENT'
+} worker job retry scheduled
+{ sing: 1, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 2, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 3, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 4, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 5, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{
+  jobId: '5257c020-e2a8-44bc-a2e4-98f0045c1fe2',
+  attempts: 2,
+  error: 'OpenRouter music returned no audio: Gemini blocked the request: PROHIBITED_CONTENT'
+} worker job retry scheduled
+{ sing: 1, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 2, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 3, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 4, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 5, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{
+  jobId: '5257c020-e2a8-44bc-a2e4-98f0045c1fe2',
+  attempts: 3,
+  error: 'OpenRouter music returned no audio: Gemini blocked the request: PROHIBITED_CONTENT'
+} worker job retry scheduled
+{ sing: 1, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 2, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 3, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 4, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 5, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{
+  jobId: '5257c020-e2a8-44bc-a2e4-98f0045c1fe2',
+  attempts: 4,
+  error: 'OpenRouter music returned no audio: Gemini blocked the request: PROHIBITED_CONTENT'
+} worker job retry scheduled
+{ sing: 1, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 2, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 3, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 4, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 5, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{
+  jobId: '5257c020-e2a8-44bc-a2e4-98f0045c1fe2',
+  attempts: 5,
+  error: 'OpenRouter music returned no audio: Gemini blocked the request: PROHIBITED_CONTENT'
+} worker job retry scheduled
+{ sing: 1, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 2, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 3, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 4, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 5, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{
+  jobId: '5257c020-e2a8-44bc-a2e4-98f0045c1fe2',
+  error: 'OpenRouter music returned no audio: Gemini blocked the request: PROHIBITED_CONTENT'
+} worker job permanently failed
+{ sing: 1, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 2, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 3, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 4, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 5, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{
+  jobId: '14e2fafc-f8f7-4dc4-ae70-efead7b7f06d',
+  attempts: 1,
+  error: 'OpenRouter music returned no audio: Gemini blocked the request: PROHIBITED_CONTENT'
+} worker job retry scheduled
+{ sing: 1, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 2, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 3, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 4, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 5, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{
+  jobId: '14e2fafc-f8f7-4dc4-ae70-efead7b7f06d',
+  attempts: 2,
+  error: 'OpenRouter music returned no audio: Gemini blocked the request: PROHIBITED_CONTENT'
+} worker job retry scheduled
+{ sing: 1, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 2, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 3, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 4, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 5, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{
+  jobId: '14e2fafc-f8f7-4dc4-ae70-efead7b7f06d',
+  attempts: 3,
+  error: 'OpenRouter music returned no audio: Gemini blocked the request: PROHIBITED_CONTENT'
+} worker job retry scheduled
+{ sing: 1, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 2, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 3, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 4, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 5, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{
+  jobId: '14e2fafc-f8f7-4dc4-ae70-efead7b7f06d',
+  attempts: 4,
+  error: 'OpenRouter music returned no audio: Gemini blocked the request: PROHIBITED_CONTENT'
+} worker job retry scheduled
+{ sing: 1, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 2, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 3, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 4, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 5, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{
+  jobId: '14e2fafc-f8f7-4dc4-ae70-efead7b7f06d',
+  attempts: 5,
+  error: 'OpenRouter music returned no audio: Gemini blocked the request: PROHIBITED_CONTENT'
+} worker job retry scheduled
+{ sing: 1, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 2, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 3, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 4, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{ sing: 5, maxSings: 5 } filtro de conteúdo bloqueou; tentando novamente
+{
+  jobId: '14e2fafc-f8f7-4dc4-ae70-efead7b7f06d',
+  error: 'OpenRouter music returned no audio: Gemini blocked the request: PROHIBITED_CONTENT'
+} worker job permanently failed
+12:18:01 PM [tsx] change in ./../../packages/domain/src/index.ts Restarting...
+{ signal: 'SIGTERM' } worker stopping
+worker stopped
+{ orderPublicId: 'awz0bkdYx8rGFPSg' } e-mail de entrega registrado localmente (sem RESEND_API_KEY)
+{ jobId: 'e37a7b34-928c-4ceb-8aac-3ff7e5522b27' } worker job completed

@@ -1,1 +1,5 @@
-{ "extends": "../typescript-config/node.json", "include": ["src"] }
+{
+  "extends": "../typescript-config/node.json",
+  "compilerOptions": { "outDir": "dist" },
+  "include": ["src"]
+}

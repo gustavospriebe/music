@@ -256,4 +256,54 @@ describe('fluxo completo de pedido', () => {
     const peek = await app.inject({ method: 'GET', url: `/api/v1/orders/${session.publicId}` });
     expect(peek.statusCode).toBe(401);
   });
+
+  it('admin revisa a letra aprovada e reinclui o pedido na produção', async () => {
+    const app = appWith(compliantLyrics());
+    const session = await createOrderAndStory(app);
+    const generated = await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/lyrics/generate`,
+    });
+    const { id: versionId, orderId } = generated.json() as { id: string; orderId: string };
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/lyrics/${versionId}/approve`,
+    });
+    const checkout = await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/checkout`,
+    });
+    const paymentId = (checkout.json() as { paymentId: string }).paymentId;
+    await app.inject({ method: 'POST', url: `/api/v1/dev/payments/${paymentId}/approve` });
+
+    const login = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/session',
+      payload: { email: 'admin@example.test', password: 'a-simple-local-password' },
+    });
+    expect(login.statusCode).toBe(200);
+    const cookie = String(login.headers['set-cookie']).split(';')[0] ?? '';
+
+    const edited = await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/admin/orders/${orderId}/lyrics`,
+      headers: { cookie },
+      payload: lyricsWith([story.subjectName, ...story.facts].join('\n')),
+    });
+    expect(edited.statusCode).toBe(200);
+
+    const rebuildNoAuth = await app.inject({
+      method: 'POST',
+      url: `/api/v1/admin/orders/${orderId}/audio/rebuild`,
+    });
+    expect(rebuildNoAuth.statusCode).toBe(401);
+    const rebuilt = await app.inject({
+      method: 'POST',
+      url: `/api/v1/admin/orders/${orderId}/audio/rebuild`,
+      headers: { cookie },
+    });
+    expect(rebuilt.statusCode).toBe(200);
+    const statusRows = await pool.query('select status from orders where id=$1', [orderId]);
+    expect(statusRows.rows[0]?.status).toBe('audio_queued');
+  });
 });

@@ -157,16 +157,18 @@ export const validateLyrics = (lyrics: GeneratedLyrics, story: Story): string[] 
   return errors;
 };
 
-export const makeMusicPrompt = (lyrics: GeneratedLyrics): string =>
-  [
+export const makeMusicPrompt = (lyrics: GeneratedLyrics): string => {
+  // Sem linhas extras de contexto: o classificador de segurança de áudio do provedor é
+  // probabilístico e instruções como notas de pronúncia disparam falsos positivos
+  // de PROHIBITED_CONTENT. A pronúncia fica apenas na letra (que o modelo lê em pt-BR).
+  return [
     'Crie uma música original em português brasileiro com duração aproximada de dois minutos.',
     `Gênero: ${lyrics.musicalDirection.genre}. Clima: ${lyrics.musicalDirection.mood}. Andamento: ${lyrics.musicalDirection.tempo}.`,
     `Voz: ${lyrics.musicalDirection.voice}. Instrumentação: ${lyrics.musicalDirection.instrumentation.join(', ')}.`,
-    `Estrutura: ${lyrics.sections.map((section) => section.type).join(', ')}.`,
-    `Notas de pronúncia: ${lyrics.pronunciationNotes.map((note) => `${note.term}: ${note.pronunciation}`).join('; ') || 'nenhuma'}.`,
-    'Faça uma variação musical sem alterar fatos, nomes ou a letra. Não imite artistas.',
+    'Música 100% original e alegre; interprete exatamente a letra fornecida, sem alterar palavras.',
     `Letra aprovada:\n${lyrics.fullLyrics}`,
   ].join('\n');
+};
 
 export const retryDelayMs = (
   attempt: number,

@@ -413,9 +413,13 @@ const orderStep = (status: string) =>
       ? 2
       : ['lyrics_approved', 'payment_pending'].includes(status)
         ? 3
-        : ['paid', 'audio_queued', 'audio_generating', 'review_required', 'revision_requested'].includes(
-              status,
-            )
+        : [
+              'paid',
+              'audio_queued',
+              'audio_generating',
+              'review_required',
+              'revision_requested',
+            ].includes(status)
           ? 4
           : status === 'delivered'
             ? 5
@@ -506,7 +510,11 @@ export function OrderPlayer() {
         {ready.map((audio) => (
           <div className="price-card" key={audio.id}>
             <span>Versão {audio.variant}</span>
-            <audio controls preload="none" src={api.downloadUrl(publicOrderId, audio.assetId as string)} />
+            <audio
+              controls
+              preload="none"
+              src={api.downloadUrl(publicOrderId, audio.assetId as string)}
+            />
             <a
               className="button secondary"
               href={api.downloadUrl(publicOrderId, audio.assetId as string)}
