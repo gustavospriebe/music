@@ -52,3 +52,702 @@
 11:24:22 AM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
 11:24:57 AM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
 11:24:57 AM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+12:52:41 PM [vite] (client) hmr update /src/styles.css
+1:00:39 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+1:00:39 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+1:00:39 PM [vite] (client) hmr update /src/styles.css
+1:00:44 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+1:01:01 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+1:01:27 PM [vite] (client) hmr update /src/components.tsx, /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+1:01:32 PM [vite] (client) hmr update /src/components.tsx, /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+1:01:45 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+1:01:55 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+1:02:07 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+1:02:15 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+1:02:18 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+1:02:31 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+1:02:37 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+1:02:40 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+1:02:49 PM [vite] (client) hmr update /src/styles.css
+1:02:59 PM [vite] (client) hmr update /src/styles.css
+1:09:27 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+1:09:27 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+1:09:27 PM [vite] (client) hmr update /src/styles.css
+1:25:16 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+1:25:25 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+1:25:33 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+1:25:45 PM [vite] (client) hmr update /src/components.tsx, /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+1:25:52 PM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+1:25:59 PM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+1:26:14 PM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+1:26:23 PM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+1:33:38 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+1:34:25 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+1:34:42 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+1:35:51 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+1:35:56 PM [vite] (client) hmr update /src/components.tsx, /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+1:36:08 PM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+1:36:16 PM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+1:36:21 PM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+1:36:34 PM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+1:37:27 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+2:59:36 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+2:59:37 PM [vite] (client) Pre-transform error: Transform failed with 1 error:
+/home/gustavo/projects/music/apps/web/src/api.ts:52:10: ERROR: Expected ";" but found ":"
+  Plugin: vite:esbuild
+  File: /home/gustavo/projects/music/apps/web/src/api.ts:52:10
+  
+  Expected ";" but found ":"
+  50 |        body: JSON.stringify(story),
+  51 |      }),
+  52 |    getOrder: (publicId: string) => request<OrderDetail>(`/orders/${publicId}`),
+     |            ^
+  53 |    editLyrics: (publicId: string, versionNumber: number, content: LyricsContent) =>
+  54 |      request(`/orders/${publicId}/lyrics/${versionNumber}`, {
+  
+2:59:37 PM [vite] Internal server error: Transform failed with 1 error:
+/home/gustavo/projects/music/apps/web/src/api.ts:52:10: ERROR: Expected ";" but found ":"
+  Plugin: vite:esbuild
+  File: /home/gustavo/projects/music/apps/web/src/api.ts:52:10
+  
+  Expected ";" but found ":"
+  50 |        body: JSON.stringify(story),
+  51 |      }),
+  52 |    getOrder: (publicId: string) => request<OrderDetail>(`/orders/${publicId}`),
+     |            ^
+  53 |    editLyrics: (publicId: string, versionNumber: number, content: LyricsContent) =>
+  54 |      request(`/orders/${publicId}/lyrics/${versionNumber}`, {
+  
+      at failureErrorWithLog (/home/gustavo/projects/music/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/lib/main.js:1748:15)
+      at /home/gustavo/projects/music/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/lib/main.js:1017:50
+      at responseCallbacks.<computed> (/home/gustavo/projects/music/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/lib/main.js:884:9)
+      at handleIncomingPacket (/home/gustavo/projects/music/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/lib/main.js:939:12)
+      at Socket.readFromStdout (/home/gustavo/projects/music/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/lib/main.js:862:7)
+      at Socket.emit (node:events:519:28)
+      at addChunk (node:internal/streams/readable:561:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+      at Readable.push (node:internal/streams/readable:392:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+3:00:34 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+3:00:34 PM [vite] (client) Pre-transform error: Transform failed with 1 error:
+/home/gustavo/projects/music/apps/web/src/api.ts:50:12: ERROR: Expected "}" but found ":"
+  Plugin: vite:esbuild
+  File: /home/gustavo/projects/music/apps/web/src/api.ts:50:12
+  
+  Expected "}" but found ":"
+  48 |      }),
+  49 |    saveStory: (publicId: string, story: Story) =>
+  50 |        method: 'PATCH',
+     |              ^
+  51 |        body: JSON.stringify(story),
+  52 |      }),
+  
+3:00:34 PM [vite] Internal server error: Transform failed with 1 error:
+/home/gustavo/projects/music/apps/web/src/api.ts:50:12: ERROR: Expected "}" but found ":"
+  Plugin: vite:esbuild
+  File: /home/gustavo/projects/music/apps/web/src/api.ts:50:12
+  
+  Expected "}" but found ":"
+  48 |      }),
+  49 |    saveStory: (publicId: string, story: Story) =>
+  50 |        method: 'PATCH',
+     |              ^
+  51 |        body: JSON.stringify(story),
+  52 |      }),
+  
+      at failureErrorWithLog (/home/gustavo/projects/music/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/lib/main.js:1748:15)
+      at /home/gustavo/projects/music/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/lib/main.js:1017:50
+      at responseCallbacks.<computed> (/home/gustavo/projects/music/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/lib/main.js:884:9)
+      at handleIncomingPacket (/home/gustavo/projects/music/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/lib/main.js:939:12)
+      at Socket.readFromStdout (/home/gustavo/projects/music/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/lib/main.js:862:7)
+      at Socket.emit (node:events:519:28)
+      at addChunk (node:internal/streams/readable:561:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+      at Readable.push (node:internal/streams/readable:392:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+3:01:13 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+3:01:24 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+3:01:30 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+3:01:42 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+3:02:05 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+3:02:05 PM [vite] (client) Pre-transform error: Transform failed with 1 error:
+/home/gustavo/projects/music/apps/web/src/api.ts:122:21: ERROR: Expected ";" but found ":"
+  Plugin: vite:esbuild
+  File: /home/gustavo/projects/music/apps/web/src/api.ts:122:21
+  
+  Expected ";" but found ":"
+  120 |  };
+  121 |    adminOrder: (id: string) => request<AdminOrderDetail>(`/admin/orders/${id}`),
+  122 |    adminAssetStreamUrl: (orderId: string, assetId: string) =>
+      |                       ^
+  123 |      url(`/admin/orders/${orderId}/assets/${assetId}/stream`),
+  124 |    retryJob: (id: string) =>
+  
+3:02:06 PM [vite] Internal server error: Transform failed with 1 error:
+/home/gustavo/projects/music/apps/web/src/api.ts:122:21: ERROR: Expected ";" but found ":"
+  Plugin: vite:esbuild
+  File: /home/gustavo/projects/music/apps/web/src/api.ts:122:21
+  
+  Expected ";" but found ":"
+  120 |  };
+  121 |    adminOrder: (id: string) => request<AdminOrderDetail>(`/admin/orders/${id}`),
+  122 |    adminAssetStreamUrl: (orderId: string, assetId: string) =>
+      |                       ^
+  123 |      url(`/admin/orders/${orderId}/assets/${assetId}/stream`),
+  124 |    retryJob: (id: string) =>
+  
+      at failureErrorWithLog (/home/gustavo/projects/music/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/lib/main.js:1748:15)
+      at /home/gustavo/projects/music/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/lib/main.js:1017:50
+      at responseCallbacks.<computed> (/home/gustavo/projects/music/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/lib/main.js:884:9)
+      at handleIncomingPacket (/home/gustavo/projects/music/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/lib/main.js:939:12)
+      at Socket.readFromStdout (/home/gustavo/projects/music/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/lib/main.js:862:7)
+      at Socket.emit (node:events:519:28)
+      at addChunk (node:internal/streams/readable:561:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+      at Readable.push (node:internal/streams/readable:392:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+3:02:58 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+3:03:06 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+3:04:13 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+3:04:18 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+3:04:25 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+3:04:43 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+3:04:49 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+3:04:50 PM [vite] Internal server error: /home/gustavo/projects/music/apps/web/src/pages/public.tsx: Unexpected token (126:2)
+
+  124 |       <Footer />
+  125 |     </>
+> 126 |   );
+      |   ^
+  127 | }
+  128 |
+  129 | export function CreateStory() {
+  Plugin: vite:react-babel
+  File: /home/gustavo/projects/music/apps/web/src/pages/public.tsx:126:2
+  124 |        <Footer />
+  125 |      </>
+  126 |    );
+      |    ^
+  127 |  }
+  128 |  
+      at constructor (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:369:19)
+      at TypeScriptParserMixin.raise (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:6620:19)
+      at TypeScriptParserMixin.unexpected (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:6640:16)
+      at TypeScriptParserMixin.parseExprAtom (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:11468:22)
+      at TypeScriptParserMixin.parseExprAtom (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:4780:20)
+      at TypeScriptParserMixin.parseExprSubscripts (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:11102:23)
+      at TypeScriptParserMixin.parseUpdate (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:11087:21)
+      at TypeScriptParserMixin.parseMaybeUnary (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:11067:23)
+      at TypeScriptParserMixin.parseMaybeUnary (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9858:18)
+      at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10920:61)
+      at TypeScriptParserMixin.parseExprOps (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10925:23)
+      at TypeScriptParserMixin.parseMaybeConditional (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10902:23)
+      at TypeScriptParserMixin.parseMaybeAssign (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10852:21)
+      at TypeScriptParserMixin.parseMaybeAssign (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9807:20)
+      at TypeScriptParserMixin.parseExpressionBase (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10805:23)
+      at /home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10801:39
+      at TypeScriptParserMixin.allowInAnd (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12450:16)
+      at TypeScriptParserMixin.parseExpression (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10801:17)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12924:23)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9529:18)
+      at TypeScriptParserMixin.parseStatementLike (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12796:17)
+      at TypeScriptParserMixin.parseStatementListItem (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12776:17)
+      at TypeScriptParserMixin.parseBlockOrModuleBlockBody (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13345:61)
+      at TypeScriptParserMixin.parseBlockBody (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13338:10)
+      at TypeScriptParserMixin.parseBlock (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13326:10)
+      at TypeScriptParserMixin.parseFunctionBody (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12129:24)
+      at TypeScriptParserMixin.parseFunctionBodyAndFinish (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12115:10)
+      at TypeScriptParserMixin.parseFunctionBodyAndFinish (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9193:18)
+      at /home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13474:12
+      at TypeScriptParserMixin.withSmartMixTopicForbiddingContext (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12432:14)
+      at TypeScriptParserMixin.parseFunction (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13473:10)
+      at TypeScriptParserMixin.parseFunctionStatement (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13154:17)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12820:21)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9529:18)
+      at TypeScriptParserMixin.parseStatementLike (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12796:17)
+      at TypeScriptParserMixin.parseStatementListItem (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12776:17)
+      at TypeScriptParserMixin.parseExportDeclaration (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13963:17)
+      at TypeScriptParserMixin.parseExportDeclaration (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9650:85)
+      at TypeScriptParserMixin.maybeParseExportDeclaration (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13922:31)
+      at TypeScriptParserMixin.parseExport (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13841:29)
+      at TypeScriptParserMixin.parseExport (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9406:20)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12907:27)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9529:18)
+      at TypeScriptParserMixin.parseStatementLike (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12796:17)
+      at TypeScriptParserMixin.parseModuleItem (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12773:17)
+      at TypeScriptParserMixin.parseBlockOrModuleBlockBody (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13345:36)
+      at TypeScriptParserMixin.parseBlockBody (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13338:10)
+      at TypeScriptParserMixin.parseProgram (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12651:10)
+      at TypeScriptParserMixin.parseTopLevel (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12641:25)
+      at TypeScriptParserMixin.parse (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:14517:25)
+3:04:55 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+3:05:12 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+3:05:12 PM [vite] Internal server error: /home/gustavo/projects/music/apps/web/src/pages/public.tsx: Missing semicolon. (136:17)
+
+  134 |   }, []);
+  135 |     resolver: zodResolver(storySchema),
+> 136 |     defaultValues: { ...defaults, ...readDraft() },
+      |                  ^
+  137 |   });
+  138 |   const values = useWatch({ control: form.control });
+  139 |   const saveStatus = useDraft(values);
+  Plugin: vite:react-babel
+  File: /home/gustavo/projects/music/apps/web/src/pages/public.tsx:136:17
+  134 |    }, []);
+  135 |      resolver: zodResolver(storySchema),
+  136 |      defaultValues: { ...defaults, ...readDraft() },
+      |                   ^
+  137 |    });
+  138 |    const values = useWatch({ control: form.control });
+      at constructor (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:369:19)
+      at TypeScriptParserMixin.raise (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:6620:19)
+      at TypeScriptParserMixin.semicolon (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:6916:10)
+      at TypeScriptParserMixin.parseExpressionStatement (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13314:10)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12928:19)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9529:18)
+      at TypeScriptParserMixin.parseStatementLike (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12796:17)
+      at TypeScriptParserMixin.parseStatement (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12789:17)
+      at TypeScriptParserMixin.parseLabeledStatement (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13307:95)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12926:19)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9529:18)
+      at TypeScriptParserMixin.parseStatementLike (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12796:17)
+      at TypeScriptParserMixin.parseStatementListItem (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12776:17)
+      at TypeScriptParserMixin.parseBlockOrModuleBlockBody (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13345:61)
+      at TypeScriptParserMixin.parseBlockBody (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13338:10)
+      at TypeScriptParserMixin.parseBlock (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13326:10)
+      at TypeScriptParserMixin.parseFunctionBody (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12129:24)
+      at TypeScriptParserMixin.parseFunctionBodyAndFinish (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12115:10)
+      at TypeScriptParserMixin.parseFunctionBodyAndFinish (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9193:18)
+      at /home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13474:12
+      at TypeScriptParserMixin.withSmartMixTopicForbiddingContext (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12432:14)
+      at TypeScriptParserMixin.parseFunction (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13473:10)
+      at TypeScriptParserMixin.parseFunctionStatement (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13154:17)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12820:21)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9529:18)
+      at TypeScriptParserMixin.parseStatementLike (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12796:17)
+      at TypeScriptParserMixin.parseStatementListItem (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12776:17)
+      at TypeScriptParserMixin.parseExportDeclaration (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13963:17)
+      at TypeScriptParserMixin.parseExportDeclaration (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9650:85)
+      at TypeScriptParserMixin.maybeParseExportDeclaration (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13922:31)
+      at TypeScriptParserMixin.parseExport (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13841:29)
+      at TypeScriptParserMixin.parseExport (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9406:20)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12907:27)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9529:18)
+      at TypeScriptParserMixin.parseStatementLike (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12796:17)
+      at TypeScriptParserMixin.parseModuleItem (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12773:17)
+      at TypeScriptParserMixin.parseBlockOrModuleBlockBody (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13345:36)
+      at TypeScriptParserMixin.parseBlockBody (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13338:10)
+      at TypeScriptParserMixin.parseProgram (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12651:10)
+      at TypeScriptParserMixin.parseTopLevel (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12641:25)
+      at TypeScriptParserMixin.parse (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:14517:25)
+      at TypeScriptParserMixin.parse (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10147:18)
+      at parse (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:14551:38)
+      at parser (/home/gustavo/projects/music/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/lib/parser/index.js:41:34)
+      at parser.next (<anonymous>)
+      at normalizeFile (/home/gustavo/projects/music/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/lib/transformation/normalize-file.js:51:37)
+      at normalizeFile.next (<anonymous>)
+      at run (/home/gustavo/projects/music/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/lib/transformation/index.js:22:50)
+      at run.next (<anonymous>)
+      at transform (/home/gustavo/projects/music/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/lib/transform.js:22:33)
+3:05:16 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+3:05:31 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+3:05:53 PM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+3:06:08 PM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+3:06:22 PM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+3:06:28 PM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+3:06:46 PM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+3:06:52 PM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+3:12:00 PM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+4:04:24 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+4:04:27 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+4:04:28 PM [vite] Internal server error: /home/gustavo/projects/music/apps/web/src/pages/public.tsx: 'import' and 'export' may only appear at the top level. (290:0)
+
+  288 |   rememberMyOrder(publicId);
+  289 | }
+> 290 | export function LyricsReview() {
+      | ^
+  291 |   const navigate = useNavigate();
+  292 |   const publicId = orderIdFromSearch();
+  293 |   const queryClient = useQueryClient();
+  Plugin: vite:react-babel
+  File: /home/gustavo/projects/music/apps/web/src/pages/public.tsx:290:0
+  288 |    rememberMyOrder(publicId);
+  289 |  }
+  290 |  export function LyricsReview() {
+      |  ^
+  291 |    const navigate = useNavigate();
+  292 |    const publicId = orderIdFromSearch();
+      at constructor (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:369:19)
+      at TypeScriptParserMixin.raise (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:6620:19)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12900:18)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9529:18)
+      at TypeScriptParserMixin.parseStatementLike (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12796:17)
+      at TypeScriptParserMixin.parseStatementListItem (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12776:17)
+      at TypeScriptParserMixin.parseBlockOrModuleBlockBody (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13345:61)
+      at TypeScriptParserMixin.parseBlockBody (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13338:10)
+      at TypeScriptParserMixin.parseBlock (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13326:10)
+      at TypeScriptParserMixin.parseFunctionBody (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12129:24)
+      at TypeScriptParserMixin.parseFunctionBodyAndFinish (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12115:10)
+      at TypeScriptParserMixin.parseFunctionBodyAndFinish (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9193:18)
+      at /home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13474:12
+      at TypeScriptParserMixin.withSmartMixTopicForbiddingContext (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12432:14)
+      at TypeScriptParserMixin.parseFunction (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13473:10)
+      at TypeScriptParserMixin.parseFunctionStatement (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13154:17)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12820:21)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9529:18)
+      at TypeScriptParserMixin.parseStatementLike (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12796:17)
+      at TypeScriptParserMixin.parseModuleItem (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12773:17)
+      at TypeScriptParserMixin.parseBlockOrModuleBlockBody (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13345:36)
+      at TypeScriptParserMixin.parseBlockBody (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13338:10)
+      at TypeScriptParserMixin.parseProgram (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12651:10)
+      at TypeScriptParserMixin.parseTopLevel (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12641:25)
+      at TypeScriptParserMixin.parse (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:14517:25)
+      at TypeScriptParserMixin.parse (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10147:18)
+      at parse (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:14551:38)
+      at parser (/home/gustavo/projects/music/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/lib/parser/index.js:41:34)
+      at parser.next (<anonymous>)
+      at normalizeFile (/home/gustavo/projects/music/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/lib/transformation/normalize-file.js:51:37)
+      at normalizeFile.next (<anonymous>)
+      at run (/home/gustavo/projects/music/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/lib/transformation/index.js:22:50)
+      at run.next (<anonymous>)
+      at transform (/home/gustavo/projects/music/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/lib/transform.js:22:33)
+      at transform.next (<anonymous>)
+      at step (/home/gustavo/projects/music/node_modules/.pnpm/gensync@1.0.0-beta.2/node_modules/gensync/index.js:261:32)
+      at /home/gustavo/projects/music/node_modules/.pnpm/gensync@1.0.0-beta.2/node_modules/gensync/index.js:273:13
+      at async.call.result.err.err (/home/gustavo/projects/music/node_modules/.pnpm/gensync@1.0.0-beta.2/node_modules/gensync/index.js:223:11)
+      at /home/gustavo/projects/music/node_modules/.pnpm/gensync@1.0.0-beta.2/node_modules/gensync/index.js:189:28
+      at /home/gustavo/projects/music/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/lib/gensync-utils/async.js:67:7
+      at /home/gustavo/projects/music/node_modules/.pnpm/gensync@1.0.0-beta.2/node_modules/gensync/index.js:113:33
+      at step (/home/gustavo/projects/music/node_modules/.pnpm/gensync@1.0.0-beta.2/node_modules/gensync/index.js:287:14)
+      at /home/gustavo/projects/music/node_modules/.pnpm/gensync@1.0.0-beta.2/node_modules/gensync/index.js:273:13
+      at async.call.result.err.err (/home/gustavo/projects/music/node_modules/.pnpm/gensync@1.0.0-beta.2/node_modules/gensync/index.js:223:11)
+4:04:32 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+4:04:42 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+4:04:42 PM [vite] (client) hmr invalidate /src/pages/public.tsx Could not Fast Refresh (new export)
+4:04:42 PM [vite] (client) hmr update /src/main.tsx
+4:04:42 PM [vite] (client) hmr invalidate /src/main.tsx Could not Fast Refresh ("true" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+4:04:42 PM [vite] (client) page reload src/main.tsx
+4:04:45 PM [vite] (client) hmr update /src/main.tsx, /src/styles.css
+4:04:46 PM [vite] (client) hmr update /src/components.tsx, /src/styles.css
+4:04:46 PM [vite] (client) hmr invalidate /src/main.tsx Could not Fast Refresh ("true" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+4:04:46 PM [vite] (client) page reload src/main.tsx
+4:04:47 PM [vite] (client) hmr update /src/main.tsx, /src/styles.css
+4:04:47 PM [vite] (client) hmr invalidate /src/main.tsx Could not Fast Refresh ("true" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+4:04:47 PM [vite] (client) page reload src/main.tsx
+4:04:54 PM [vite] (client) hmr update /src/main.tsx, /src/styles.css
+4:04:54 PM [vite] (client) hmr invalidate /src/main.tsx Could not Fast Refresh ("true" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+4:04:54 PM [vite] (client) page reload src/main.tsx
+4:05:00 PM [vite] (client) hmr update /src/styles.css
+4:05:14 PM [vite] (client) hmr update /src/styles.css
+4:05:14 PM [vite] (client) hmr update /src/styles.css
+4:05:14 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+4:05:26 PM [vite] (client) hmr update /src/main.tsx, /src/styles.css
+4:05:26 PM [vite] (client) hmr invalidate /src/main.tsx Could not Fast Refresh ("true" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+4:05:26 PM [vite] (client) page reload src/main.tsx
+4:46:07 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+4:46:07 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+4:46:14 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+4:46:21 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+4:46:23 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+4:46:25 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+4:46:29 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+4:46:36 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+4:46:38 PM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+4:46:40 PM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+4:46:43 PM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+4:46:49 PM [vite] (client) hmr update /src/styles.css
+4:46:51 PM [vite] (client) hmr update /src/styles.css
+4:47:29 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+4:47:30 PM [vite] (client) Pre-transform error: Transform failed with 1 error:
+/home/gustavo/projects/music/apps/web/src/api.ts:91:27: ERROR: Expected "}" but found ";"
+  Plugin: vite:esbuild
+  File: /home/gustavo/projects/music/apps/web/src/api.ts:91:27
+  
+  Expected "}" but found ";"
+  89 |    delivery: (token: string) =>
+  90 |      request<{
+  91 |        publicOrderId: string;
+     |                             ^
+  92 |        lyrics: Lyrics[];
+  93 |        audio: Audio[];
+  
+4:47:30 PM [vite] Internal server error: Transform failed with 1 error:
+/home/gustavo/projects/music/apps/web/src/api.ts:91:27: ERROR: Expected "}" but found ";"
+  Plugin: vite:esbuild
+  File: /home/gustavo/projects/music/apps/web/src/api.ts:91:27
+  
+  Expected "}" but found ";"
+  89 |    delivery: (token: string) =>
+  90 |      request<{
+  91 |        publicOrderId: string;
+     |                             ^
+  92 |        lyrics: Lyrics[];
+  93 |        audio: Audio[];
+  
+      at failureErrorWithLog (/home/gustavo/projects/music/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/lib/main.js:1748:15)
+      at /home/gustavo/projects/music/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/lib/main.js:1017:50
+      at responseCallbacks.<computed> (/home/gustavo/projects/music/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/lib/main.js:884:9)
+      at handleIncomingPacket (/home/gustavo/projects/music/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/lib/main.js:939:12)
+      at Socket.readFromStdout (/home/gustavo/projects/music/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/lib/main.js:862:7)
+      at Socket.emit (node:events:519:28)
+      at addChunk (node:internal/streams/readable:561:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+      at Readable.push (node:internal/streams/readable:392:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+4:47:33 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+4:47:38 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+4:47:40 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+4:47:40 PM [vite] Internal server error: /home/gustavo/projects/music/apps/web/src/pages/public.tsx: Expected corresponding JSX closing tag for <>. (686:14)
+
+  684 |                   Baixar versão {audio.variant}
+  685 |                 </a>
+> 686 |               </div>
+      |               ^
+  687 |             ))}
+  688 |             {delivery.data.lyrics[0] && (
+  689 |               <details>
+  Plugin: vite:react-babel
+  File: /home/gustavo/projects/music/apps/web/src/pages/public.tsx:686:14
+  684 |                    Baixar versão {audio.variant}
+  685 |                  </a>
+  686 |                </div>
+      |                ^
+  687 |              ))}
+  688 |              {delivery.data.lyrics[0] && (
+      at constructor (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:369:19)
+      at TypeScriptParserMixin.raise (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:6620:19)
+      at TypeScriptParserMixin.jsxParseElementAt (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:4736:14)
+      at TypeScriptParserMixin.jsxParseElementAt (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:4714:32)
+      at TypeScriptParserMixin.jsxParseElementAt (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:4714:32)
+      at TypeScriptParserMixin.jsxParseElement (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:4765:17)
+      at TypeScriptParserMixin.parseExprAtom (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:4775:19)
+      at TypeScriptParserMixin.parseExprSubscripts (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:11102:23)
+      at TypeScriptParserMixin.parseUpdate (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:11087:21)
+      at TypeScriptParserMixin.parseMaybeUnary (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:11067:23)
+      at TypeScriptParserMixin.parseMaybeUnary (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9858:18)
+      at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10920:61)
+      at TypeScriptParserMixin.parseExprOps (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10925:23)
+      at TypeScriptParserMixin.parseMaybeConditional (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10902:23)
+      at TypeScriptParserMixin.parseMaybeAssign (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10852:21)
+      at /home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9796:39
+      at TypeScriptParserMixin.tryParse (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:6928:20)
+      at TypeScriptParserMixin.parseMaybeAssign (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9796:18)
+      at /home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10821:39
+      at TypeScriptParserMixin.allowInAnd (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12455:12)
+      at TypeScriptParserMixin.parseMaybeAssignAllowIn (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10821:17)
+      at TypeScriptParserMixin.parseMaybeAssignAllowInOrVoidPattern (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12522:17)
+      at TypeScriptParserMixin.parseParenAndDistinguishExpression (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:11701:28)
+      at TypeScriptParserMixin.parseExprAtom (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:11357:23)
+      at TypeScriptParserMixin.parseExprAtom (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:4780:20)
+      at TypeScriptParserMixin.parseExprSubscripts (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:11102:23)
+      at TypeScriptParserMixin.parseUpdate (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:11087:21)
+      at TypeScriptParserMixin.parseMaybeUnary (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:11067:23)
+      at TypeScriptParserMixin.parseMaybeUnary (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9858:18)
+      at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10920:61)
+      at TypeScriptParserMixin.parseExprOps (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10925:23)
+      at TypeScriptParserMixin.parseMaybeConditional (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10902:23)
+      at TypeScriptParserMixin.parseMaybeAssign (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10852:21)
+      at TypeScriptParserMixin.parseMaybeAssign (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9807:20)
+      at TypeScriptParserMixin.parseExpressionBase (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10805:23)
+      at /home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10801:39
+      at TypeScriptParserMixin.allowInAnd (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12450:16)
+      at TypeScriptParserMixin.parseExpression (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10801:17)
+      at TypeScriptParserMixin.parseReturnStatement (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13171:28)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12827:21)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9529:18)
+      at TypeScriptParserMixin.parseStatementLike (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12796:17)
+      at TypeScriptParserMixin.parseStatementListItem (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12776:17)
+      at TypeScriptParserMixin.parseBlockOrModuleBlockBody (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13345:61)
+      at TypeScriptParserMixin.parseBlockBody (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13338:10)
+      at TypeScriptParserMixin.parseBlock (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13326:10)
+      at TypeScriptParserMixin.parseFunctionBody (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12129:24)
+      at TypeScriptParserMixin.parseFunctionBodyAndFinish (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12115:10)
+      at TypeScriptParserMixin.parseFunctionBodyAndFinish (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9193:18)
+      at /home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13474:12
+4:47:46 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+4:47:49 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+4:47:54 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+4:48:14 PM [vite] (client) hmr update /src/styles.css
+4:48:17 PM [vite] (client) hmr update /src/styles.css
+4:48:22 PM [vite] (client) hmr update /src/styles.css
+4:48:59 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+4:51:01 PM [vite] (client) hmr update /src/styles.css
+4:53:46 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+4:54:21 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+4:54:21 PM [vite] Internal server error: /home/gustavo/projects/music/apps/web/src/pages/public.tsx: Expected corresponding JSX closing tag for <button>. (389:6)
+
+  387 |           }
+  388 |         >
+> 389 |       </div>
+      |       ^
+  390 |     </form>
+  391 |   );
+  392 | }
+  Plugin: vite:react-babel
+  File: /home/gustavo/projects/music/apps/web/src/pages/public.tsx:389:6
+  387 |            }
+  388 |          >
+  389 |        </div>
+      |        ^
+  390 |      </form>
+  391 |    );
+      at constructor (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:369:19)
+      at TypeScriptParserMixin.raise (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:6620:19)
+      at TypeScriptParserMixin.jsxParseElementAt (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:4743:16)
+      at TypeScriptParserMixin.jsxParseElementAt (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:4714:32)
+      at TypeScriptParserMixin.jsxParseElementAt (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:4714:32)
+      at TypeScriptParserMixin.jsxParseElement (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:4765:17)
+      at TypeScriptParserMixin.parseExprAtom (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:4775:19)
+      at TypeScriptParserMixin.parseExprSubscripts (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:11102:23)
+      at TypeScriptParserMixin.parseUpdate (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:11087:21)
+      at TypeScriptParserMixin.parseMaybeUnary (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:11067:23)
+      at TypeScriptParserMixin.parseMaybeUnary (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9858:18)
+      at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10920:61)
+      at TypeScriptParserMixin.parseExprOps (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10925:23)
+      at TypeScriptParserMixin.parseMaybeConditional (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10902:23)
+      at TypeScriptParserMixin.parseMaybeAssign (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10852:21)
+      at /home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9796:39
+      at TypeScriptParserMixin.tryParse (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:6928:20)
+      at TypeScriptParserMixin.parseMaybeAssign (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9796:18)
+      at /home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10821:39
+      at TypeScriptParserMixin.allowInAnd (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12455:12)
+      at TypeScriptParserMixin.parseMaybeAssignAllowIn (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10821:17)
+      at TypeScriptParserMixin.parseMaybeAssignAllowInOrVoidPattern (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12522:17)
+      at TypeScriptParserMixin.parseParenAndDistinguishExpression (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:11701:28)
+      at TypeScriptParserMixin.parseExprAtom (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:11357:23)
+      at TypeScriptParserMixin.parseExprAtom (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:4780:20)
+      at TypeScriptParserMixin.parseExprSubscripts (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:11102:23)
+      at TypeScriptParserMixin.parseUpdate (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:11087:21)
+      at TypeScriptParserMixin.parseMaybeUnary (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:11067:23)
+      at TypeScriptParserMixin.parseMaybeUnary (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9858:18)
+      at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10920:61)
+      at TypeScriptParserMixin.parseExprOps (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10925:23)
+      at TypeScriptParserMixin.parseMaybeConditional (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10902:23)
+      at TypeScriptParserMixin.parseMaybeAssign (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10852:21)
+      at TypeScriptParserMixin.parseMaybeAssign (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9807:20)
+      at TypeScriptParserMixin.parseExpressionBase (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10805:23)
+      at /home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10801:39
+      at TypeScriptParserMixin.allowInAnd (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12450:16)
+      at TypeScriptParserMixin.parseExpression (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10801:17)
+      at TypeScriptParserMixin.parseReturnStatement (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13171:28)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12827:21)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9529:18)
+      at TypeScriptParserMixin.parseStatementLike (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12796:17)
+      at TypeScriptParserMixin.parseStatementListItem (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12776:17)
+      at TypeScriptParserMixin.parseBlockOrModuleBlockBody (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13345:61)
+      at TypeScriptParserMixin.parseBlockBody (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13338:10)
+      at TypeScriptParserMixin.parseBlock (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13326:10)
+      at TypeScriptParserMixin.parseFunctionBody (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12129:24)
+      at TypeScriptParserMixin.parseFunctionBodyAndFinish (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12115:10)
+      at TypeScriptParserMixin.parseFunctionBodyAndFinish (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9193:18)
+      at /home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13474:12
+4:54:26 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+4:54:52 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+4:58:03 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+4:58:37 PM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+4:58:41 PM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+4:58:46 PM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+4:58:53 PM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+4:59:16 PM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+5:04:15 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+5:04:41 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+5:06:39 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+5:06:46 PM [vite] (client) hmr update /src/styles.css
+5:06:49 PM [vite] (client) hmr update /src/styles.css
+5:19:11 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+5:19:28 PM [vite] (client) hmr update /src/styles.css
+5:19:34 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+5:19:42 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+5:19:56 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+5:20:04 PM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+5:21:45 PM [vite] (client) hmr update /src/styles.css
+5:41:22 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+5:41:51 PM [vite] (client) hmr update /src/styles.css
+5:41:53 PM [vite] (client) hmr update /src/styles.css
+5:53:38 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+5:53:47 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+5:54:02 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+5:54:02 PM [vite] (client) warning: Duplicate key "refetchInterval" in object literal
+529 |      queryFn: () => api.getOrder(publicOrderId),
+530 |      refetchInterval: 5000,
+531 |      refetchInterval: (data) => data?.order.status === 'delivered' ? false : 5000
+    |      ^
+532 |    });
+533 |    if (order.isLoading) return <Loading label="Carregando suas músicas…" />;
+
+  Plugin: vite:esbuild
+  File: /home/gustavo/projects/music/apps/web/src/pages/public.tsx
+5:54:05 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+5:54:28 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+5:54:50 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+5:54:57 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+5:55:00 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+5:55:00 PM [vite] Internal server error: /home/gustavo/projects/music/apps/web/src/pages/public.tsx: Missing semicolon. (531:11)
+
+  529 |   const { publicOrderId = '' } = useParams();
+  530 |     queryKey: ['order', publicOrderId],
+> 531 |     queryFn: () => api.getOrder(publicOrderId),
+      |            ^
+  532 |     refetchInterval: (query) => (query.state.data?.order.status === 'delivered' ? false : 5000),
+  533 |     refetchInterval: (data) => (data?.order.status === 'delivered' ? false : 5000),
+  534 |   });
+  Plugin: vite:react-babel
+  File: /home/gustavo/projects/music/apps/web/src/pages/public.tsx:531:11
+  529 |    const { publicOrderId = '' } = useParams();
+  530 |      queryKey: ['order', publicOrderId],
+  531 |      queryFn: () => api.getOrder(publicOrderId),
+      |             ^
+  532 |      refetchInterval: (query) => (query.state.data?.order.status === 'delivered' ? false : 5000),
+  533 |      refetchInterval: (data) => (data?.order.status === 'delivered' ? false : 5000),
+      at constructor (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:369:19)
+      at TypeScriptParserMixin.raise (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:6620:19)
+      at TypeScriptParserMixin.semicolon (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:6916:10)
+      at TypeScriptParserMixin.parseExpressionStatement (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13314:10)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12928:19)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9529:18)
+      at TypeScriptParserMixin.parseStatementLike (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12796:17)
+      at TypeScriptParserMixin.parseStatement (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12789:17)
+      at TypeScriptParserMixin.parseLabeledStatement (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13307:95)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12926:19)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9529:18)
+      at TypeScriptParserMixin.parseStatementLike (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12796:17)
+      at TypeScriptParserMixin.parseStatementListItem (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12776:17)
+      at TypeScriptParserMixin.parseBlockOrModuleBlockBody (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13345:61)
+      at TypeScriptParserMixin.parseBlockBody (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13338:10)
+      at TypeScriptParserMixin.parseBlock (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13326:10)
+      at TypeScriptParserMixin.parseFunctionBody (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12129:24)
+      at TypeScriptParserMixin.parseFunctionBodyAndFinish (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12115:10)
+      at TypeScriptParserMixin.parseFunctionBodyAndFinish (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9193:18)
+      at /home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13474:12
+      at TypeScriptParserMixin.withSmartMixTopicForbiddingContext (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12432:14)
+      at TypeScriptParserMixin.parseFunction (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13473:10)
+      at TypeScriptParserMixin.parseFunctionStatement (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13154:17)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12820:21)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9529:18)
+      at TypeScriptParserMixin.parseStatementLike (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12796:17)
+      at TypeScriptParserMixin.parseStatementListItem (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12776:17)
+      at TypeScriptParserMixin.parseExportDeclaration (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13963:17)
+      at TypeScriptParserMixin.parseExportDeclaration (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9650:85)
+      at TypeScriptParserMixin.maybeParseExportDeclaration (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13922:31)
+      at TypeScriptParserMixin.parseExport (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13841:29)
+      at TypeScriptParserMixin.parseExport (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9406:20)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12907:27)
+      at TypeScriptParserMixin.parseStatementContent (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:9529:18)
+      at TypeScriptParserMixin.parseStatementLike (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12796:17)
+      at TypeScriptParserMixin.parseModuleItem (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12773:17)
+      at TypeScriptParserMixin.parseBlockOrModuleBlockBody (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13345:36)
+      at TypeScriptParserMixin.parseBlockBody (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:13338:10)
+      at TypeScriptParserMixin.parseProgram (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12651:10)
+      at TypeScriptParserMixin.parseTopLevel (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:12641:25)
+      at TypeScriptParserMixin.parse (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:14517:25)
+      at TypeScriptParserMixin.parse (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:10147:18)
+      at parse (/home/gustavo/projects/music/node_modules/.pnpm/@babel+parser@7.29.8/node_modules/@babel/parser/lib/index.js:14551:38)
+      at parser (/home/gustavo/projects/music/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/lib/parser/index.js:41:34)
+      at parser.next (<anonymous>)
+      at normalizeFile (/home/gustavo/projects/music/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/lib/transformation/normalize-file.js:51:37)
+      at normalizeFile.next (<anonymous>)
+      at run (/home/gustavo/projects/music/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/lib/transformation/index.js:22:50)
+      at run.next (<anonymous>)
+      at transform (/home/gustavo/projects/music/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/lib/transform.js:22:33)
+5:55:06 PM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+5:55:39 PM [vite] (client) hmr update /src/styles.css

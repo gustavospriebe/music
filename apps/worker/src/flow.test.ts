@@ -1,7 +1,7 @@
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { Pool } from 'pg';
 import type { ClaimedJob } from '@resenha/database';
 import { processAudioJob, type MusicResult, type WorkerConfig } from './worker.js';
@@ -275,5 +275,51 @@ describe('processAudioJob cost persistence', () => {
       [orderId],
     );
     expect(delivery.rows[0]?.count).toBe(0);
+  });
+
+  it('terminal block fails the order via domain transition with failed event', async () => {
+    const { orderId } = await setupOrder('audio-terminal-1', 'audio:terminal-1');
+    await pool.query("update orders set status='audio_generating' where id=$1", [orderId]);
+    await pool.query(
+      "update generation_jobs set run_at = now() + interval '1 hour' where order_id != $1",
+      [orderId],
+    );
+    const { createWorker } = await import('./worker.js');
+    const worker = createWorker({ pool, config });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(
+            new ReadableStream({
+              start(controller) {
+                controller.enqueue(
+                  new TextEncoder().encode(
+                    `data: ${JSON.stringify({ id: 'gen-blocked', error: { message: 'PROHIBITED_CONTENT' } })}\n\ndata: [DONE]\n\n`,
+                  ),
+                );
+                controller.close();
+              },
+            }),
+            { headers: { 'content-type': 'text/event-stream' } },
+          ),
+      ),
+    );
+    try {
+      await worker.tick();
+      await worker.waitForIdle();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    const status = await pool.query('select status from orders where id=$1', [orderId]);
+    expect(status.rows[0]?.status).toBe('failed');
+    const jobs = await pool.query('select status from generation_jobs where order_id=$1', [
+      orderId,
+    ]);
+    expect(jobs.rows[0]?.status).toBe('failed');
+    const events = await pool.query('select event from analytics_events where order_public_id=$1', [
+      'audio-terminal-1',
+    ]);
+    expect(events.rows.map((row) => row.event)).toContain('failed');
   });
 });

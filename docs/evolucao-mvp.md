@@ -28,7 +28,7 @@ Key em 04/09: US$ 21,59 usados de US$ 25. Prova controlada: 1 variante por execu
 ## 3. Por que custos antigos zerados e fails de áudio
 
 - `ai_usage` nasceu em 03/09/2026: pedidos anteriores não têm linhas (o `usage` era descartado). Zeros antigos são esperados, não bug; sem backfill possível.
-- Fails `PROHIBITED_CONTENT`: filtro probabilístico do Lyria, sensível a instruções de pronúncia e prefixos (lição do handoff §1). Fluxo: admin edita a letra (mantendo fatos literais) → "reproduzir". Cada bloqueio agora grava linha `blocked` em `ai_usage` (visível no admin, sem custo).
+- Filtro Lyria é probabilístico (sem determinismo alegado); `PROHIBITED_CONTENT` agora é terminal após 2 sings (era 5×6=30 queimas). Falha esgotada/terminal vira `failed` por `assertTransition` + evento `failed` no funil; admin reedita e reconstrói, usuário vê explicação sem custo extra.
 
 ## 4. Bancos: um servidor, dois databases
 

@@ -110,4 +110,66 @@ describe('API client', () => {
     expect(method).toBe('POST');
     expect(tokenBody).toEqual({ token: 'token-secreto-123' });
   });
+
+  it('gera visitorId em formato UUID mesmo sem crypto.randomUUID (HTTP não-seguro)', async () => {
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const { visitorId } = await import('./api');
+    window.localStorage.clear();
+    const randomUUID = (globalThis.crypto as Crypto | undefined)?.randomUUID;
+    if (randomUUID) {
+      (globalThis.crypto as { randomUUID?: unknown }).randomUUID = undefined;
+    }
+    try {
+      const first = visitorId();
+      expect(first).toMatch(uuid);
+      expect(visitorId()).toBe(first);
+      window.localStorage.setItem('resenha:visitor', 'anon-123');
+      expect(visitorId()).toMatch(uuid);
+    } finally {
+      if (randomUUID) {
+        (globalThis.crypto as { randomUUID?: unknown }).randomUUID = randomUUID;
+      }
+      window.localStorage.clear();
+    }
+  });
+
+  it('omite visitorId inválido em vez de enviar texto que o servidor rejeita', async () => {
+    let orderBody: unknown;
+    server.use(
+      http.post('http://localhost:3001/api/v1/orders', async ({ request }) => {
+        orderBody = await request.json();
+        return HttpResponse.json({ publicId: 'public-order-9' }, { status: 201 });
+      }),
+    );
+
+    await api.createOrder('friend_roast', 'anon-123');
+    expect(orderBody).toEqual({ productType: 'friend_roast' });
+  });
+
+  it('gera UUID válido mesmo com crypto e localStorage indisponíveis', async () => {
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const { visitorId } = await import('./api');
+    const getRandomValues = (
+      globalThis.crypto as { getRandomValues?: typeof crypto.getRandomValues } | undefined
+    )?.getRandomValues;
+    const getItem = window.localStorage.getItem;
+    const setItem = window.localStorage.setItem;
+    (globalThis.crypto as { getRandomValues?: unknown }).getRandomValues = () => {
+      throw new DOMException('indisponível', 'NotSupportedError');
+    };
+    window.localStorage.getItem = () => {
+      throw new DOMException('bloqueado', 'SecurityError');
+    };
+    window.localStorage.setItem = () => {
+      throw new DOMException('bloqueado', 'SecurityError');
+    };
+    try {
+      expect(visitorId()).toMatch(uuid);
+    } finally {
+      (globalThis.crypto as { getRandomValues?: unknown }).getRandomValues = getRandomValues;
+      window.localStorage.getItem = getItem;
+      window.localStorage.setItem = setItem;
+      window.localStorage.clear();
+    }
+  });
 });

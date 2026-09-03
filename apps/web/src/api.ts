@@ -13,20 +13,37 @@ const baseUrl =
   import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? '' : 'http://localhost:3001');
 const url = (path: string) => `${baseUrl}/api/v1${path}`;
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** UUID v4 sem depender de `crypto.randomUUID` (ausente em HTTP não-seguro). */
+const newVisitorId = (): string => {
+  try {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x40;
+    bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80;
+    const hex = [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  } catch {
+    const part = (): string =>
+      Math.floor(Math.random() * 0xffff)
+        .toString(16)
+        .padStart(4, '0');
+    return `${part()}${part()}-${part()}-4${part().slice(1)}-8${part().slice(1)}-${part()}${part()}${part()}`;
+  }
+};
+
 /** Random per-browser id (localStorage, no PII); links pre-order beacons to the order. */
 export const visitorId = (): string => {
   const key = 'resenha:visitor';
-  let id: string | null = null;
   try {
-    id = localStorage.getItem(key);
-    if (!id) {
-      id = crypto.randomUUID();
-      localStorage.setItem(key, id);
-    }
+    const stored = localStorage.getItem(key);
+    if (stored && UUID_RE.test(stored)) return stored;
+    const id = newVisitorId();
+    localStorage.setItem(key, id);
+    return id;
   } catch {
-    id = `anon-${Date.now()}`;
+    return newVisitorId();
   }
-  return id;
 };
 export class ApiError extends Error {
   constructor(
@@ -59,7 +76,9 @@ export const api = {
   createOrder: (productType: ProductType, visitorId?: string) =>
     request<{ publicId: string }>(`/orders`, {
       method: 'POST',
-      body: JSON.stringify(visitorId ? { productType, visitorId } : { productType }),
+      body: JSON.stringify(
+        visitorId && UUID_RE.test(visitorId) ? { productType, visitorId } : { productType },
+      ),
     }),
   saveStory: (publicId: string, story: Story) =>
     request<{ saved: true }>(`/orders/${publicId}/story`, {
@@ -145,11 +164,13 @@ export const api = {
   analyticsFunnel: (days = 30) => request<Funnel>(`/admin/analytics/funnel?days=${days}`),
   /** Beacon de funil: fire-and-forget, nunca rejeita (não quebra o fluxo do cliente). */
   sendBeacon: (event: 'landing_view' | 'form_started' | 'form_completed'): void => {
+    const id = visitorId();
+    if (!UUID_RE.test(id)) return;
     void fetch(url('/analytics/beacon'), {
       method: 'POST',
       keepalive: true,
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ event, visitorId: visitorId() }),
+      body: JSON.stringify({ event, visitorId: id }),
     }).catch(() => undefined);
   },
 };

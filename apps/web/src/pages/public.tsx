@@ -465,7 +465,10 @@ export function OrderStatus() {
   const order = useQuery({
     queryKey: ['order', publicOrderId],
     queryFn: () => api.getOrder(publicOrderId),
-    refetchInterval: 2000,
+    refetchInterval: (query) =>
+      query.state.data && ['failed', 'delivered'].includes(query.state.data.order.status)
+        ? false
+        : 2000,
   });
   if (order.isLoading) return <Loading label="Atualizando pedido…" />;
   if (order.isError || !order.data)
@@ -488,7 +491,7 @@ export function OrderStatus() {
         </h1>
         <p>
           {status === 'failed'
-            ? 'Nossa equipe já foi avisada e vai corrigir e entregar assim que possível.'
+            ? 'A produção não foi concluída. Estamos revisando seu pedido e vamos regerar sua música sem nenhum custo extra — acompanhe por aqui.'
             : status === 'delivered'
               ? 'Ouça e baixe as duas versões no player.'
               : 'Você recebe o link de entrega assim que a produção terminar.'}
@@ -527,7 +530,7 @@ export function OrderPlayer() {
   const order = useQuery({
     queryKey: ['order', publicOrderId],
     queryFn: () => api.getOrder(publicOrderId),
-    refetchInterval: 5000,
+    refetchInterval: (query) => (query.state.data?.order.status === 'delivered' ? false : 5000),
   });
   if (order.isLoading) return <Loading label="Carregando suas músicas…" />;
   if (order.isError || !order.data)

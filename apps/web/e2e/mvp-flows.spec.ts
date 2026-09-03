@@ -173,3 +173,19 @@ test('link de entrega recupera o acesso ao pedido neste navegador', async ({ pag
   await page.getByRole('button', { name: /acompanhar pedido neste navegador/i }).click();
   await expect(page).toHaveURL(/\/pedido\/order-recovered-1/);
 });
+
+test('pedido com falha explica e orienta sem prometer causa', async ({ page }) => {
+  await page.route('**/api/v1/orders/order-failed-x', (route) =>
+    route.fulfill({
+      json: {
+        order: { publicId: 'order-failed-x', status: 'failed', priceCents: 4990 },
+        lyrics: [],
+        audio: [],
+      },
+    }),
+  );
+  await page.goto('/pedido/order-failed-x');
+  await expect(page.getByRole('heading', { name: /problema na produção/i })).toBeVisible();
+  await expect(page.getByText(/produção não foi concluída/i)).toBeVisible();
+  await expect(page.getByText(/sem nenhum custo extra/i)).toBeVisible();
+});

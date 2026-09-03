@@ -93,6 +93,25 @@ describe('music sing parsing', () => {
     expect(outcome.usage.requestId).toBe('gen-blocked');
   });
 
+  it('encerra bloqueios do filtro após orçamento curto com erro terminal', async () => {
+    const fetch = vi.fn(async () =>
+      sse([{ id: 'gen-blocked', error: { message: 'PROHIBITED_CONTENT' } }]),
+    );
+    vi.stubGlobal('fetch', fetch);
+    const provider = (await import('./worker.js')).createOpenRouterMusicProvider({
+      apiKey: 'key',
+      model: 'm',
+      webUrl: 'http://local',
+    });
+    const failure = await provider.generate('prompt').then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(failure).toMatchObject({ terminal: true });
+    expect((failure as { attempts?: unknown[] }).attempts).toHaveLength(2);
+  });
+
   it('converts transport failures into error outcomes', async () => {
     vi.stubGlobal(
       'fetch',

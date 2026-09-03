@@ -125,6 +125,11 @@ export const createOpenRouterMusicProvider = (config: {
 }): MusicProvider => ({
   generate: async (prompt) => {
     const maxSings = 5;
+    // O filtro de áudio é probabilístico: dois bloqueios seguidos encerram o orçamento
+    // (sem alegar determinismo) e o erro sai como terminal — nova tentativa só com
+    // nova edição/admin, sem as 30 queimas no mesmo prompt.
+    let blockedCount = 0;
+    const blockedBudget = 2;
     const attempts: MusicAttempt[] = [];
     let lastError: Error = new Error('OpenRouter music produced no result');
     for (let sing = 1; sing <= maxSings; sing += 1) {
@@ -143,12 +148,20 @@ export const createOpenRouterMusicProvider = (config: {
       }
       lastError = outcome.error;
       const blocked = /PROHIBITED_CONTENT/i.test(lastError.message);
-      const retryable = blocked || /no audio|failed \((429|5\d\d)\)/i.test(lastError.message);
       attempts.push({
         sample: outcome.usage,
         status: blocked ? 'blocked' : 'error',
         error: sanitizeError(lastError),
       });
+      if (blocked) {
+        blockedCount += 1;
+        if (blockedCount >= blockedBudget)
+          throw Object.assign(lastError, { attempts, terminal: true });
+        console.warn({ sing, blockedBudget }, 'áudio bloqueado pelo filtro; nova tentativa curta');
+        await new Promise((done) => setTimeout(done, 3_000 * sing));
+        continue;
+      }
+      const retryable = /no audio|failed \((429|5\d\d)\)/i.test(lastError.message);
       if (!retryable) throw Object.assign(lastError, { attempts });
       console.warn({ sing, maxSings }, 'tentativa de áudio falhou; tentando novamente');
       await new Promise((done) => setTimeout(done, 3_000 * sing));
@@ -280,6 +293,34 @@ export const generateMusicOnce = async (
 };
 
 type OrderRow = { id: string; public_id: string; status: Parameters<typeof assertTransition>[0] };
+
+/** Falha de áudio esgotada/terminal: `failed` por transição de domínio + evento público. */
+const failAudioOrder = async (pool: Pool, orderId: string): Promise<void> => {
+  const result = await pool.query<{ id: string; public_id: string; status: string }>(
+    'select id, public_id, status from orders where id=$1',
+    [orderId],
+  );
+  const row = result.rows[0];
+  if (!row || row.status !== 'audio_generating') return;
+  const order = await transitionOrder(
+    pool,
+    { id: row.id, public_id: row.public_id, status: row.status } as OrderRow,
+    'failed',
+  );
+  try {
+    const visitor = await pool.query<{ visitor_id: string | null }>(
+      'select visitor_id from analytics_events where order_public_id=$1 and event=$2 limit 1',
+      [order.public_id, 'order_created'],
+    );
+    await pool.query(
+      `insert into analytics_events(event,product_type,order_public_id,visitor_id)
+       values('failed',(select product_type from orders where id=$1),$2,$3)`,
+      [order.id, order.public_id, visitor.rows[0]?.visitor_id ?? null],
+    );
+  } catch (error) {
+    console.warn({ error: sanitizeError(error) }, 'analytics failed event dropped');
+  }
+};
 
 const transitionOrder = async (
   pool: Pool,
@@ -576,13 +617,14 @@ export const createWorker = ({ pool, config }: { pool: Pool; config: WorkerConfi
       console.info({ jobId: job.id }, 'worker job completed');
     } catch (error) {
       const message = sanitizeError(error);
-      if (job.attempts >= job.maxAttempts) {
+      const terminal =
+        typeof error === 'object' &&
+        error !== null &&
+        'terminal' in error &&
+        (error as { terminal?: unknown }).terminal === true;
+      if (terminal || job.attempts >= job.maxAttempts) {
         await failJob(pool, job.id, message);
-        if (job.type === 'generate_audio')
-          await pool.query(
-            "update orders set status='failed', updated_at=now() where id=$1 and status='audio_generating'",
-            [job.orderId],
-          );
+        if (job.type === 'generate_audio') await failAudioOrder(pool, job.orderId);
         console.error({ jobId: job.id, error: message }, 'worker job permanently failed');
       } else {
         await retryJob(pool, job, message);
