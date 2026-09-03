@@ -4,16 +4,21 @@ import { join, relative, resolve } from 'node:path';
 import { generatedLyricsSchema, type GeneratedLyrics, type Story } from '@resenha/contracts';
 import type { Env } from './env.js';
 
+import type { AiUsageSample } from '@resenha/domain';
+
+export type LyricsResult = { lyrics: GeneratedLyrics; usage: AiUsageSample };
 export type LyricsProvider = {
-  generate: (story: Story, feedback?: string) => Promise<GeneratedLyrics>;
+  generate: (story: Story, feedback?: string) => Promise<LyricsResult>;
 };
 
 export const createOpenRouterLyricsProvider = (env: Env): LyricsProvider => ({
   generate: async (story, feedback) => {
     if (!env.OPENROUTER_API_KEY || !env.OPENROUTER_TEXT_MODEL)
       throw new Error('Defina OPENROUTER_API_KEY e OPENROUTER_TEXT_MODEL para gerar letras.');
+    const model = env.OPENROUTER_TEXT_MODEL;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 60_000);
+    const startedAt = Date.now();
     try {
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
@@ -25,7 +30,7 @@ export const createOpenRouterLyricsProvider = (env: Env): LyricsProvider => ({
           'x-title': 'Musica da Resenha',
         },
         body: JSON.stringify({
-          model: env.OPENROUTER_TEXT_MODEL,
+          model,
           response_format: { type: 'json_object' },
           messages: [
             {
@@ -51,9 +56,28 @@ export const createOpenRouterLyricsProvider = (env: Env): LyricsProvider => ({
       });
       if (!response.ok) throw new Error(`OpenRouter lyrics failed (${response.status})`);
       const body = (await response.json()) as {
+        id?: string;
+        usage?: {
+          prompt_tokens?: number;
+          completion_tokens?: number;
+          cost?: number | string;
+        };
         choices?: Array<{ message?: { content?: string } }>;
       };
-      return generatedLyricsSchema.parse(JSON.parse(body.choices?.[0]?.message?.content ?? ''));
+      const lyrics = generatedLyricsSchema.parse(
+        JSON.parse(body.choices?.[0]?.message?.content ?? ''),
+      );
+      return {
+        lyrics,
+        usage: {
+          requestId: typeof body.id === 'string' ? body.id : null,
+          model,
+          inputTokens: body.usage?.prompt_tokens ?? 0,
+          outputTokens: body.usage?.completion_tokens ?? 0,
+          costUsd: body.usage?.cost === undefined ? null : String(body.usage.cost),
+          latencyMs: Date.now() - startedAt,
+        },
+      };
     } finally {
       clearTimeout(timeout);
     }

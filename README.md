@@ -52,6 +52,10 @@ OpenRouter, Mercado Pago e Resend são selecionados apenas por variáveis de amb
 
 Há imagens de produção multi-stage e não-root em `docker/api/Dockerfile`, `docker/worker/Dockerfile` e `docker/web/Dockerfile`. O projeto não faz deploy. Antes de publicar, siga [docs/production-checklist.md](docs/production-checklist.md).
 
+## Custo de IA
+
+Cada chamada ao OpenRouter grava uma linha em `ai_usage` (pedido, `kind` letra/áudio, modelo, tokens, `cost_usd` em dólar como devolvido em `usage.cost`, latência, status `ok`/`blocked`/`error`/`rejected`, `requestId` e tentativa — inclusive bloqueios do filtro e tentativas reprovadas na validação local, que também são cobradas). Somas em USD são feitas no PostgreSQL (`numeric`) e trafegam como string decimal exata até o painel. O admin vê o custo por pedido, o agregado do mês/30 dias em `GET /admin/ai-usage/summary` e o uso da key (`GET /key` documentado do OpenRouter, gratuito, best-effort) no painel. Respostas públicas e logs carregam só referências públicas (`publicId`, número da versão, variante do áudio); UUIDs internos ficam no admin autenticado.
+
 ## Limites do MVP
 
-Não há clonagem de voz, imitação de artista, vídeo, WhatsApp Business, cobrança automática real ou deploy. Termos, privacidade, consentimentos e promessa comercial precisam de revisão jurídica/comercial antes de produção.
+Não há clonagem de voz, imitação de artista, vídeo, WhatsApp Business, cobrança automática real ou deploy. Termos, privacidade, consentimentos e promessa comercial precisam de revisão jurídica/comercial antes de produção. Sem cadastro: `/minhas-musicas` lista neste navegador os pedidos criados aqui (`resenha:my-orders`, 20 mais recentes); em aparelho novo ou dados limpos, a lista não acompanha.

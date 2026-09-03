@@ -22,7 +22,7 @@ const env: Env = {
 
 describe('HTTP foundation', () => {
   it('serves a live health probe through fastify.inject', async () => {
-    const app = buildApp(env);
+    const app = await buildApp(env);
     try {
       const response = await app.inject({ method: 'GET', url: '/api/v1/health/live' });
       expect(response.statusCode).toBe(200);
@@ -33,7 +33,7 @@ describe('HTTP foundation', () => {
   });
 
   it('returns a stable, request-correlated validation error', async () => {
-    const app = buildApp(env);
+    const app = await buildApp(env);
     try {
       const response = await app.inject({
         method: 'POST',
@@ -54,7 +54,7 @@ describe('HTTP foundation', () => {
   });
 
   it('accepts POSTs with a JSON content-type and no body (parse, not reject)', async () => {
-    const app = buildApp(env);
+    const app = await buildApp(env);
     try {
       const response = await app.inject({
         method: 'POST',

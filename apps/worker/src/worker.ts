@@ -1,7 +1,14 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
 import { generatedLyricsSchema } from '@resenha/contracts';
-import { assertTransition, createAccessToken, hashToken, makeMusicPrompt } from '@resenha/domain';
+import {
+  assertTransition,
+  createAccessToken,
+  hashToken,
+  makeMusicPrompt,
+  type AiUsageSample,
+  type AiUsageStatus,
+} from '@resenha/domain';
 import {
   claimNextJob,
   completeJob,
@@ -82,8 +89,15 @@ const writeLocalAsset = async (basePath: string, key: string, body: Buffer): Pro
   await writeFile(target, body);
 };
 
-export type MusicGeneration = { bytes: Buffer; mime: string; externalId: string };
-export type MusicProvider = { generate: (prompt: string) => Promise<MusicGeneration> };
+export type MusicGeneration = {
+  bytes: Buffer;
+  mime: string;
+  externalId: string;
+  usage: AiUsageSample;
+};
+export type MusicAttempt = { sample: AiUsageSample; status: AiUsageStatus; error: string | null };
+export type MusicResult = { generation: MusicGeneration; attempts: MusicAttempt[] };
+export type MusicProvider = { generate: (prompt: string) => Promise<MusicResult> };
 
 /** Detecta o contêiner real retornado pelo modelo (o format pedido pode ser ignorado). */
 export const detectAudioMime = (bytes: Buffer): { mime: string; ext: string } => {
@@ -111,30 +125,58 @@ export const createOpenRouterMusicProvider = (config: {
 }): MusicProvider => ({
   generate: async (prompt) => {
     const maxSings = 5;
+    const attempts: MusicAttempt[] = [];
     let lastError: Error = new Error('OpenRouter music produced no result');
     for (let sing = 1; sing <= maxSings; sing += 1) {
-      try {
-        return await generateMusicOnce(config, prompt);
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        const blocked = /PROHIBITED_CONTENT|no audio|failed \((429|5\d\d)\)/i.test(
-          lastError.message,
-        );
-        if (!blocked) throw lastError;
-        console.warn({ sing, maxSings }, 'filtro de conteúdo bloqueou; tentando novamente');
-        await new Promise((done) => setTimeout(done, 3_000 * sing));
+      const outcome = await generateMusicOnce(config, prompt);
+      if (outcome.ok) {
+        attempts.push({ sample: outcome.usage, status: 'ok', error: null });
+        return {
+          generation: {
+            bytes: outcome.bytes,
+            mime: outcome.mime,
+            externalId: outcome.externalId,
+            usage: outcome.usage,
+          },
+          attempts,
+        };
       }
+      lastError = outcome.error;
+      const blocked = /PROHIBITED_CONTENT/i.test(lastError.message);
+      const retryable = blocked || /no audio|failed \((429|5\d\d)\)/i.test(lastError.message);
+      attempts.push({
+        sample: outcome.usage,
+        status: blocked ? 'blocked' : 'error',
+        error: sanitizeError(lastError),
+      });
+      if (!retryable) throw Object.assign(lastError, { attempts });
+      console.warn({ sing, maxSings }, 'tentativa de áudio falhou; tentando novamente');
+      await new Promise((done) => setTimeout(done, 3_000 * sing));
     }
-    throw lastError;
+    throw Object.assign(lastError, { attempts });
   },
 });
 
-const generateMusicOnce = async (
+type SingOutcome =
+  | { ok: true; bytes: Buffer; mime: string; externalId: string; usage: AiUsageSample }
+  | { ok: false; error: Error; usage: AiUsageSample };
+
+/** Exportada como seam de teste (o provider real cobra por chamada). */
+export const generateMusicOnce = async (
   config: { apiKey: string; model: string; webUrl: string },
   prompt: string,
-): Promise<MusicGeneration> => {
+): Promise<SingOutcome> => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 300_000);
+  const startedAt = Date.now();
+  const blankUsage = (): AiUsageSample => ({
+    requestId: null,
+    model: config.model,
+    inputTokens: 0,
+    outputTokens: 0,
+    costUsd: null,
+    latencyMs: Date.now() - startedAt,
+  });
   try {
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -155,9 +197,13 @@ const generateMusicOnce = async (
     });
     if (!response.ok || !response.body) {
       const detail = await response.text().catch(() => '');
-      throw new Error(
-        `OpenRouter music failed (${response.status})${detail ? `: ${detail.slice(0, 300)}` : ''}`,
-      );
+      return {
+        ok: false,
+        error: new Error(
+          `OpenRouter music failed (${response.status})${detail ? `: ${detail.slice(0, 300)}` : ''}`,
+        ),
+        usage: blankUsage(),
+      };
     }
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -165,6 +211,7 @@ const generateMusicOnce = async (
     let buffer = '';
     let externalId = '';
     let upstreamError = '';
+    let streamedUsage: AiUsageSample | null = null;
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -178,6 +225,7 @@ const generateMusicOnce = async (
         let chunk: {
           id?: string;
           error?: { message?: string };
+          usage?: { prompt_tokens?: number; completion_tokens?: number; cost?: number | string };
           choices?: Array<{
             delta?: { audio?: { data?: string } };
             message?: { audio?: { data?: string } };
@@ -190,17 +238,42 @@ const generateMusicOnce = async (
         }
         if (chunk.id) externalId = chunk.id;
         if (chunk.error?.message) upstreamError = chunk.error.message;
+        if (chunk.usage)
+          streamedUsage = {
+            requestId: externalId || null,
+            model: config.model,
+            inputTokens: chunk.usage.prompt_tokens ?? 0,
+            outputTokens: chunk.usage.completion_tokens ?? 0,
+            costUsd: chunk.usage.cost === undefined ? null : String(chunk.usage.cost),
+            latencyMs: Date.now() - startedAt,
+          };
         const choice = chunk.choices?.[0];
         if (choice?.delta?.audio?.data) audioChunks.push(choice.delta.audio.data);
         if (choice?.message?.audio?.data) audioChunks.push(choice.message.audio.data);
       }
     }
     if (!audioChunks.length)
-      throw new Error(
-        `OpenRouter music returned no audio${upstreamError ? `: ${upstreamError}` : ''}`,
-      );
+      return {
+        ok: false,
+        error: new Error(
+          `OpenRouter music returned no audio${upstreamError ? `: ${upstreamError}` : ''}`,
+        ),
+        usage: streamedUsage ?? { ...blankUsage(), requestId: externalId || null },
+      };
     const bytes = Buffer.from(audioChunks.join(''), 'base64');
-    return { bytes, mime: detectAudioMime(bytes).mime, externalId };
+    return {
+      ok: true,
+      bytes,
+      mime: detectAudioMime(bytes).mime,
+      externalId,
+      usage: streamedUsage ?? { ...blankUsage(), requestId: externalId || null },
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error : new Error(String(error)),
+      usage: blankUsage(),
+    };
   } finally {
     clearTimeout(timeout);
   }
@@ -305,16 +378,75 @@ const deliveryEmail = async (
   console.info({ orderPublicId: publicId }, 'delivery email sent');
 };
 
-const processAudioJob = async (
+/** Sings anexadas ao erro pelo provider (fronteira interna; forma validada campo a campo). */
+const isMusicAttempt = (value: unknown): value is MusicAttempt => {
+  if (typeof value !== 'object' || value === null) return false;
+  if (!('sample' in value) || !('status' in value) || !('error' in value)) return false;
+  const { sample, status, error } = value;
+  if (typeof sample !== 'object' || sample === null) return false;
+  if (
+    !('requestId' in sample) ||
+    !('model' in sample) ||
+    !('inputTokens' in sample) ||
+    !('outputTokens' in sample) ||
+    !('costUsd' in sample) ||
+    !('latencyMs' in sample)
+  )
+    return false;
+  const { requestId, model, inputTokens, outputTokens, costUsd, latencyMs } = sample;
+  if (requestId !== null && typeof requestId !== 'string') return false;
+  if (typeof model !== 'string') return false;
+  if (typeof inputTokens !== 'number' || typeof outputTokens !== 'number') return false;
+  if (costUsd !== null && typeof costUsd !== 'string') return false;
+  if (typeof latencyMs !== 'number') return false;
+  if (!['ok', 'blocked', 'error', 'rejected'].includes(status as string)) return false;
+  return error === null || typeof error === 'string';
+};
+const musicAttemptsOf = (error: unknown): MusicAttempt[] => {
+  if (typeof error !== 'object' || error === null || !('attempts' in error)) return [];
+  const { attempts } = error;
+  return Array.isArray(attempts) ? attempts.filter(isMusicAttempt) : [];
+};
+
+/** Uma linha por sing do provedor, inclusive bloqueios (visibilidade do filtro). */
+const recordAudioUsage = async (
+  pool: Pool,
+  orderId: string,
+  jobId: string,
+  attempt: MusicAttempt,
+  jobAttempts: number,
+): Promise<void> => {
+  await pool.query(
+    `insert into ai_usage(order_id,job_id,kind,provider,model,external_id,input_tokens,output_tokens,cost_usd,latency_ms,status,error,attempt)
+     values($1,$2,'audio','openrouter',$3,$4,$5,$6,$7,$8,$9,$10,$11)
+     on conflict do nothing`,
+    [
+      orderId,
+      jobId,
+      attempt.sample.model,
+      attempt.sample.requestId,
+      attempt.sample.inputTokens,
+      attempt.sample.outputTokens,
+      attempt.sample.costUsd,
+      attempt.sample.latencyMs,
+      attempt.status,
+      attempt.error,
+      jobAttempts,
+    ],
+  );
+};
+/** `music`/`variants` são seams de teste e contenção de custo (produção: OpenRouter, [1, 2]). */
+export const processAudioJob = async (
   pool: Pool,
   job: ClaimedJob,
   config: WorkerConfig,
-): Promise<void> => {
-  const music = createOpenRouterMusicProvider({
+  music: MusicProvider = createOpenRouterMusicProvider({
     apiKey: config.openRouterApiKey,
     model: config.openRouterMusicModel,
     webUrl: config.webUrl,
-  });
+  }),
+  variants: readonly number[] = [1, 2],
+): Promise<void> => {
   const orderResult = await pool.query<OrderRow>(
     'select id, public_id, status from orders where id=$1',
     [job.orderId],
@@ -362,11 +494,21 @@ const processAudioJob = async (
       )
     ).rows.map((row: { variant: number }) => Number(row.variant)),
   );
-  for (const variant of [1, 2] as const) {
+  for (const variant of variants) {
     if (completedVariants.has(variant)) continue;
     // Instruções extras (prefixos de variante) aumentam falsos positivos do filtro
     // de áudio; o modelo já produz faixas distintas a cada chamada (sem seed fixa).
-    const generation = await music.generate(basePrompt);
+    let result: MusicResult;
+    try {
+      result = await music.generate(basePrompt);
+    } catch (error) {
+      for (const attempt of musicAttemptsOf(error))
+        await recordAudioUsage(pool, order.id, job.id, attempt, job.attempts);
+      throw error;
+    }
+    for (const attempt of result.attempts)
+      await recordAudioUsage(pool, order.id, job.id, attempt, job.attempts);
+    const generation = result.generation;
     const { mime, ext } = detectAudioMime(generation.bytes);
     const key = `orders/${order.public_id}/audio-${variant}.${ext}`;
     await writeLocalAsset(config.storagePath, key, generation.bytes);
@@ -392,10 +534,27 @@ const processAudioJob = async (
     );
   }
 
+  // Execuções parciais (seam de contenção/teste) nunca entregam: só o par 1+2 fecha a venda.
+  const finished = await pool.query(
+    "select variant from audio_generations where order_id=$1 and status='completed'",
+    [order.id],
+  );
+  const finishedSet = new Set(finished.rows.map((row: { variant: number }) => Number(row.variant)));
+  if (![1, 2].every((variant) => finishedSet.has(variant))) return;
   const readyOrder = { ...order, status: 'audio_generating' } as OrderRow;
   const finalStatus = config.reviewMode === 'manual' ? 'review_required' : 'delivered';
   await transitionOrder(pool, readyOrder, finalStatus);
   if (finalStatus === 'delivered') {
+    try {
+      await pool.query(
+        `insert into analytics_events(event,product_type,order_public_id,visitor_id)
+         values('delivered',(select product_type from orders where id=$1),$2,
+           (select visitor_id from analytics_events where order_public_id=$2 and event='order_created' limit 1))`,
+        [order.id, order.public_id],
+      );
+    } catch (error) {
+      console.warn({ error: sanitizeError(error) }, 'analytics delivered event dropped');
+    }
     const story = await pool.query('select data from story_sessions where order_id=$1', [order.id]);
     const recipient = (story.rows[0]?.data as { buyerEmail?: string } | null)?.buyerEmail;
     if (recipient) await deliveryEmail(pool, config, order.id, recipient, order.public_id);

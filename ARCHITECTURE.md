@@ -21,9 +21,9 @@ Uma `story_session` tem token opaco e salva respostas progressivamente. A letra 
 ## Limites e decisões
 
 - PostgreSQL é fonte de verdade e fila durável; não há Redis, microserviços ou Kubernetes.
-- Providers são adapters reais selecionados por variáveis de ambiente (OpenRouter, Mercado Pago, Resend); sem chaves, as operações falham com mensagem clara.
+- Providers são adapters reais selecionados por variáveis de ambiente (OpenRouter, Mercado Pago, Resend); fora de produção, a ausência de credencial de pagamento/e-mail cai em fallback local (pagamento dev, e-mail em `var/emails`) — em produção as chaves são obrigatórias.
 - O storage é privado: a API valida token antes de disponibilizar download local ou URL assinada.
-- IDs internos, segredos, payloads pessoais e histórias não entram em respostas públicas ou logs usuais.
-- Admin usa Argon2id, cookie HttpOnly e auditoria. Transições de status passam por `assertTransition`.
+- Respostas públicas carregam só referências públicas (`publicId`, número da versão de letra, variante do áudio); UUIDs internos ficam no admin autenticado. Logs registram template de rota, nunca URL concreta. Mutações de cliente exigem o cookie de acesso do pedido.
+- Admin é único via `ADMIN_EMAIL`/`ADMIN_PASSWORD` de ambiente (decisão do dono; sem hash), cookie HttpOnly e sessão de 8h. Transições de status passam por `assertTransition`.
 
 Veja também [docs/architecture.md](docs/architecture.md), que mantém o diagrama resumido original.

@@ -1,7 +1,10 @@
+import { sql } from 'drizzle-orm';
 import {
   boolean,
+  index,
   integer,
   jsonb,
+  numeric,
   pgEnum,
   pgTable,
   text,
@@ -145,6 +148,36 @@ export const audioGenerations = pgTable(
   },
   (t) => [uniqueIndex('audio_order_variant').on(t.orderId, t.variant)],
 );
+/** Append-only AI cost ledger: one row per provider call (lyrics + each audio variant). */
+export const aiUsage = pgTable(
+  'ai_usage',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    orderId: uuid('order_id')
+      .references(() => orders.id, { onDelete: 'cascade' })
+      .notNull(),
+    jobId: uuid('job_id').references(() => generationJobs.id, { onDelete: 'set null' }),
+    kind: varchar('kind', { length: 20 }).notNull(),
+    provider: varchar('provider', { length: 30 }).notNull().default('openrouter'),
+    model: varchar('model', { length: 120 }),
+    externalId: varchar('external_id', { length: 160 }),
+    inputTokens: integer('input_tokens').default(0).notNull(),
+    outputTokens: integer('output_tokens').default(0).notNull(),
+    costUsd: numeric('cost_usd', { precision: 12, scale: 6 }),
+    latencyMs: integer('latency_ms'),
+    status: varchar('status', { length: 20 }).notNull(),
+    error: text('error'),
+    attempt: integer('attempt').default(0).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index('ai_usage_order_id').on(t.orderId),
+    index('ai_usage_created_at').on(t.createdAt),
+    uniqueIndex('ai_usage_order_kind_external')
+      .on(t.orderId, t.kind, t.externalId)
+      .where(sql`${t.externalId} is not null`),
+  ],
+);
 export const orderEvents = pgTable('order_events', {
   id: uuid('id').defaultRandom().primaryKey(),
   orderId: uuid('order_id')
@@ -230,6 +263,8 @@ export const analyticsEvents = pgTable('analytics_events', {
   event: varchar('event', { length: 80 }).notNull(),
   productType: productType('product_type'),
   orderPublicId: varchar('order_public_id', { length: 32 }),
+  /** Random per-browser id (localStorage, no PII); enables pre-order beacons later. */
+  visitorId: varchar('visitor_id', { length: 64 }),
   utm: jsonb('utm'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });

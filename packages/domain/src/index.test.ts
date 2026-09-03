@@ -8,6 +8,7 @@ import {
   hashToken,
   makeMusicPrompt,
   retryDelayMs,
+  sanitizeAiError,
   validateLyrics,
   verifyToken,
 } from './index.js';
@@ -92,5 +93,10 @@ describe('lyrics and generation rules', () => {
     expect(retryDelayMs(3, 1_000, 60_000, () => 0)).toBe(3_000);
     expect(calculatePriceCents(4_990, [500, 250])).toBe(5_740);
     expect(makeMusicPrompt(lyrics)).toContain('100% original');
+  });
+  it('sanitizes provider errors to a single capped line', () => {
+    expect(sanitizeAiError(new Error('a\nb'))).toBe('a b');
+    expect(sanitizeAiError('x'.repeat(600)).length).toBeLessThanOrEqual(500);
+    expect(sanitizeAiError(null)).toBe('unknown provider error');
   });
 });

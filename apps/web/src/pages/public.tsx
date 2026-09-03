@@ -1,13 +1,15 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, CheckCircle2, Music } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { api } from '../api';
+import { api, visitorId } from '../api';
 import { Footer, Header, Loading } from '../components';
 import { clearDraft, readDraft, useDraft } from '../hooks/use-draft';
+import { readMyOrders, rememberMyOrder } from '../my-orders';
 import { formatMoney, type LyricsContent, type Story } from '../types';
 
 const storySchema = z.object({
@@ -48,6 +50,9 @@ const defaults: StoryForm = {
   voice: 'either',
 };
 export function Landing() {
+  useEffect(() => {
+    api.sendBeacon('landing_view');
+  }, []);
   return (
     <>
       <Header />
@@ -125,6 +130,9 @@ export function Landing() {
 
 export function CreateStory() {
   const navigate = useNavigate();
+  useEffect(() => {
+    api.sendBeacon('form_started');
+  }, []);
   const form = useForm<StoryForm>({
     resolver: zodResolver(storySchema),
     defaultValues: { ...defaults, ...readDraft() },
@@ -133,8 +141,7 @@ export function CreateStory() {
   const saveStatus = useDraft(values);
   const submit = useMutation({
     mutationFn: async (data: StoryForm) => {
-      const created = await api.createOrder('friend_roast');
-      sessionStorage.setItem(`access:${created.publicId}`, created.accessToken);
+      const created = await api.createOrder('friend_roast', visitorId());
       rememberOrder(created.publicId);
       const facts = data.factsText
         .split('\n')
@@ -163,6 +170,7 @@ export function CreateStory() {
     },
     onSuccess: (publicId) => {
       clearDraft();
+      api.sendBeacon('form_completed');
       toast.success('História salva. Vamos criar sua letra!');
       navigate(`/criar/letra?pedido=${encodeURIComponent(publicId)}`);
     },
@@ -273,7 +281,12 @@ function orderIdFromSearch() {
   return param ?? window.sessionStorage.getItem('resenha:lastOrder') ?? '';
 }
 function rememberOrder(publicId: string) {
-  window.sessionStorage.setItem('resenha:lastOrder', publicId);
+  try {
+    window.sessionStorage.setItem('resenha:lastOrder', publicId);
+  } catch {
+    // modo privado: segue só com localStorage
+  }
+  rememberMyOrder(publicId);
 }
 export function LyricsReview() {
   const navigate = useNavigate();
@@ -290,12 +303,13 @@ export function LyricsReview() {
     onError: (e) => toast.error(e.message),
   });
   const edit = useMutation({
-    mutationFn: ({ id, content }: { id: string; content: LyricsContent }) =>
-      api.editLyrics(publicId, id, content),
+    mutationFn: ({ number, content }: { number: number; content: LyricsContent }) =>
+      api.editLyrics(publicId, number, content),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order', publicId] }),
   });
   const approve = useMutation({
-    mutationFn: (id: string) => api.approveLyrics(publicId, id),
+    mutationFn: ({ number, content }: { number: number; content?: LyricsContent }) =>
+      api.approveLyrics(publicId, number, content),
     onSuccess: () => navigate(`/criar/checkout?pedido=${publicId}`),
   });
   if (!publicId) return <Navigate to="/criar" replace />;
@@ -320,8 +334,8 @@ export function LyricsReview() {
         ) : (
           <LyricEditor
             lyric={lyric}
-            onSave={(content) => edit.mutate({ id: lyric.id, content })}
-            onApprove={() => approve.mutate(lyric.id)}
+            onSave={(content) => edit.mutate({ number: lyric.number, content })}
+            onApprove={(content) => approve.mutate({ number: lyric.number, content })}
             busy={edit.isPending || approve.isPending}
           />
         )}
@@ -338,11 +352,15 @@ function LyricEditor({
 }: {
   lyric: { content: LyricsContent };
   onSave: (content: LyricsContent) => void;
-  onApprove: () => void;
+  onApprove: (content?: LyricsContent) => void;
   busy: boolean;
 }) {
   const form = useForm<{ fullLyrics: string }>({
     defaultValues: { fullLyrics: lyric.content.fullLyrics },
+  });
+  const current = (): LyricsContent => ({
+    ...lyric.content,
+    fullLyrics: form.getValues().fullLyrics,
   });
   return (
     <form
@@ -358,7 +376,16 @@ function LyricEditor({
         <button className="button secondary" disabled={busy}>
           Salvar nova versão
         </button>
-        <button type="button" className="button primary" disabled={busy} onClick={onApprove}>
+        <button
+          type="button"
+          className="button primary"
+          disabled={busy}
+          onClick={() =>
+            onApprove(
+              form.getValues().fullLyrics !== lyric.content.fullLyrics ? current() : undefined,
+            )
+          }
+        >
           Aprovar letra <CheckCircle2 size={17} />
         </button>
       </div>
@@ -369,6 +396,11 @@ function LyricEditor({
 export function Checkout() {
   const nav = useNavigate();
   const publicId = orderIdFromSearch();
+  const order = useQuery({
+    queryKey: ['order', publicId],
+    queryFn: () => api.getOrder(publicId),
+    enabled: Boolean(publicId),
+  });
   const payment = useMutation({
     mutationFn: async () => {
       const checkout = await api.checkout(publicId);
@@ -382,6 +414,9 @@ export function Checkout() {
     onError: (e) => toast.error(e.message),
   });
   if (!publicId) return <Navigate to="/criar" replace />;
+  if (order.isLoading) return <Loading label="Carregando seu pedido…" />;
+  if (order.isError || !order.data)
+    return <PageError message="Não foi possível abrir seu pedido para pagamento." />;
   return (
     <>
       <Header />
@@ -390,7 +425,7 @@ export function Checkout() {
         <h1>Falta pouco para dar play.</h1>
         <div className="price-card">
           <span>Música da Resenha</span>
-          <b>{formatMoney(4990)}</b>
+          <b>{formatMoney(order.data.order.priceCents)}</b>
           <small>Letra, duas versões e página privada.</small>
           <button
             className="button primary"
@@ -499,7 +534,7 @@ export function OrderPlayer() {
     return <PageError message="Pedido não encontrado ou acesso inválido." />;
   const ready =
     order.data.order.status === 'delivered'
-      ? order.data.audio.filter((audio) => audio.assetId)
+      ? order.data.audio.filter((audio) => audio.status === 'completed')
       : [];
   return (
     <>
@@ -508,16 +543,12 @@ export function OrderPlayer() {
         <p className="eyebrow">SUAS VERSÕES</p>
         <h1>{ready.length ? 'Ouvir e baixar' : 'As versões ainda estão em produção'}</h1>
         {ready.map((audio) => (
-          <div className="price-card" key={audio.id}>
+          <div className="price-card" key={audio.variant}>
             <span>Versão {audio.variant}</span>
-            <audio
-              controls
-              preload="none"
-              src={api.downloadUrl(publicOrderId, audio.assetId as string)}
-            />
+            <audio controls preload="none" src={api.downloadUrl(publicOrderId, audio.variant)} />
             <a
               className="button secondary"
-              href={api.downloadUrl(publicOrderId, audio.assetId as string)}
+              href={api.downloadUrl(publicOrderId, audio.variant)}
               download
             >
               Baixar versão {audio.variant}
@@ -532,13 +563,103 @@ export function OrderPlayer() {
     </>
   );
 }
+const myOrderStatusLabel = (status: string) =>
+  status === 'delivered'
+    ? 'Pronta'
+    : status === 'failed'
+      ? 'Problema na produção'
+      : [
+            'paid',
+            'audio_queued',
+            'audio_generating',
+            'review_required',
+            'revision_requested',
+          ].includes(status)
+        ? 'Em produção'
+        : ['lyrics_approved', 'payment_pending'].includes(status)
+          ? 'Aguardando pagamento'
+          : 'Em criação';
+
+export function MyOrders() {
+  const [ids] = useState<string[]>(() => readMyOrders());
+  const details = useQueries({
+    queries: ids.map((publicId) => ({
+      queryKey: ['order', publicId],
+      queryFn: () => api.getOrder(publicId),
+      retry: false,
+      staleTime: 30_000,
+    })),
+  });
+  if (!ids.length)
+    return (
+      <>
+        <Header />
+        <main className="delivery">
+          <p className="eyebrow">MINHAS MÚSICAS</p>
+          <h1>Você ainda não criou nenhuma música aqui</h1>
+          <p>Os pedidos feitos neste navegador aparecem nesta página, sem cadastro.</p>
+          <Link className="button primary" to="/criar">
+            Criar minha música
+          </Link>
+        </main>
+        <Footer />
+      </>
+    );
+  return (
+    <>
+      <Header />
+      <main className="delivery">
+        <p className="eyebrow">MINHAS MÚSICAS</p>
+        <h1>Suas músicas neste navegador</h1>
+        <p>Sem cadastro: em aparelho novo ou navegador limpo, a lista não acompanha.</p>
+        {details.map((query, index) => {
+          const publicId = ids[index];
+          if (query.isLoading) return <Loading key={publicId} label="Carregando pedidos…" />;
+          if (query.isError || !query.data)
+            return (
+              <div className="price-card" key={publicId}>
+                <span>Pedido {publicId}</span>
+                <p>
+                  Disponível só neste navegador/dispositivo. Abra no aparelho onde criou ou peça um
+                  novo link de acesso.
+                </p>
+                <Link className="button secondary" to={`/pedido/${publicId}`}>
+                  Tentar abrir mesmo assim
+                </Link>
+              </div>
+            );
+          const title = query.data.lyrics.find((lyric) => lyric.approvedAt) ?? query.data.lyrics[0];
+          return (
+            <div className="price-card" key={publicId}>
+              <span>{title?.content.title ?? `Pedido ${publicId}`}</span>
+              <p>{myOrderStatusLabel(query.data.order.status)}</p>
+              <Link className="button secondary" to={`/pedido/${publicId}`}>
+                Ver pedido
+              </Link>
+            </div>
+          );
+        })}
+      </main>
+      <Footer />
+    </>
+  );
+}
 export function Delivery() {
   const { deliveryToken = '' } = useParams();
+  const navigate = useNavigate();
   const delivery = useQuery({
     queryKey: ['delivery', deliveryToken],
     queryFn: () => api.delivery(deliveryToken),
     enabled: Boolean(deliveryToken),
     refetchInterval: 5000,
+  });
+  const recover = useMutation({
+    mutationFn: () => api.recoverViaDelivery(deliveryToken),
+    onSuccess: ({ publicId }) => {
+      rememberMyOrder(publicId);
+      navigate(`/pedido/${publicId}`);
+    },
+    onError: (e) => toast.error(e.message),
   });
   return (
     <>
@@ -551,21 +672,24 @@ export function Delivery() {
           <>
             <h1>Sua música está pronta!</h1>
             <p>Este link é privado. Ouça e baixe as duas versões abaixo.</p>
+            <button
+              className="button secondary"
+              disabled={recover.isPending}
+              onClick={() => recover.mutate()}
+            >
+              {recover.isPending ? 'Liberando…' : 'Acompanhar pedido neste navegador'}
+            </button>
             {delivery.data.audio.map((audio) => (
-              <div className="price-card" key={audio.id}>
+              <div className="price-card" key={audio.variant}>
                 <span>Versão {audio.variant}</span>
-                {audio.assetId && (
-                  <>
-                    <audio controls src={api.deliveryDownloadUrl(deliveryToken, audio.assetId)} />
-                    <a
-                      className="button secondary"
-                      href={api.deliveryDownloadUrl(deliveryToken, audio.assetId)}
-                      download
-                    >
-                      Baixar versão {audio.variant}
-                    </a>
-                  </>
-                )}
+                <audio controls src={api.deliveryDownloadUrl(deliveryToken, audio.variant)} />
+                <a
+                  className="button secondary"
+                  href={api.deliveryDownloadUrl(deliveryToken, audio.variant)}
+                  download
+                >
+                  Baixar versão {audio.variant}
+                </a>
               </div>
             ))}
             {delivery.data.lyrics[0] && (

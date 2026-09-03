@@ -4,9 +4,9 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { api } from '../api';
+import { api, type Funnel } from '../api';
 import { Loading } from '../components';
-import { formatMoney, products } from '../types';
+import { formatMoney, formatUsd, formatUsdExact, products } from '../types';
 
 export function AdminLogin() {
   const nav = useNavigate();
@@ -47,12 +47,23 @@ function Logout() {
     </button>
   );
 }
+const visitorsOf = (funnel: Funnel, event: string): number =>
+  funnel.preOrder.find((step) => step.event === event)?.visitors ?? 0;
+const stepOrdersOf = (funnel: Funnel, event: string): number =>
+  funnel.steps.find((step) => step.event === event)?.orders ?? 0;
 export function AdminDashboard() {
   const orders = useQuery({ queryKey: ['admin', 'orders'], queryFn: () => api.adminOrders() });
-  if (orders.isLoading) return <Loading label="Carregando indicadores…" />;
+  const usage = useQuery({ queryKey: ['admin', 'ai-usage'], queryFn: () => api.aiUsageSummary() });
+  const funnel = useQuery({
+    queryKey: ['admin', 'funnel'],
+    queryFn: () => api.analyticsFunnel(30),
+  });
+  if (orders.isLoading || usage.isLoading) return <Loading label="Carregando indicadores…" />;
   if (orders.isError) return <AdminAuthError />;
   const items = orders.data?.items ?? [];
   const paid = items.filter((x) => ['paid', 'audio_generating', 'delivered'].includes(x.status));
+  const month = usage.data?.month;
+  const key = usage.data?.key;
   return (
     <main className="admin">
       <div className="admin-head">
@@ -75,15 +86,117 @@ export function AdminDashboard() {
           <b>{formatMoney(paid.reduce((sum, x) => sum + x.priceCents, 0))}</b>
           <p>Receita registrada</p>
         </article>
+        <article className="card">
+          <b>{month ? formatUsdExact(month.totalUsd) : '—'}</b>
+          <p>
+            Custo IA no mês
+            {month && month.calls > 0
+              ? ` · ${month.calls} chamadas · letra ${formatUsdExact(month.lyricsUsd)} · áudio ${formatUsdExact(month.audioUsd)}`
+              : ''}
+          </p>
+        </article>
+        <article className="card">
+          <b>
+            {funnel.data
+              ? `${stepOrdersOf(funnel.data, 'delivered')} / ${stepOrdersOf(funnel.data, 'paid')}`
+              : '—'}
+          </b>
+          <p>
+            Entregues / pagos (30d)
+            {funnel.data && stepOrdersOf(funnel.data, 'paid') > 0
+              ? ` · ${((stepOrdersOf(funnel.data, 'delivered') / stepOrdersOf(funnel.data, 'paid')) * 100).toFixed(1)}% de entrega`
+              : ''}
+          </p>
+        </article>
+        <article className="card">
+          <b>
+            {usage.data ? usage.data.byDay.slice(-7).reduce((sum, d) => sum + d.blocked, 0) : '—'}
+          </b>
+          <p>Bloqueios do filtro (7d)</p>
+        </article>
       </div>
+      {usage.isError && (
+        <p className="error">
+          Observabilidade de custo indisponível (resumo de IA falhou); pedidos seguem normais.
+        </p>
+      )}
+      {key && (
+        <p>
+          Key OpenRouter: {formatUsd(key.usage)} usados
+          {key.limit !== null ? ` de ${formatUsd(key.limit)}` : ' (sem limite configurado)'}
+          {key.remaining !== null ? ` · ${formatUsd(key.remaining)} restantes` : ''} ·{' '}
+          {month && month.calls > 0
+            ? `custo rastreado ${formatUsdExact(month.totalUsd)}`
+            : 'sem custo rastreado no mês'}
+        </p>
+      )}
+      <h2>Funil (30 dias)</h2>
+      {funnel.isError && (
+        <p className="error">
+          Funil indisponível (resumo de analytics falhou); pedidos seguem normais.
+        </p>
+      )}
+      {funnel.data && (
+        <>
+          <p>
+            Visitantes: landing {visitorsOf(funnel.data, 'landing_view')} · formulário{' '}
+            {visitorsOf(funnel.data, 'form_started')} · concluíram{' '}
+            {visitorsOf(funnel.data, 'form_completed')}
+          </p>
+          {funnel.data.steps.map((step) => (
+            <p key={step.event}>
+              {step.event}: {step.orders} pedidos
+              {step.rateFromPrevious !== null
+                ? ` · ${(step.rateFromPrevious * 100).toFixed(1)}% da etapa anterior`
+                : ''}
+            </p>
+          ))}
+          <p>
+            Custo por venda: {formatUsdExact(funnel.data.perSaleUsd)} ({funnel.data.salesWithCost}{' '}
+            vendas com custo)
+          </p>
+        </>
+      )}
       <Link className="button primary" to="/admin/pedidos">
         Ver pedidos
       </Link>
     </main>
   );
 }
+const orderStatuses = [
+  'draft',
+  'story_completed',
+  'lyrics_generating',
+  'lyrics_ready',
+  'lyrics_approved',
+  'payment_pending',
+  'paid',
+  'audio_queued',
+  'audio_generating',
+  'review_required',
+  'delivered',
+  'revision_requested',
+  'failed',
+  'refunded',
+  'cancelled',
+] as const;
 export function AdminOrders() {
-  const orders = useQuery({ queryKey: ['admin', 'orders'], queryFn: () => api.adminOrders() });
+  const [status, setStatus] = useState('');
+  const [productType, setProductType] = useState('');
+  const [q, setQ] = useState('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  if (productType) params.set('productType', productType);
+  if (q.trim()) params.set('q', q.trim());
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  const filters = params.size ? `?${params}` : '';
+  const orders = useQuery({
+    queryKey: ['admin', 'orders', filters],
+    queryFn: () => api.adminOrders(filters),
+  });
   if (orders.isLoading) return <Loading label="Carregando pedidos…" />;
   if (orders.isError) return <AdminAuthError />;
   return (
@@ -95,6 +208,47 @@ export function AdminOrders() {
         </div>
         <Logout />
       </div>
+      <form
+        className="form-grid"
+        onSubmit={(event) => {
+          event.preventDefault();
+          orders.refetch();
+        }}
+      >
+        <label>
+          Status
+          <select value={status} onChange={(event) => setStatus(event.target.value)}>
+            <option value="">Todos</option>
+            {orderStatuses.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Produto
+          <select value={productType} onChange={(event) => setProductType(event.target.value)}>
+            <option value="">Todos</option>
+            <option value="friend_roast">Música da Resenha</option>
+            <option value="team_anthem">Hino da Pelada</option>
+            <option value="emotional_tribute">Sua História em Música</option>
+          </select>
+        </label>
+        <label>
+          Buscar publicId
+          <input value={q} onChange={(event) => setQ(event.target.value)} placeholder="X6NUN8…" />
+        </label>
+        <label>
+          De
+          <input type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
+        </label>
+        <label>
+          Até
+          <input type="date" value={to} onChange={(event) => setTo(event.target.value)} />
+        </label>
+        <button className="button secondary">Filtrar</button>
+      </form>
       <div className="admin-table">
         {orders.data?.items.map((order) => (
           <Link key={order.id} to={`/admin/pedidos/${order.id}`}>
@@ -150,6 +304,14 @@ export function AdminOrderDetail() {
     },
     onError: (e) => toast.error(e.message),
   });
+  const approveAudio = useMutation({
+    mutationFn: (audioId: string) => api.adminApproveAudio(orderId, audioId),
+    onSuccess: () => {
+      toast.success('Áudio aprovado e pedido entregue.');
+      invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
   if (detail.isLoading) return <Loading label="Carregando pedido…" />;
   if (detail.isError) return <AdminAuthError />;
   if (!detail.data)
@@ -199,6 +361,24 @@ export function AdminOrderDetail() {
             {value.payments.map((x) => `${x.status} · ${formatMoney(x.amountCents)}`).join(', ') ||
               'Ainda não iniciado'}
           </p>
+          <h2>Custo de IA</h2>
+          <p>
+            Total {formatUsdExact(value.aiCost.totalUsd)} · letra{' '}
+            {formatUsdExact(value.aiCost.lyricsUsd)} · áudio {formatUsdExact(value.aiCost.audioUsd)}{' '}
+            · {value.aiCost.calls} chamadas · {value.aiCost.inputTokens + value.aiCost.outputTokens}{' '}
+            tokens
+          </p>
+          {value.aiUsage.map((row) => (
+            <p key={row.id}>
+              {row.kind} · {row.status} · {row.model ?? 'modelo desconhecido'} ·{' '}
+              {row.inputTokens + row.outputTokens} tokens ·{' '}
+              {row.costUsd ? formatUsdExact(row.costUsd) : 'custo ausente'} ·{' '}
+              {row.latencyMs !== null ? `${row.latencyMs}ms` : 'sem latência'} · tentativa{' '}
+              {row.attempt}
+              {row.externalId && <small> · req {row.externalId}</small>}{' '}
+              {row.error && <small className="error">{row.error}</small>}
+            </p>
+          ))}
         </section>
         <section>
           <h2>Fila</h2>
@@ -234,6 +414,15 @@ export function AdminOrderDetail() {
                 >
                   Baixar
                 </a>
+                {value.order.status === 'review_required' && (
+                  <button
+                    className="button primary"
+                    disabled={approveAudio.isPending}
+                    onClick={() => approveAudio.mutate(a.id)}
+                  >
+                    {approveAudio.isPending ? 'Entregando…' : 'Aprovar e entregar'}
+                  </button>
+                )}
               </div>
             ))}
           {canRebuild && (

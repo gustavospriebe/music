@@ -15,6 +15,20 @@
       "when": 1785677000000,
       "tag": "0001_phase2_vocabulary",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788453000000,
+      "tag": "0002_ai_usage",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788540000000,
+      "tag": "0003_analytics_visitor",
+      "breakpoints": true
     }
   ]
 }

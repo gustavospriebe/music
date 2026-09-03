@@ -5,14 +5,25 @@ import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
-import { and, desc, eq, gt, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, sql } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { ZodError } from 'zod';
-import { createOrderSchema, generatedLyricsSchema, storySchema } from '@resenha/contracts';
+import {
+  adminOrdersQuerySchema,
+  approveLyricsSchema,
+  beaconEventSchema,
+  createOrderSchema,
+  deliveryAccessSchema,
+  generatedLyricsSchema,
+  storySchema,
+  type GeneratedLyrics,
+} from '@resenha/contracts';
 import {
   adminNotes,
   adminSessions,
   adminUsers,
+  aiUsage,
+  analyticsEvents,
   audioGenerations,
   createDb,
   deliveries,
@@ -31,8 +42,11 @@ import {
   createAccessToken,
   evaluateContent,
   hashToken,
+  sanitizeAiError,
   validateLyrics,
   verifyToken,
+  type AiUsageSample,
+  type AiUsageStatus,
 } from '@resenha/domain';
 import type { Env } from './env.js';
 import {
@@ -41,16 +55,89 @@ import {
   createMercadoPagoProvider,
   verifyMercadoPagoSignature,
   type LyricsProvider,
+  type LyricsResult,
 } from './providers.js';
+/** Saldo da key OpenRouter (`GET /key` documentado, gratuito); falha best-effort vira `null`. */
+export const fetchOpenRouterKeyUsage = async (
+  apiKey: string | undefined,
+): Promise<{ usage: number; limit: number | null; remaining: number | null } | null> => {
+  if (!apiKey) return null;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8_000);
+  try {
+    const response = await fetch('https://openrouter.ai/api/v1/key', {
+      signal: controller.signal,
+      headers: { authorization: `Bearer ${apiKey}` },
+    });
+    if (!response.ok) return null;
+    const body = (await response.json()) as {
+      data?: { usage?: number; limit?: number | null; limit_remaining?: number | null };
+    };
+    if (typeof body.data?.usage !== 'number') return null;
+    return {
+      usage: body.data.usage,
+      limit: typeof body.data.limit === 'number' ? body.data.limit : null,
+      remaining: typeof body.data.limit_remaining === 'number' ? body.data.limit_remaining : null,
+    };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
 
-export const buildApp = (env: Env, overrides: { lyrics?: LyricsProvider } = {}) => {
+const ADMIN_TZ = 'America/Sao_Paulo';
+/** Offset (ms) de `ADMIN_TZ` num instante UTC, via Intl (vale para DST histórico). */
+export const tzOffsetMs = (timeZone: string, utcMs: number): number => {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(new Date(utcMs));
+  const get = (type: string): number => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  const hour = get('hour') === 24 ? 0 : get('hour');
+  return (
+    Date.UTC(get('year'), get('month') - 1, get('day'), hour, get('minute'), get('second')) - utcMs
+  );
+};
+/** Meia-noite de `date` (YYYY-MM-DD) em `ADMIN_TZ`, devolvida como ISO UTC. */
+export const spDayStartUtc = (date: string): string => {
+  const midnightGuess = Date.parse(`${date}T00:00:00.000Z`);
+  let start = midnightGuess - tzOffsetMs(ADMIN_TZ, midnightGuess);
+  start = midnightGuess - tzOffsetMs(ADMIN_TZ, start);
+  return new Date(start).toISOString();
+};
+/** Dia corrido seguinte (para o limite exclusivo do `to`). */
+export const nextUtcDate = (date: string): string =>
+  new Date(Date.parse(`${date}T00:00:00.000Z`) + 86_400_000).toISOString().slice(0, 10);
+
+export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } = {}) => {
   const app = Fastify({
     logger: {
       level: process.env.LOG_LEVEL ?? 'info',
       redact: ['req.headers.authorization', 'req.headers.cookie'],
     },
+    disableRequestLogging: true,
     genReqId: () => nanoid(12),
     bodyLimit: 100_000,
+  });
+  /** URLs concretas carregam tokens de capability e UUIDs: loga só o template da rota. */
+  app.addHook('onResponse', (request, reply, done) => {
+    request.log.info(
+      {
+        route: request.routeOptions.url ?? '<unmatched>',
+        method: request.method,
+        statusCode: reply.statusCode,
+        latencyMs: Math.round(reply.elapsedTime),
+      },
+      'request completed',
+    );
+    done();
   });
   const { db, pool } = createDb(env.DATABASE_URL);
   const lyrics = overrides.lyrics ?? createLyricsProvider(env);
@@ -74,7 +161,7 @@ export const buildApp = (env: Env, overrides: { lyrics?: LyricsProvider } = {}) 
     contentSecurityPolicy: false,
     referrerPolicy: { policy: 'same-origin' },
   });
-  void app.register(rateLimit, { max: 120, timeWindow: '1 minute' });
+  await app.register(rateLimit, { max: 120, timeWindow: '1 minute' });
   void app.register(swagger, {
     openapi: {
       info: { title: 'Música da Resenha API', version: '1.0.0' },
@@ -89,8 +176,74 @@ export const buildApp = (env: Env, overrides: { lyrics?: LyricsProvider } = {}) 
     if (!order) throw fail('Pedido não encontrado', 404);
     return order;
   };
+  /** Funnel analytics (no PII): best-effort para nunca quebrar a venda; falha vira warn. */
+  const recordEvent = async (
+    event: string,
+    order: { publicId: string; productType: typeof orders.$inferSelect.productType },
+    visitorId?: string | null,
+  ): Promise<void> => {
+    try {
+      let visitor = visitorId ?? null;
+      if (!visitor) {
+        const [first] = await db
+          .select({ visitorId: analyticsEvents.visitorId })
+          .from(analyticsEvents)
+          .where(
+            and(
+              eq(analyticsEvents.orderPublicId, order.publicId),
+              eq(analyticsEvents.event, 'order_created'),
+            ),
+          );
+        visitor = first?.visitorId ?? null;
+      }
+      await db.insert(analyticsEvents).values({
+        event,
+        productType: order.productType,
+        orderPublicId: order.publicId,
+        visitorId: visitor,
+        utm: null,
+      });
+    } catch (error) {
+      app.log.warn({ event, error: sanitizeAiError(error) }, 'analytics event dropped');
+    }
+  };
+  /** Uma linha por chamada ao provedor, inclusive tentativas rejeitadas (cobradas igual). */
+  const recordLyricsUsage = async (
+    orderId: string,
+    usage: AiUsageSample,
+    status: AiUsageStatus,
+    error: string | null,
+    attempt: number,
+  ): Promise<void> => {
+    await db
+      .insert(aiUsage)
+      .values({
+        orderId,
+        jobId: null,
+        kind: 'lyrics',
+        provider: 'openrouter',
+        model: usage.model,
+        externalId: usage.requestId,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        costUsd: usage.costUsd,
+        latencyMs: usage.latencyMs,
+        status,
+        error,
+        attempt,
+      })
+      .onConflictDoNothing();
+  };
   const hasAccess = (publicId: string, request: { cookies: Record<string, string | undefined> }) =>
     request.cookies[`order_${publicId}`] === '1';
+  /**
+   * Sessão limitada de recovery (link de entrega compartilhável): só leitura do
+   * status/letra/áudio, sem `story` (PII) e sem mutações. Mutações exigem `hasAccess`.
+   */
+  const hasViewAccess = (
+    publicId: string,
+    request: { cookies: Record<string, string | undefined> },
+  ) => hasAccess(publicId, request) || request.cookies[`order_view_${publicId}`] === '1';
   const requireAdmin = async (request: { cookies: Record<string, string | undefined> }) => {
     const token = request.cookies.admin_session;
     if (!token) throw fail('Autenticação administrativa necessária', 401);
@@ -132,6 +285,26 @@ export const buildApp = (env: Env, overrides: { lyrics?: LyricsProvider } = {}) 
   app.get('/api/v1/products', async () =>
     db.select().from(products).where(eq(products.active, true)),
   );
+  /** Beacons públicos de funil (whitelist, sem payload de história/PII); best-effort. */
+  app.post(
+    '/api/v1/analytics/beacon',
+    { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } },
+    async (request) => {
+      const input = beaconEventSchema.parse(request.body);
+      try {
+        await db.insert(analyticsEvents).values({
+          event: input.event,
+          productType: input.productType ?? null,
+          orderPublicId: null,
+          visitorId: input.visitorId,
+          utm: null,
+        });
+      } catch (error) {
+        app.log.warn({ error: sanitizeAiError(error) }, 'analytics beacon dropped');
+      }
+      return { received: true };
+    },
+  );
   app.post('/api/v1/orders', async (request, reply) => {
     const input = createOrderSchema.parse(request.body);
     const [product] = await db
@@ -155,16 +328,21 @@ export const buildApp = (env: Env, overrides: { lyrics?: LyricsProvider } = {}) 
       secure: env.NODE_ENV === 'production',
       path: '/',
     });
-    return reply.status(201).send({ ...order!, accessToken: token });
+    const { publicId, productType, status, priceCents, createdAt } = order!;
+    await recordEvent('order_created', order!, input.visitorId);
+    return reply.status(201).send({ publicId, productType, status, priceCents, createdAt });
   });
   app.patch('/api/v1/orders/:publicId/story', async (request) => {
-    const order = await orderFor((request.params as { publicId: string }).publicId);
+    const storyPublicId = (request.params as { publicId: string }).publicId;
+    if (!hasAccess(storyPublicId, request)) throw fail('Acesso privado necessário', 401);
+    const order = await orderFor(storyPublicId);
     if (!['draft', 'story_completed'].includes(order.status))
       throw fail('O formulário não pode mais ser alterado.');
     const story = storySchema.parse(request.body);
     if (story.productType !== order.productType) throw fail('Tipo de produto inválido.');
     const content = evaluateContent(JSON.stringify(story));
     if (!content.allowed) throw fail(content.reason);
+    const isFirstSave = order.status === 'draft';
     await db.transaction(async (tx) => {
       await tx
         .insert(storySubmissions)
@@ -173,7 +351,7 @@ export const buildApp = (env: Env, overrides: { lyrics?: LyricsProvider } = {}) 
           target: storySubmissions.orderId,
           set: { data: story, updatedAt: new Date() },
         });
-      if (order.status === 'draft') {
+      if (isFirstSave) {
         assertTransition('draft', 'story_completed');
         await tx
           .update(orders)
@@ -181,13 +359,16 @@ export const buildApp = (env: Env, overrides: { lyrics?: LyricsProvider } = {}) 
           .where(eq(orders.id, order.id));
       }
     });
+    if (isFirstSave) await recordEvent('story_saved', order);
     return { saved: true };
   });
   app.post(
     '/api/v1/orders/:publicId/lyrics/generate',
     { config: { rateLimit: { max: 5, timeWindow: '1 hour' } } },
     async (request) => {
-      const order = await orderFor((request.params as { publicId: string }).publicId);
+      const generatePublicId = (request.params as { publicId: string }).publicId;
+      if (!hasAccess(generatePublicId, request)) throw fail('Acesso privado necessário', 401);
+      const order = await orderFor(generatePublicId);
       if (order.status === 'draft') throw fail('Preencha o formulário antes de gerar a letra.');
       if (
         !['story_completed', 'lyrics_ready', 'failed', 'lyrics_generating'].includes(order.status)
@@ -215,13 +396,44 @@ export const buildApp = (env: Env, overrides: { lyrics?: LyricsProvider } = {}) 
       }
       try {
         let feedback: string | undefined;
-        let content: Awaited<ReturnType<LyricsProvider['generate']>> | undefined;
+        let content: GeneratedLyrics | undefined;
         let errors: string[] = [];
         for (let attempt = 1; attempt <= 3; attempt += 1) {
-          content = await lyrics.generate(story, feedback);
-          errors = validateLyrics(content, story);
-          if (!errors.length) break;
+          let result: LyricsResult;
+          const startedAt = Date.now();
+          try {
+            result = await lyrics.generate(story, feedback);
+          } catch (error) {
+            await recordLyricsUsage(
+              order.id,
+              {
+                requestId: null,
+                model: env.OPENROUTER_TEXT_MODEL ?? 'unknown',
+                inputTokens: 0,
+                outputTokens: 0,
+                costUsd: null,
+                latencyMs: Date.now() - startedAt,
+              },
+              'error',
+              sanitizeAiError(error),
+              attempt,
+            );
+            throw error;
+          }
+          errors = validateLyrics(result.lyrics, story);
+          if (!errors.length) {
+            await recordLyricsUsage(order.id, result.usage, 'ok', null, attempt);
+            content = result.lyrics;
+            break;
+          }
           feedback = errors.join(' ');
+          await recordLyricsUsage(
+            order.id,
+            result.usage,
+            'rejected',
+            `Letra reprovada na validação: ${feedback}`.slice(0, 500),
+            attempt,
+          );
           content = undefined;
         }
         if (!content) throw fail(`${errors.join(' ')} Tente novamente.`);
@@ -232,13 +444,16 @@ export const buildApp = (env: Env, overrides: { lyrics?: LyricsProvider } = {}) 
         const [version] = await db
           .insert(lyricsVersions)
           .values({ orderId: order.id, number: countRow.count + 1, kind: 'generated', content })
-          .returning();
+          .returning({ number: lyricsVersions.number, kind: lyricsVersions.kind });
+        assertTransition('lyrics_generating', 'lyrics_ready');
         await db
           .update(orders)
           .set({ status: 'lyrics_ready', updatedAt: new Date() })
           .where(eq(orders.id, order.id));
+        await recordEvent('lyrics_generated', order);
         return version;
       } catch (error) {
+        assertTransition('lyrics_generating', 'failed');
         await db
           .update(orders)
           .set({ status: 'failed', updatedAt: new Date() })
@@ -247,9 +462,18 @@ export const buildApp = (env: Env, overrides: { lyrics?: LyricsProvider } = {}) 
       }
     },
   );
-  app.patch('/api/v1/orders/:publicId/lyrics/:versionId', async (request) => {
-    const order = await orderFor((request.params as { publicId: string }).publicId);
+  app.patch('/api/v1/orders/:publicId/lyrics/:versionNumber', async (request) => {
+    const editPublicId = (request.params as { publicId: string }).publicId;
+    if (!hasAccess(editPublicId, request)) throw fail('Acesso privado necessário', 401);
+    const order = await orderFor(editPublicId);
     if (order.status !== 'lyrics_ready') throw fail('A letra está bloqueada.');
+    const versionNumber = Number((request.params as { versionNumber: string }).versionNumber);
+    if (!Number.isInteger(versionNumber) || versionNumber < 1) throw fail('Versão inválida.', 404);
+    const [base] = await db
+      .select({ number: lyricsVersions.number })
+      .from(lyricsVersions)
+      .where(and(eq(lyricsVersions.orderId, order.id), eq(lyricsVersions.number, versionNumber)));
+    if (!base) throw fail('Versão não encontrada.', 404);
     const content = generatedLyricsSchema.parse(request.body);
     const [countRow = { count: 0 }] = await db
       .select({ count: sql<number>`count(*)::int` })
@@ -258,27 +482,52 @@ export const buildApp = (env: Env, overrides: { lyrics?: LyricsProvider } = {}) 
     const [version] = await db
       .insert(lyricsVersions)
       .values({ orderId: order.id, number: countRow.count + 1, kind: 'edited', content })
-      .returning();
+      .returning({ number: lyricsVersions.number, kind: lyricsVersions.kind });
     return version;
   });
-  app.post('/api/v1/orders/:publicId/lyrics/:versionId/approve', async (request) => {
-    const order = await orderFor((request.params as { publicId: string }).publicId);
+  app.post('/api/v1/orders/:publicId/lyrics/:versionNumber/approve', async (request) => {
+    const approvePublicId = (request.params as { publicId: string }).publicId;
+    if (!hasAccess(approvePublicId, request)) throw fail('Acesso privado necessário', 401);
+    const order = await orderFor(approvePublicId);
     if (order.status !== 'lyrics_ready') throw fail('A letra não está disponível.');
-    const versionId = (request.params as { versionId: string }).versionId;
+    const versionNumber = Number((request.params as { versionNumber: string }).versionNumber);
+    if (!Number.isInteger(versionNumber) || versionNumber < 1) throw fail('Versão inválida.', 404);
+    const [version] = await db
+      .select({ id: lyricsVersions.id })
+      .from(lyricsVersions)
+      .where(and(eq(lyricsVersions.orderId, order.id), eq(lyricsVersions.number, versionNumber)));
+    if (!version) throw fail('Versão não encontrada.', 404);
+    const { content } = approveLyricsSchema.parse(request.body ?? {});
     await db.transaction(async (tx) => {
+      let approvedId = version.id;
+      if (content) {
+        const [countRow = { count: 0 }] = await tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(lyricsVersions)
+          .where(eq(lyricsVersions.orderId, order.id));
+        const [edited] = await tx
+          .insert(lyricsVersions)
+          .values({ orderId: order.id, number: countRow.count + 1, kind: 'edited', content })
+          .returning({ id: lyricsVersions.id });
+        approvedId = edited!.id;
+      }
       await tx
         .update(lyricsVersions)
         .set({ approvedAt: new Date() })
-        .where(and(eq(lyricsVersions.id, versionId), eq(lyricsVersions.orderId, order.id)));
+        .where(eq(lyricsVersions.id, approvedId));
+      assertTransition(order.status, 'lyrics_approved');
       await tx
         .update(orders)
         .set({ status: 'lyrics_approved', updatedAt: new Date() })
         .where(eq(orders.id, order.id));
     });
+    await recordEvent('lyrics_approved', order);
     return { approved: true };
   });
   app.post('/api/v1/orders/:publicId/checkout', async (request) => {
-    const order = await orderFor((request.params as { publicId: string }).publicId);
+    const checkoutPublicId = (request.params as { publicId: string }).publicId;
+    if (!hasAccess(checkoutPublicId, request)) throw fail('Acesso privado necessário', 401);
+    const order = await orderFor(checkoutPublicId);
     if (!['lyrics_approved', 'payment_pending'].includes(order.status))
       throw fail('Aprove a letra antes do pagamento.');
     const [existing] = await db
@@ -307,6 +556,7 @@ export const buildApp = (env: Env, overrides: { lyrics?: LyricsProvider } = {}) 
           })
           .returning();
       });
+      await recordEvent('checkout_started', order);
       return {
         paymentId: devPayment!.id,
         checkoutUrl: `${env.WEB_URL}/pedido/${order.publicId}`,
@@ -338,6 +588,7 @@ export const buildApp = (env: Env, overrides: { lyrics?: LyricsProvider } = {}) 
         })
         .returning();
     });
+    await recordEvent('checkout_started', order);
     return { paymentId: payment!.id, checkoutUrl: preference.initPoint };
   });
   /** O webhook apenas notifica: valida assinatura, busca o pagamento e confere valor/referência. */
@@ -394,9 +645,8 @@ export const buildApp = (env: Env, overrides: { lyrics?: LyricsProvider } = {}) 
       if (mpPayment.status === 'approved') {
         if (mpPayment.amountCents !== order.priceCents || mpPayment.currency !== 'BRL')
           throw new Error('Payment amount or currency does not match the order.');
+        let justPaid = false;
         await db.transaction(async (tx) => {
-          const [current] = await tx.select().from(payments).where(eq(payments.id, payment.id));
-          if (current?.status === 'approved') return;
           await tx
             .update(payments)
             .set({
@@ -423,8 +673,10 @@ export const buildApp = (env: Env, overrides: { lyrics?: LyricsProvider } = {}) 
                 maxAttempts: 6,
               })
               .onConflictDoNothing();
+            justPaid = true;
           }
         });
+        if (justPaid) await recordEvent('paid', order);
       } else if (['rejected', 'cancelled'].includes(mpPayment.status)) {
         await db
           .update(payments)
@@ -450,6 +702,8 @@ export const buildApp = (env: Env, overrides: { lyrics?: LyricsProvider } = {}) 
     const paymentId = (request.params as { paymentId: string }).paymentId;
     const [payment] = await db.select().from(payments).where(eq(payments.id, paymentId));
     if (!payment || payment.provider !== 'dev') throw fail('Pagamento não encontrado', 404);
+    let devPaid: { publicId: string; productType: typeof orders.$inferSelect.productType } | null =
+      null;
     await db.transaction(async (tx) => {
       const [current] = await tx.select().from(payments).where(eq(payments.id, paymentId));
       if (current?.status !== 'pending') return;
@@ -475,8 +729,10 @@ export const buildApp = (env: Env, overrides: { lyrics?: LyricsProvider } = {}) 
             maxAttempts: 6,
           })
           .onConflictDoNothing();
+        devPaid = { publicId: order.publicId, productType: order.productType };
       }
     });
+    if (devPaid) await recordEvent('paid', devPaid);
     return { approved: true };
   });
   app.post('/api/v1/orders/:publicId/access/exchange', async (request, reply) => {
@@ -498,36 +754,65 @@ export const buildApp = (env: Env, overrides: { lyrics?: LyricsProvider } = {}) 
   });
   app.get('/api/v1/orders/:publicId', async (request) => {
     const publicId = (request.params as { publicId: string }).publicId;
-    if (!hasAccess(publicId, request)) throw fail('Acesso privado necessário', 401);
+    if (!hasViewAccess(publicId, request)) throw fail('Acesso privado necessário', 401);
+    const full = hasAccess(publicId, request);
     const order = await orderFor(publicId);
-    const [story] = await db
-      .select()
-      .from(storySubmissions)
-      .where(eq(storySubmissions.orderId, order.id));
+    const [story] = full
+      ? await db.select().from(storySubmissions).where(eq(storySubmissions.orderId, order.id))
+      : [undefined];
     const versions = await db
       .select()
       .from(lyricsVersions)
       .where(eq(lyricsVersions.orderId, order.id))
       .orderBy(desc(lyricsVersions.number));
     const audio = await db
-      .select({
-        id: audioGenerations.id,
-        assetId: audioGenerations.assetId,
-        variant: audioGenerations.variant,
-        status: audioGenerations.status,
-      })
+      .select({ variant: audioGenerations.variant, status: audioGenerations.status })
       .from(audioGenerations)
       .where(eq(audioGenerations.orderId, order.id));
-    return { order, story: story?.data, lyrics: versions, audio, privateAccess: true };
+    const publicOrder = {
+      publicId: order.publicId,
+      productType: order.productType,
+      status: order.status,
+      priceCents: order.priceCents,
+      createdAt: order.createdAt,
+    };
+    const publicLyrics = versions.map((version) => ({
+      number: version.number,
+      kind: version.kind,
+      approvedAt: version.approvedAt,
+      content: version.content,
+    }));
+    return {
+      order: publicOrder,
+      story: story?.data,
+      lyrics: publicLyrics,
+      audio,
+      privateAccess: full,
+    };
   });
-  app.get('/api/v1/orders/:publicId/assets/:assetId/download', async (request, reply) => {
-    const { publicId, assetId } = request.params as { publicId: string; assetId: string };
-    if (!hasAccess(publicId, request)) throw fail('Acesso privado necessário', 401);
+  app.get('/api/v1/orders/:publicId/assets/:variant/download', async (request, reply) => {
+    const { publicId, variant } = request.params as { publicId: string; variant: string };
+    if (!hasViewAccess(publicId, request)) throw fail('Acesso privado necessário', 401);
     const order = await orderFor(publicId);
+    if (order.status !== 'delivered') throw fail('Entrega indisponível.', 404);
+    const variantNumber = Number(variant);
+    if (!Number.isInteger(variantNumber) || variantNumber < 1)
+      throw fail('Arquivo não encontrado', 404);
+    const [generation] = await db
+      .select({ assetId: audioGenerations.assetId })
+      .from(audioGenerations)
+      .where(
+        and(
+          eq(audioGenerations.orderId, order.id),
+          eq(audioGenerations.variant, variantNumber),
+          eq(audioGenerations.status, 'completed'),
+        ),
+      );
+    if (!generation?.assetId) throw fail('Arquivo não encontrado', 404);
     const [asset] = await db
       .select()
       .from(storedAssets)
-      .where(and(eq(storedAssets.id, assetId), eq(storedAssets.orderId, order.id)));
+      .where(and(eq(storedAssets.id, generation.assetId), eq(storedAssets.orderId, order.id)));
     if (!asset) throw fail('Arquivo não encontrado', 404);
     reply
       .type(asset.mimeType)
@@ -555,24 +840,25 @@ export const buildApp = (env: Env, overrides: { lyrics?: LyricsProvider } = {}) 
       throw fail('Link de entrega inválido ou expirado.', 404);
     const [order] = await db.select().from(orders).where(eq(orders.id, delivery.orderId));
     if (!order || order.status !== 'delivered') throw fail('Entrega indisponível.', 404);
-    const lyrics = await db
+    const lyricRows = await db
       .select()
       .from(lyricsVersions)
       .where(
         and(eq(lyricsVersions.orderId, order.id), sql`${lyricsVersions.approvedAt} is not null`),
       );
+    const lyrics = lyricRows.map((row) => ({
+      number: row.number,
+      kind: row.kind,
+      content: row.content,
+    }));
     const audio = await db
-      .select({
-        id: audioGenerations.id,
-        assetId: audioGenerations.assetId,
-        variant: audioGenerations.variant,
-      })
+      .select({ variant: audioGenerations.variant })
       .from(audioGenerations)
       .where(and(eq(audioGenerations.orderId, order.id), eq(audioGenerations.status, 'completed')));
     return { publicOrderId: order.publicId, lyrics, audio };
   });
-  app.get('/api/v1/deliveries/:token/files/:assetId/download', async (request, reply) => {
-    const { token, assetId } = request.params as { token: string; assetId: string };
+  app.get('/api/v1/deliveries/:token/files/:variant/download', async (request, reply) => {
+    const { token, variant } = request.params as { token: string; variant: string };
     const [delivery] = await db
       .select()
       .from(deliveries)
@@ -584,10 +870,26 @@ export const buildApp = (env: Env, overrides: { lyrics?: LyricsProvider } = {}) 
       );
     if (!delivery || (delivery.expiresAt && delivery.expiresAt <= new Date()))
       throw fail('Link de entrega inválido ou expirado.', 404);
+    const variantNumber = Number(variant);
+    if (!Number.isInteger(variantNumber) || variantNumber < 1)
+      throw fail('Arquivo não encontrado', 404);
+    const [generation] = await db
+      .select({ assetId: audioGenerations.assetId })
+      .from(audioGenerations)
+      .where(
+        and(
+          eq(audioGenerations.orderId, delivery.orderId),
+          eq(audioGenerations.variant, variantNumber),
+          eq(audioGenerations.status, 'completed'),
+        ),
+      );
+    if (!generation?.assetId) throw fail('Arquivo não encontrado', 404);
     const [asset] = await db
       .select()
       .from(storedAssets)
-      .where(and(eq(storedAssets.id, assetId), eq(storedAssets.orderId, delivery.orderId)));
+      .where(
+        and(eq(storedAssets.id, generation.assetId), eq(storedAssets.orderId, delivery.orderId)),
+      );
     if (!asset) throw fail('Arquivo não encontrado', 404);
     reply
       .type(asset.mimeType)
@@ -606,6 +908,39 @@ export const buildApp = (env: Env, overrides: { lyrics?: LyricsProvider } = {}) 
     await db.insert(revisionRequests).values({ orderId: order.id, message: body.message });
     return { received: true };
   });
+  /**
+   * Recovery sem cadastro: um link de entrega válido (que o cliente tem no e-mail)
+   * vira sessão limitada de leitura neste navegador (sem story/PII, sem mutações).
+   * Só vale para pedido já entregue.
+   */
+  app.post(
+    '/api/v1/deliveries/:token/access',
+    { config: { rateLimit: { max: 20, timeWindow: '1 hour' } } },
+    async (request, reply) => {
+      deliveryAccessSchema.parse(request.body ?? {});
+      const token = (request.params as { token: string }).token;
+      const [delivery] = await db
+        .select()
+        .from(deliveries)
+        .where(
+          and(
+            eq(deliveries.tokenHash, hashToken(token, env.CUSTOMER_ACCESS_TOKEN_PEPPER)),
+            sql`${deliveries.revokedAt} is null`,
+          ),
+        );
+      if (!delivery || (delivery.expiresAt && delivery.expiresAt <= new Date()))
+        throw fail('Link de entrega inválido ou expirado.', 404);
+      const [order] = await db.select().from(orders).where(eq(orders.id, delivery.orderId));
+      if (!order || order.status !== 'delivered') throw fail('Entrega indisponível.', 404);
+      reply.setCookie(`order_view_${order.publicId}`, '1', {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: env.NODE_ENV === 'production',
+        path: '/',
+      });
+      return { publicId: order.publicId };
+    },
+  );
   app.post(
     '/api/v1/admin/session',
     { config: { rateLimit: { max: 5, timeWindow: '15 minutes' } } },
@@ -649,15 +984,17 @@ export const buildApp = (env: Env, overrides: { lyrics?: LyricsProvider } = {}) 
   });
   app.get('/api/v1/admin/orders', async (request) => {
     await requireAdmin(request);
-    const query = request.query as { status?: string; productType?: string; page?: string };
-    const page = Math.max(1, Number(query.page ?? 1));
+    const query = adminOrdersQuerySchema.parse(request.query ?? {});
+    // Filtro exibe dia corrido Brasil (America/Sao_Paulo, com DST histórico via Intl);
+    // persistência e comparação seguem em UTC ISO. (AGENTS.md: UTC no armazenamento.)
+    const fromUtc = query.from ? spDayStartUtc(query.from) : undefined;
+    const toUtc = query.to ? spDayStartUtc(nextUtcDate(query.to)) : undefined;
     const filters = [
-      query.status
-        ? eq(orders.status, query.status as typeof orders.$inferSelect.status)
-        : undefined,
-      query.productType
-        ? eq(orders.productType, query.productType as typeof orders.$inferSelect.productType)
-        : undefined,
+      query.status ? eq(orders.status, query.status) : undefined,
+      query.productType ? eq(orders.productType, query.productType) : undefined,
+      query.q ? sql`${orders.publicId} ilike ${`%${query.q}%`}` : undefined,
+      fromUtc ? sql`${orders.createdAt} >= ${fromUtc}` : undefined,
+      toUtc ? sql`${orders.createdAt} < ${toUtc}` : undefined,
     ].filter(Boolean);
     const rows = await db
       .select()
@@ -665,8 +1002,8 @@ export const buildApp = (env: Env, overrides: { lyrics?: LyricsProvider } = {}) 
       .where(filters.length ? and(...filters) : undefined)
       .orderBy(desc(orders.createdAt))
       .limit(30)
-      .offset((page - 1) * 30);
-    return { items: rows, page };
+      .offset((query.page - 1) * 30);
+    return { items: rows, page: query.page };
   });
   app.get('/api/v1/admin/orders/:id', async (request) => {
     await requireAdmin(request);
@@ -686,7 +1023,155 @@ export const buildApp = (env: Env, overrides: { lyrics?: LyricsProvider } = {}) 
     const jobs = await db.select().from(generationJobs).where(eq(generationJobs.orderId, id));
     const audio = await db.select().from(audioGenerations).where(eq(audioGenerations.orderId, id));
     const notes = await db.select().from(adminNotes).where(eq(adminNotes.orderId, id));
-    return { order, story: story?.data, lyrics, payments: paymentRows, jobs, audio, notes };
+    const usageRows = await db.select().from(aiUsage).where(eq(aiUsage.orderId, id));
+    const [sums] = await db
+      .select({
+        totalUsd: sql<string | null>`sum(${aiUsage.costUsd})::text`,
+        lyricsUsd: sql<
+          string | null
+        >`sum(${aiUsage.costUsd}) filter (where ${aiUsage.kind} = 'lyrics')::text`,
+        audioUsd: sql<
+          string | null
+        >`sum(${aiUsage.costUsd}) filter (where ${aiUsage.kind} = 'audio')::text`,
+        inputTokens: sql<number>`coalesce(sum(${aiUsage.inputTokens}), 0)::int`,
+        outputTokens: sql<number>`coalesce(sum(${aiUsage.outputTokens}), 0)::int`,
+        calls: sql<number>`count(*)::int`,
+      })
+      .from(aiUsage)
+      .where(eq(aiUsage.orderId, id));
+    const aiCost = {
+      totalUsd: sums?.totalUsd ?? '0',
+      lyricsUsd: sums?.lyricsUsd ?? '0',
+      audioUsd: sums?.audioUsd ?? '0',
+      inputTokens: sums?.inputTokens ?? 0,
+      outputTokens: sums?.outputTokens ?? 0,
+      calls: sums?.calls ?? 0,
+    };
+    return {
+      order,
+      story: story?.data,
+      lyrics,
+      payments: paymentRows,
+      jobs,
+      audio,
+      notes,
+      aiUsage: usageRows,
+      aiCost,
+    };
+  });
+  /** Custo de IA agregado para o painel admin (mês corrente + últimos 30 dias + key). */
+  app.get('/api/v1/admin/ai-usage/summary', async (request) => {
+    await requireAdmin(request);
+    const zero = '0';
+    const [month] = await db
+      .select({
+        totalUsd: sql<string | null>`sum(${aiUsage.costUsd})::text`,
+        lyricsUsd: sql<
+          string | null
+        >`sum(${aiUsage.costUsd}) filter (where ${aiUsage.kind} = 'lyrics')::text`,
+        audioUsd: sql<
+          string | null
+        >`sum(${aiUsage.costUsd}) filter (where ${aiUsage.kind} = 'audio')::text`,
+        calls: sql<number>`count(*)::int`,
+        blocked: sql<number>`count(*) filter (where ${aiUsage.status} = 'blocked')::int`,
+      })
+      .from(aiUsage)
+      .where(sql`date_trunc('month', ${aiUsage.createdAt}) = date_trunc('month', now())`);
+    const byDay = await db
+      .select({
+        day: sql<string>`date_trunc('day', ${aiUsage.createdAt})::date::text`,
+        totalUsd: sql<string | null>`sum(${aiUsage.costUsd})::text`,
+        calls: sql<number>`count(*)::int`,
+        blocked: sql<number>`count(*) filter (where ${aiUsage.status} = 'blocked')::int`,
+      })
+      .from(aiUsage)
+      .where(sql`${aiUsage.createdAt} >= date_trunc('day', now()) - interval '29 days'`)
+      .groupBy(sql`1`)
+      .orderBy(sql`1`);
+    return {
+      month: {
+        totalUsd: month?.totalUsd ?? zero,
+        lyricsUsd: month?.lyricsUsd ?? zero,
+        audioUsd: month?.audioUsd ?? zero,
+        calls: month?.calls ?? 0,
+        blocked: month?.blocked ?? 0,
+      },
+      byDay: byDay.map((row) => ({
+        day: row.day,
+        totalUsd: row.totalUsd ?? zero,
+        calls: row.calls,
+        blocked: row.blocked,
+      })),
+      key: await fetchOpenRouterKeyUsage(env.OPENROUTER_API_KEY),
+    };
+  });
+  /** Funil de conversão por etapa (pedidos distintos) + custo médio por entrega. */
+  app.get('/api/v1/admin/analytics/funnel', async (request) => {
+    await requireAdmin(request);
+    const rawDays = Number((request.query as { days?: string }).days ?? 30);
+    const days = Number.isFinite(rawDays) ? Math.min(90, Math.max(1, Math.floor(rawDays))) : 30;
+    const stages = [
+      'order_created',
+      'story_saved',
+      'lyrics_generated',
+      'lyrics_approved',
+      'checkout_started',
+      'paid',
+      'delivered',
+    ];
+    const counts = await db
+      .select({
+        event: analyticsEvents.event,
+        orders: sql<number>`count(distinct ${analyticsEvents.orderPublicId})::int`,
+      })
+      .from(analyticsEvents)
+      .where(
+        and(
+          sql`${analyticsEvents.createdAt} >= date_trunc('day', now()) - interval '${sql.raw(String(days))} days'`,
+          inArray(analyticsEvents.event, stages),
+        ),
+      )
+      .groupBy(analyticsEvents.event);
+    const byEvent = new Map(counts.map((row) => [row.event, row.orders]));
+    const steps = stages.map((event, index) => {
+      const orders = byEvent.get(event) ?? 0;
+      const previous = index === 0 ? null : (byEvent.get(stages[index - 1] as string) ?? 0);
+      return { event, orders, rateFromPrevious: previous ? orders / previous : null };
+    });
+    const [cost] = await db
+      .select({
+        perSaleUsd: sql<
+          string | null
+        >`(sum(${aiUsage.costUsd}) / nullif(count(distinct ${aiUsage.orderId}), 0))::text`,
+        sales: sql<number>`count(distinct ${aiUsage.orderId})::int`,
+      })
+      .from(aiUsage)
+      .where(
+        and(
+          sql`${aiUsage.createdAt} >= date_trunc('day', now()) - interval '${sql.raw(String(days))} days'`,
+          sql`exists (select 1 from orders where orders.id = ${aiUsage.orderId} and orders.status = 'delivered')`,
+        ),
+      );
+    const preOrder = await db
+      .select({
+        event: analyticsEvents.event,
+        visitors: sql<number>`count(distinct ${analyticsEvents.visitorId})::int`,
+      })
+      .from(analyticsEvents)
+      .where(
+        and(
+          sql`${analyticsEvents.createdAt} >= date_trunc('day', now()) - interval '${sql.raw(String(days))} days'`,
+          inArray(analyticsEvents.event, ['landing_view', 'form_started', 'form_completed']),
+        ),
+      )
+      .groupBy(analyticsEvents.event);
+    return {
+      days,
+      steps,
+      preOrder,
+      perSaleUsd: cost?.perSaleUsd ?? '0',
+      salesWithCost: cost?.sales ?? 0,
+    };
   });
   /** Prévia em streaming do áudio para a revisão administrativa. */
   app.get('/api/v1/admin/orders/:id/assets/:assetId/stream', async (request, reply) => {
@@ -750,6 +1235,19 @@ export const buildApp = (env: Env, overrides: { lyrics?: LyricsProvider } = {}) 
     if (!audio || audio.status !== 'completed') throw fail('Áudio não está pronto.', 400);
     const [order] = await db.select().from(orders).where(eq(orders.id, id));
     if (order?.status !== 'review_required') throw fail('Pedido não está em revisão.', 400);
+    const ready = await db
+      .select({ variant: audioGenerations.variant })
+      .from(audioGenerations)
+      .where(
+        and(
+          eq(audioGenerations.orderId, id),
+          eq(audioGenerations.status, 'completed'),
+          sql`${audioGenerations.assetId} is not null`,
+        ),
+      );
+    const readyVariants = new Set(ready.map((row) => row.variant));
+    if (!readyVariants.has(1) || !readyVariants.has(2))
+      throw fail('Ambas as versões precisam estar prontas com áudio.', 400);
     assertTransition('review_required', 'delivered');
     const token = createAccessToken();
     await db.transaction(async (tx) => {
@@ -765,7 +1263,20 @@ export const buildApp = (env: Env, overrides: { lyrics?: LyricsProvider } = {}) 
           deliveredAt: new Date(),
         })
         .onConflictDoNothing();
+      // O worker conclui este job pelo caminho já entregue (par pronto + delivered)
+      // e dispara o e-mail com o link privado; reexecutável via email_deliveries.
+      await tx
+        .insert(generationJobs)
+        .values({
+          type: 'generate_audio',
+          orderId: id,
+          payload: {},
+          idempotencyKey: `audio:${id}:deliver-notify:${Date.now()}`,
+          maxAttempts: 6,
+        })
+        .onConflictDoNothing();
     });
+    await recordEvent('delivered', order);
     return { delivered: true, deliveryToken: token };
   });
   app.post('/api/v1/admin/orders/:id/audio/:audioId/regenerate', async (request) => {

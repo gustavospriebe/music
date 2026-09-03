@@ -7,7 +7,6 @@ export type Story = Record<string, unknown> & {
   facts: string[];
 };
 export type Lyrics = {
-  id: string;
   number: number;
   kind: string;
   approvedAt?: string | null;
@@ -27,7 +26,6 @@ export type LyricsContent = {
   };
 };
 export type Order = {
-  id: string;
   publicId: string;
   productType: ProductType;
   status: string;
@@ -36,14 +34,25 @@ export type Order = {
 };
 export type OrderDetail = { order: Order; story?: Story; lyrics: Lyrics[]; audio: Audio[] };
 export type Audio = {
-  id: string;
-  assetId?: string;
   variant: number;
   status: string;
-  storage_key?: string;
-  mime_type?: string;
 };
-
+/** Admin-authenticated views keep addressing internal rows directly. */
+export type AdminAudio = Audio & { id: string; assetId: string };
+export const formatUsd = (value: number): string =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+/** Formats an exact decimal USD string (from PostgreSQL `numeric`) without float math. */
+export const formatUsdExact = (value: string): string => {
+  const [int = '0', frac = ''] = value.split('.');
+  const digits = `${frac}000`;
+  let cents = Number(digits.slice(0, 2)) + (Number(digits[2]) >= 5 ? 1 : 0);
+  let dollars = Number(int);
+  if (cents >= 100) {
+    cents -= 100;
+    dollars += 1;
+  }
+  return `$${dollars}.${String(cents).padStart(2, '0')}`;
+};
 export const products: Record<
   ProductType,
   { title: string; eyebrow: string; description: string; accent: string; bullets: string[] }

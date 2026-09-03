@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 const lyric = {
-  id: 'lyric-1',
+  number: 1,
   content: {
     title: 'A Resenha da Bia',
     summary: 'Demo local',
@@ -43,12 +43,12 @@ test('fluxo completo local: história, letra, checkout e acompanhamento', async 
     if (method === 'GET' && url.pathname.endsWith('/orders/order-demo-123'))
       return route.fulfill({
         json: {
-          order: { publicId: 'order-demo-123' },
+          order: { publicId: 'order-demo-123', priceCents: 4990 },
           lyrics: lyricReady ? [lyric] : [],
           audio: [],
         },
       });
-    if (method === 'POST' && url.pathname.includes('/lyrics/lyric-1/approve'))
+    if (method === 'POST' && url.pathname.includes('/lyrics/1/approve'))
       return route.fulfill({ json: { approved: true } });
     if (method === 'POST' && url.pathname.endsWith('/checkout'))
       return route.fulfill({
@@ -67,15 +67,17 @@ test('fluxo completo local: história, letra, checkout e acompanhamento', async 
   await page.getByLabel(/qual é a ocasião/i).fill('Aniversário');
   await page.getByLabel(/^seu nome$/i).fill('Nina');
   await page.getByLabel(/^seu e-mail$/i).fill('nina@example.test');
-  await page.getByLabel(/histórias, apelidos/i).fill('Sempre chega cantando');
+  await page
+    .getByLabel(/histórias, apelidos/i)
+    .fill('Sempre chega cantando\nTodo churrasco vira show');
   await page.getByLabel(/aceito os termos/i).check();
   await page.getByRole('button', { name: /gerar minha letra/i }).click();
   await expect(page).toHaveURL(/\/criar\/letra\?pedido=order-demo-123/);
   await page.getByRole('button', { name: /criar letra agora/i }).click();
   await page.getByRole('button', { name: /aprovar letra/i }).click();
   await expect(page).toHaveURL(/\/criar\/checkout\?pedido=order-demo-123/);
+  await expect(page.getByText(/R\$\s*49,90/)).toBeVisible();
   await page.getByRole('button', { name: /pagar com mercado pago/i }).click();
-  await expect(page).toHaveURL(/\/pedido\/order-demo-123/);
   await expect(page.getByRole('heading', { name: /sendo produzida/i })).toBeVisible();
 });
 
@@ -92,7 +94,9 @@ test('checkout repete o redirecionamento ao Mercado Pago sem duplicar pagamento'
       });
     }
     if (path.endsWith('/orders/order-repeat'))
-      return route.fulfill({ json: { order: {}, lyrics: [], audio: [] } });
+      return route.fulfill({
+        json: { order: { publicId: 'order-repeat', priceCents: 4990 }, lyrics: [], audio: [] },
+      });
     return route.fulfill({ status: 404, json: { error: { message: 'Não encontrado' } } });
   });
 
@@ -122,4 +126,50 @@ test('rotas legais e link de entrega inválido não expõem dados pessoais', asy
   await expect(page.getByRole('heading', { name: /privacidade/i })).toBeVisible();
   await page.goto('/entrega/token-opaco-inválido');
   await expect(page.getByText(/link de entrega inválido ou expirado/i)).toBeVisible();
+});
+
+test('minhas músicas lista pedidos do navegador com fallback de acesso', async ({ page }) => {
+  await page.route('**/api/v1/orders/order-mine-123', (route) =>
+    route.fulfill({
+      json: {
+        order: { publicId: 'order-mine-123', status: 'delivered' },
+        lyrics: [],
+        audio: [],
+      },
+    }),
+  );
+  await page.route('**/api/v1/orders/order-gone-456', (route) =>
+    route.fulfill({ status: 401, json: { error: { message: 'Acesso privado necessário' } } }),
+  );
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'resenha:my-orders',
+      JSON.stringify(['order-mine-123', 'order-gone-456']),
+    );
+  });
+  await page.goto('/minhas-musicas');
+  await expect(page.getByRole('link', { name: /ver pedido/i })).toBeVisible();
+  await expect(page.getByText(/disponível só neste navegador\/dispositivo/i)).toBeVisible();
+});
+
+test('link de entrega recupera o acesso ao pedido neste navegador', async ({ page }) => {
+  await page.route('**/api/v1/deliveries/token-recovery-123**', async (route) => {
+    if (route.request().method() === 'POST')
+      return route.fulfill({ json: { publicId: 'order-recovered-1' } });
+    return route.fulfill({
+      json: { publicOrderId: 'order-recovered-1', lyrics: [], audio: [] },
+    });
+  });
+  await page.route('**/api/v1/orders/order-recovered-1', (route) =>
+    route.fulfill({
+      json: {
+        order: { publicId: 'order-recovered-1', status: 'delivered', priceCents: 4990 },
+        lyrics: [],
+        audio: [],
+      },
+    }),
+  );
+  await page.goto('/entrega/token-recovery-123');
+  await page.getByRole('button', { name: /acompanhar pedido neste navegador/i }).click();
+  await expect(page).toHaveURL(/\/pedido\/order-recovered-1/);
 });

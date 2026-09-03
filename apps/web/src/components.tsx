@@ -26,6 +26,7 @@ export function Header() {
       <nav className={open ? 'open' : ''}>
         <NavLink to="/">Como funciona</NavLink>
         <NavLink to="/criar">Criar</NavLink>
+        <NavLink to="/minhas-musicas">Minhas músicas</NavLink>
         <Link className="nav-cta" to="/criar">
           Criar minha música <ArrowRight size={16} />
         </Link>

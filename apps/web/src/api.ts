@@ -1,10 +1,33 @@
-import type { Audio, Lyrics, LyricsContent, OrderDetail, ProductType, Story } from './types';
+import type {
+  AdminAudio,
+  Audio,
+  Lyrics,
+  LyricsContent,
+  OrderDetail,
+  ProductType,
+  Story,
+} from './types';
 
 /** Em dev, usa URL relativa e o proxy do Vite (funciona via Tailscale/IP). Produção exige VITE_API_URL no build. */
 const baseUrl =
   import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? '' : 'http://localhost:3001');
 const url = (path: string) => `${baseUrl}/api/v1${path}`;
 
+/** Random per-browser id (localStorage, no PII); links pre-order beacons to the order. */
+export const visitorId = (): string => {
+  const key = 'resenha:visitor';
+  let id: string | null = null;
+  try {
+    id = localStorage.getItem(key);
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem(key, id);
+    }
+  } catch {
+    id = `anon-${Date.now()}`;
+  }
+  return id;
+};
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -33,10 +56,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  createOrder: (productType: ProductType) =>
-    request<{ publicId: string; accessToken: string }>(`/orders`, {
+  createOrder: (productType: ProductType, visitorId?: string) =>
+    request<{ publicId: string }>(`/orders`, {
       method: 'POST',
-      body: JSON.stringify({ productType }),
+      body: JSON.stringify(visitorId ? { productType, visitorId } : { productType }),
     }),
   saveStory: (publicId: string, story: Story) =>
     request<{ saved: true }>(`/orders/${publicId}/story`, {
@@ -44,15 +67,18 @@ export const api = {
       body: JSON.stringify(story),
     }),
   getOrder: (publicId: string) => request<OrderDetail>(`/orders/${publicId}`),
-  generateLyrics: (publicId: string) =>
-    request(`/orders/${publicId}/lyrics/generate`, { method: 'POST' }),
-  editLyrics: (publicId: string, versionId: string, content: LyricsContent) =>
-    request(`/orders/${publicId}/lyrics/${versionId}`, {
+  editLyrics: (publicId: string, versionNumber: number, content: LyricsContent) =>
+    request(`/orders/${publicId}/lyrics/${versionNumber}`, {
       method: 'PATCH',
       body: JSON.stringify(content),
     }),
-  approveLyrics: (publicId: string, versionId: string) =>
-    request(`/orders/${publicId}/lyrics/${versionId}/approve`, { method: 'POST' }),
+  approveLyrics: (publicId: string, versionNumber: number, content?: LyricsContent) =>
+    request(`/orders/${publicId}/lyrics/${versionNumber}/approve`, {
+      method: 'POST',
+      ...(content ? { body: JSON.stringify({ content }) } : {}),
+    }),
+  generateLyrics: (publicId: string) =>
+    request(`/orders/${publicId}/lyrics/generate`, { method: 'POST' }),
   checkout: (publicId: string) =>
     request<{ paymentId: string; checkoutUrl: string; dev?: boolean }>(
       `/orders/${publicId}/checkout`,
@@ -66,20 +92,23 @@ export const api = {
       lyrics: Lyrics[];
       audio: Audio[];
     }>(`/deliveries/${token}`),
-  deliveryDownloadUrl: (token: string, assetId: string) =>
-    url(`/deliveries/${token}/files/${assetId}/download`),
+  deliveryDownloadUrl: (token: string, variant: number) =>
+    url(`/deliveries/${token}/files/${variant}/download`),
   exchangeAccess: (publicId: string, token: string) =>
     request<{ ok: true }>(`/orders/${publicId}/access/exchange`, {
       method: 'POST',
       body: JSON.stringify({ token }),
     }),
+  /** Recovery: link de entrega válido vira sessão limitada de leitura neste navegador. */
+  recoverViaDelivery: (token: string) =>
+    request<{ publicId: string }>(`/deliveries/${token}/access`, { method: 'POST' }),
   requestRevision: (publicId: string, message: string) =>
     request<{ received: true }>(`/orders/${publicId}/revision-requests`, {
       method: 'POST',
       body: JSON.stringify({ message }),
     }),
-  downloadUrl: (publicId: string, assetId: string) =>
-    url(`/orders/${publicId}/assets/${assetId}/download`),
+  downloadUrl: (publicId: string, variant: number) =>
+    url(`/orders/${publicId}/assets/${variant}/download`),
   adminLogin: (email: string, password: string) =>
     request<{ authenticated: true; expiresAt: string }>('/admin/session', {
       method: 'POST',
@@ -92,6 +121,11 @@ export const api = {
     }),
   adminRebuildAudio: (id: string) =>
     request<{ queued: true }>(`/admin/orders/${id}/audio/rebuild`, { method: 'POST' }),
+  adminApproveAudio: (id: string, audioId: string) =>
+    request<{ delivered: true; deliveryToken: string }>(
+      `/admin/orders/${id}/audio/${audioId}/approve`,
+      { method: 'POST' },
+    ),
   adminLogout: () => request<void>('/admin/session', { method: 'DELETE' }),
   adminOrders: (filters = '') =>
     request<{ items: AdminOrder[]; page: number }>(`/admin/orders${filters}`),
@@ -107,8 +141,26 @@ export const api = {
     }),
   rotateAccess: (id: string) =>
     request<{ accessToken: string }>(`/admin/orders/${id}/access/rotate`, { method: 'POST' }),
+  aiUsageSummary: () => request<AiUsageSummary>('/admin/ai-usage/summary'),
+  analyticsFunnel: (days = 30) => request<Funnel>(`/admin/analytics/funnel?days=${days}`),
+  /** Beacon de funil: fire-and-forget, nunca rejeita (não quebra o fluxo do cliente). */
+  sendBeacon: (event: 'landing_view' | 'form_started' | 'form_completed'): void => {
+    void fetch(url('/analytics/beacon'), {
+      method: 'POST',
+      keepalive: true,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ event, visitorId: visitorId() }),
+    }).catch(() => undefined);
+  },
 };
-
+export type FunnelStep = { event: string; orders: number; rateFromPrevious: number | null };
+export type Funnel = {
+  days: number;
+  steps: FunnelStep[];
+  preOrder: { event: string; visitors: number }[];
+  perSaleUsd: string;
+  salesWithCost: number;
+};
 export type AdminOrder = {
   id: string;
   publicId: string;
@@ -117,12 +169,45 @@ export type AdminOrder = {
   priceCents: number;
   createdAt: string;
 };
+/** Admin-authenticated lyric rows keep addressing internal versions directly. */
+export type AdminLyrics = Lyrics & { id: string };
 export type AdminOrderDetail = {
   order: AdminOrder;
   story?: Story;
-  lyrics: import('./types').Lyrics[];
+  lyrics: AdminLyrics[];
   payments: { id: string; status: string; amountCents: number }[];
   jobs: { id: string; status: string; type: string; lastError?: string | null }[];
-  audio: import('./types').Audio[];
+  audio: AdminAudio[];
   notes: { id: string; message: string; createdAt: string }[];
+  aiUsage: AiUsageRow[];
+  aiCost: AiCost;
+};
+export type AiUsageRow = {
+  id: string;
+  kind: string;
+  provider: string;
+  model: string | null;
+  externalId: string | null;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: string | null;
+  latencyMs: number | null;
+  status: string;
+  error: string | null;
+  attempt: number;
+  createdAt: string;
+};
+export type AiCost = {
+  /** Decimal USD strings summed exactly in PostgreSQL; format, never float-sum. */
+  totalUsd: string;
+  lyricsUsd: string;
+  audioUsd: string;
+  inputTokens: number;
+  outputTokens: number;
+  calls: number;
+};
+export type AiUsageSummary = {
+  month: AiCost & { blocked: number };
+  byDay: { day: string; totalUsd: string; calls: number; blocked: number }[];
+  key: { usage: number; limit: number | null; remaining: number | null } | null;
 };

@@ -10,20 +10,16 @@ afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 
 describe('API client', () => {
-  it('posts the selected product and returns private access data', async () => {
+  it('posts the selected product and returns the public order reference', async () => {
     server.use(
       http.post('http://localhost:3001/api/v1/orders', async ({ request }) => {
         await expect(request.json()).resolves.toEqual({ productType: 'friend_roast' });
-        return HttpResponse.json(
-          { publicId: 'public-order-123', accessToken: 'opaque-token' },
-          { status: 201 },
-        );
+        return HttpResponse.json({ publicId: 'public-order-123' }, { status: 201 });
       }),
     );
 
     await expect(api.createOrder('friend_roast')).resolves.toEqual({
       publicId: 'public-order-123',
-      accessToken: 'opaque-token',
     });
   });
 
@@ -58,5 +54,60 @@ describe('API client', () => {
 
     await api.generateLyrics('public-order-1');
     expect(sawContentType).toBeNull();
+  });
+
+  it('envia o texto atual ao aprovar e troca link de entrega por acesso', async () => {
+    let approveBody: unknown;
+    server.use(
+      http.post(
+        'http://localhost:3001/api/v1/orders/public-order-1/lyrics/2/approve',
+        async ({ request }) => {
+          approveBody = await request.json();
+          return HttpResponse.json({ approved: true });
+        },
+      ),
+      http.post('http://localhost:3001/api/v1/deliveries/token-abc/access', () =>
+        HttpResponse.json({ publicId: 'public-order-1' }),
+      ),
+    );
+
+    await api.approveLyrics('public-order-1', 2, {
+      title: 'Título',
+      summary: 'resumo',
+      fullLyrics: 'letra atual',
+      sections: [],
+      musicalDirection: {
+        genre: 'pagode',
+        mood: 'animado',
+        tempo: 'medium',
+        voice: 'female',
+        instrumentation: [],
+      },
+    });
+    expect(approveBody).toMatchObject({ content: { fullLyrics: 'letra atual' } });
+    await expect(api.recoverViaDelivery('token-abc')).resolves.toEqual({
+      publicId: 'public-order-1',
+    });
+  });
+
+  it('troca token de acesso via POST com corpo', async () => {
+    let method = '';
+    let tokenBody: unknown;
+    server.use(
+      http.all(
+        'http://localhost:3001/api/v1/orders/public-order-1/access/exchange',
+        async ({ request }) => {
+          method = request.method;
+          tokenBody = await request.json();
+          return HttpResponse.json({ ok: true });
+        },
+      ),
+    );
+
+    await expect(api.exchangeAccess('public-order-1', 'token-secreto-123')).resolves.toEqual({
+      ok: true,
+    });
+    expect(method).toBe('POST');
+    expect(tokenBody).toEqual({ token: 'token-secreto-123' });
   });
 });

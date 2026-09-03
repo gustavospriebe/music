@@ -70,13 +70,31 @@ const lyricsWith = (fullLyrics: string): GeneratedLyrics => ({
   safetyNotes: [],
 });
 
+let usageSeq = 0;
+const testUsage = () => {
+  usageSeq += 1;
+  return {
+    requestId: `test-request-${usageSeq}`,
+    model: 'test-model',
+    inputTokens: 100,
+    outputTokens: 200,
+    costUsd: '0.000123',
+    latencyMs: 10,
+  };
+};
 const compliantLyrics = (): LyricsProvider => ({
-  generate: async (input) => lyricsWith([input.subjectName, ...input.facts].join('\n')),
+  generate: async (input) => ({
+    lyrics: lyricsWith([input.subjectName, ...input.facts].join('\n')),
+    usage: testUsage(),
+  }),
 });
 const paraphrasingLyrics = (calls: { count: number }): LyricsProvider => ({
   generate: async () => {
     calls.count += 1;
-    return lyricsWith('Uma letra bonita que ignora os fatos literais.');
+    return {
+      lyrics: lyricsWith('Uma letra bonita que ignora os fatos literais.'),
+      usage: testUsage(),
+    };
   },
 });
 const throwingLyrics = (): LyricsProvider => ({
@@ -87,8 +105,8 @@ const throwingLyrics = (): LyricsProvider => ({
 
 const { db, pool } = createDb(env.DATABASE_URL);
 const apps: FastifyInstance[] = [];
-const appWith = (lyrics: LyricsProvider) => {
-  const app = buildApp(env, { lyrics });
+const appWith = async (lyrics: LyricsProvider) => {
+  const app = await buildApp(env, { lyrics });
   apps.push(app);
   return app;
 };
@@ -127,7 +145,7 @@ const createOrderAndStory = async (app: FastifyInstance): Promise<Session> => {
 
 describe('fluxo completo de pedido', () => {
   it('história → letra → aprovação → checkout dev → fila de áudio', async () => {
-    const app = appWith(compliantLyrics());
+    const app = await appWith(compliantLyrics());
     const session = await createOrderAndStory(app);
     const generated = await app.inject({
       method: 'POST',
@@ -135,10 +153,10 @@ describe('fluxo completo de pedido', () => {
       headers: { cookie: session.cookie },
     });
     expect(generated.statusCode).toBe(200);
-    const versionId = (generated.json() as { id: string }).id;
+    const versionNumber = (generated.json() as { number: number }).number;
     const approved = await app.inject({
       method: 'POST',
-      url: `/api/v1/orders/${session.publicId}/lyrics/${versionId}/approve`,
+      url: `/api/v1/orders/${session.publicId}/lyrics/${versionNumber}/approve`,
       headers: { cookie: session.cookie },
     });
     expect(approved.statusCode).toBe(200);
@@ -168,18 +186,200 @@ describe('fluxo completo de pedido', () => {
     expect(jobRows[0]?.count).toBe(1);
   });
 
+  it('aprovar com edição pendente salva e aprova o texto atual em vez de descartá-lo', async () => {
+    const app = await appWith(compliantLyrics());
+    const session = await createOrderAndStory(app);
+    const generated = await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/lyrics/generate`,
+      headers: { cookie: session.cookie },
+    });
+    const versionNumber = (generated.json() as { number: number }).number;
+    const edited = lyricsWith('Versão editada no último segundo antes de aprovar');
+    const approved = await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/lyrics/${versionNumber}/approve`,
+      headers: { cookie: session.cookie },
+      payload: { content: edited },
+    });
+    expect(approved.statusCode).toBe(200);
+    const detail = await app.inject({
+      method: 'GET',
+      url: `/api/v1/orders/${session.publicId}`,
+      headers: { cookie: session.cookie },
+    });
+    const body = detail.json() as {
+      order: { status: string };
+      lyrics: {
+        number: number;
+        kind: string;
+        approvedAt: string | null;
+        content: { fullLyrics: string };
+      }[];
+    };
+    expect(body.order.status).toBe('lyrics_approved');
+    const approvedLyric = body.lyrics.find((lyric) => lyric.approvedAt);
+    expect(approvedLyric?.content.fullLyrics).toBe(
+      'Versão editada no último segundo antes de aprovar',
+    );
+    expect(approvedLyric?.kind).toBe('edited');
+  });
+
+  it('link de entrega válido vira sessão de leitura: recovery sem cadastro', async () => {
+    const app = await appWith(compliantLyrics());
+    const session = await createOrderAndStory(app);
+    const generated = await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/lyrics/generate`,
+      headers: { cookie: session.cookie },
+    });
+    const versionNumber = (generated.json() as { number: number }).number;
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/lyrics/${versionNumber}/approve`,
+      headers: { cookie: session.cookie },
+    });
+    const checkout = await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/checkout`,
+      headers: { cookie: session.cookie },
+    });
+    const paymentId = (checkout.json() as { paymentId: string }).paymentId;
+    await app.inject({ method: 'POST', url: `/api/v1/dev/payments/${paymentId}/approve` });
+    // Fixture: worker terminou os áudios sob revisão manual (par 1+2 com asset).
+    const { rows: orderRows } = await pool.query('select id from orders where public_id=$1', [
+      session.publicId,
+    ]);
+    const orderId = orderRows[0]?.id as string;
+    await pool.query("update orders set status='review_required' where id=$1", [orderId]);
+    const { rows: audioRows } = await pool.query(
+      `with files as (
+         insert into stored_files(order_id,storage_key,mime_type,size_bytes)
+         values ($1,'${session.publicId}-v1.mp3','audio/mpeg',10),($1,'${session.publicId}-v2.mp3','audio/mpeg',10)
+         returning id
+       )
+       insert into audio_generations(order_id,variant,status,provider,asset_id)
+       select $1, row_number() over (), 'completed', 'test', id from files
+       returning id`,
+      [orderId],
+    );
+    const login = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/session',
+      payload: { email: 'admin@example.test', password: 'a-simple-local-password' },
+    });
+    const adminCookie = String(login.headers['set-cookie']).split(';')[0] ?? '';
+    const delivered = await app.inject({
+      method: 'POST',
+      url: `/api/v1/admin/orders/${orderId}/audio/${audioRows[0]?.id as string}/approve`,
+      headers: { cookie: adminCookie },
+    });
+    expect(delivered.statusCode).toBe(200);
+    const { rows: jobRows } = await pool.query(
+      "select count(*)::int as count from generation_jobs where order_id=$1 and type='generate_audio' and status='pending' and idempotency_key like '%:deliver-notify:%'",
+      [orderId],
+    );
+    expect(jobRows[0]?.count).toBe(1);
+    const deliveryToken = (delivered.json() as { deliveryToken: string }).deliveryToken;
+    // Sem cookie (aparelho novo): o token do e-mail recupera o acesso.
+    const recovered = await app.inject({
+      method: 'POST',
+      url: `/api/v1/deliveries/${deliveryToken}/access`,
+    });
+    expect(recovered.statusCode).toBe(200);
+    expect(recovered.json()).toEqual({ publicId: session.publicId });
+    const recoveredCookie = String(recovered.headers['set-cookie']).split(';')[0] ?? '';
+    expect(recoveredCookie).toMatch(/^order_view_/);
+    const detail = await app.inject({
+      method: 'GET',
+      url: `/api/v1/orders/${session.publicId}`,
+      headers: { cookie: recoveredCookie },
+    });
+    expect(detail.statusCode).toBe(200);
+    const detailBody = detail.json() as { story?: unknown; privateAccess: boolean };
+    expect(detailBody.story).toBeUndefined();
+    expect(detailBody.privateAccess).toBe(false);
+    const blocked = await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/orders/${session.publicId}/story`,
+      headers: { cookie: recoveredCookie },
+      payload: story,
+    });
+    expect(blocked.statusCode).toBe(401);
+    const invalid = await app.inject({
+      method: 'POST',
+      url: '/api/v1/deliveries/token-invalido-12345678901234567890/access',
+    });
+    expect(invalid.statusCode).toBe(404);
+  });
+
+  it('approve administrativo recusa entrega parcial: só o par 1+2 fecha a venda', async () => {
+    const app = await appWith(compliantLyrics());
+    const session = await createOrderAndStory(app);
+    const generated = await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/lyrics/generate`,
+      headers: { cookie: session.cookie },
+    });
+    const versionNumber = (generated.json() as { number: number }).number;
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/lyrics/${versionNumber}/approve`,
+      headers: { cookie: session.cookie },
+    });
+    const checkout = await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/checkout`,
+      headers: { cookie: session.cookie },
+    });
+    const paymentId = (checkout.json() as { paymentId: string }).paymentId;
+    await app.inject({ method: 'POST', url: `/api/v1/dev/payments/${paymentId}/approve` });
+    const { rows: orderRows } = await pool.query('select id from orders where public_id=$1', [
+      session.publicId,
+    ]);
+    const orderId = orderRows[0]?.id as string;
+    await pool.query("update orders set status='review_required' where id=$1", [orderId]);
+    const { rows: fileRows } = await pool.query(
+      `insert into stored_files(order_id,storage_key,mime_type,size_bytes)
+       values ($1,'${session.publicId}-solo.mp3','audio/mpeg',10) returning id`,
+      [orderId],
+    );
+    const { rows: audioRows } = await pool.query(
+      "insert into audio_generations(order_id,variant,status,provider,asset_id) values($1,1,'completed','test',$2) returning id",
+      [orderId, fileRows[0]?.id],
+    );
+    const login = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/session',
+      payload: { email: 'admin@example.test', password: 'a-simple-local-password' },
+    });
+    const adminCookie = String(login.headers['set-cookie']).split(';')[0] ?? '';
+    const refused = await app.inject({
+      method: 'POST',
+      url: `/api/v1/admin/orders/${orderId}/audio/${audioRows[0]?.id as string}/approve`,
+      headers: { cookie: adminCookie },
+    });
+    expect(refused.statusCode).toBe(400);
+    const { rows: statusRows } = await pool.query('select status from orders where id=$1', [
+      orderId,
+    ]);
+    expect(statusRows[0]?.status).toBe('review_required');
+  });
+
   it('geração que falha deixa o pedido recuperável: novo clique gera com sucesso', async () => {
-    const failingApp = appWith(throwingLyrics());
+    const failingApp = await appWith(throwingLyrics());
     const session = await createOrderAndStory(failingApp);
     const failed = await failingApp.inject({
       method: 'POST',
       url: `/api/v1/orders/${session.publicId}/lyrics/generate`,
+      headers: { cookie: session.cookie },
     });
     expect(failed.statusCode).toBe(500);
-    const retryApp = appWith(compliantLyrics());
+    const retryApp = await appWith(compliantLyrics());
     const retry = await retryApp.inject({
       method: 'POST',
       url: `/api/v1/orders/${session.publicId}/lyrics/generate`,
+      headers: { cookie: session.cookie },
     });
     expect(retry.statusCode).toBe(200);
     const current = await retryApp.inject({
@@ -192,11 +392,12 @@ describe('fluxo completo de pedido', () => {
 
   it('letra que parafraseia fatos tenta 3x com feedback e falha de forma recuperável', async () => {
     const calls = { count: 0 };
-    const app = appWith(paraphrasingLyrics(calls));
+    const app = await appWith(paraphrasingLyrics(calls));
     const session = await createOrderAndStory(app);
     const response = await app.inject({
       method: 'POST',
       url: `/api/v1/orders/${session.publicId}/lyrics/generate`,
+      headers: { cookie: session.cookie },
     });
     expect(response.statusCode).toBe(400);
     expect(calls.count).toBe(3);
@@ -205,24 +406,29 @@ describe('fluxo completo de pedido', () => {
       session.publicId,
     ]);
     expect(rows[0]?.status).toBe('failed');
-    const retry = await appWith(compliantLyrics()).inject({
+    const retry = await (
+      await appWith(compliantLyrics())
+    ).inject({
       method: 'POST',
       url: `/api/v1/orders/${session.publicId}/lyrics/generate`,
+      headers: { cookie: session.cookie },
     });
     expect(retry.statusCode).toBe(200);
   });
 
   it('draft orienta a preencher o formulário; crash em lyrics_generating se recupera', async () => {
-    const app = appWith(compliantLyrics());
+    const app = await appWith(compliantLyrics());
     const created = await app.inject({
       method: 'POST',
       url: '/api/v1/orders',
       payload: { productType: 'friend_roast' },
     });
     const publicId = (created.json() as { publicId: string }).publicId;
+    const freshCookie = String(created.headers['set-cookie']).split(';')[0] ?? '';
     const blocked = await app.inject({
       method: 'POST',
       url: `/api/v1/orders/${publicId}/lyrics/generate`,
+      headers: { cookie: freshCookie },
     });
     expect(blocked.statusCode).toBe(400);
     expect(String(blocked.json().error.message)).toContain('Preencha o formulário');
@@ -234,12 +440,13 @@ describe('fluxo completo de pedido', () => {
     const recovered = await app.inject({
       method: 'POST',
       url: `/api/v1/orders/${session.publicId}/lyrics/generate`,
+      headers: { cookie: session.cookie },
     });
     expect(recovered.statusCode).toBe(200);
   });
 
   it('checkout exige letra aprovada', async () => {
-    const app = appWith(compliantLyrics());
+    const app = await appWith(compliantLyrics());
     const session = await createOrderAndStory(app);
     const early = await app.inject({
       method: 'POST',
@@ -251,27 +458,284 @@ describe('fluxo completo de pedido', () => {
   });
 
   it('acesso privado não vaza sem cookie', async () => {
-    const app = appWith(compliantLyrics());
+    const app = await appWith(compliantLyrics());
     const session = await createOrderAndStory(app);
     const peek = await app.inject({ method: 'GET', url: `/api/v1/orders/${session.publicId}` });
     expect(peek.statusCode).toBe(401);
   });
 
-  it('admin revisa a letra aprovada e reinclui o pedido na produção', async () => {
-    const app = appWith(compliantLyrics());
+  it('respostas públicas não expõem ids internos, hashes ou tokens', async () => {
+    const app = await appWith(compliantLyrics());
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/v1/orders',
+      payload: { productType: 'friend_roast' },
+    });
+    expect(created.statusCode).toBe(201);
+    const createdBody = created.json() as Record<string, unknown>;
+    expect(Object.keys(createdBody).sort()).toEqual(
+      ['createdAt', 'priceCents', 'productType', 'publicId', 'status'].sort(),
+    );
     const session = await createOrderAndStory(app);
-    const generated = await app.inject({
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/lyrics/generate`,
+      headers: { cookie: session.cookie },
+    });
+    const detail = await app.inject({
+      method: 'GET',
+      url: `/api/v1/orders/${session.publicId}`,
+      headers: { cookie: session.cookie },
+    });
+    expect(detail.statusCode).toBe(200);
+    const body = detail.json() as {
+      order: Record<string, unknown>;
+      lyrics: Record<string, unknown>[];
+      audio: Record<string, unknown>[];
+    };
+    expect(Object.keys(body.order).sort()).toEqual(
+      ['createdAt', 'priceCents', 'productType', 'publicId', 'status'].sort(),
+    );
+    for (const lyric of body.lyrics)
+      expect(Object.keys(lyric).sort()).toEqual(['approvedAt', 'content', 'kind', 'number'].sort());
+    for (const track of body.audio)
+      expect(Object.keys(track).sort()).toEqual(['status', 'variant'].sort());
+  });
+
+  it('aprovar versão inexistente responde 404 sem transitar o pedido', async () => {
+    const app = await appWith(compliantLyrics());
+    const session = await createOrderAndStory(app);
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/lyrics/generate`,
+      headers: { cookie: session.cookie },
+    });
+    const missing = await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/lyrics/999/approve`,
+      headers: { cookie: session.cookie },
+    });
+    expect(missing.statusCode).toBe(404);
+    const { rows } = await pool.query('select status from orders where public_id=$1', [
+      session.publicId,
+    ]);
+    expect(rows[0]?.status).toBe('lyrics_ready');
+  });
+  it('mutações sem cookie de acesso respondem 401', async () => {
+    const app = await appWith(compliantLyrics());
+    const session = await createOrderAndStory(app);
+    const story = await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/orders/${session.publicId}/story`,
+      payload: {},
+    });
+    expect(story.statusCode).toBe(401);
+    const generate = await app.inject({
       method: 'POST',
       url: `/api/v1/orders/${session.publicId}/lyrics/generate`,
     });
-    const { id: versionId, orderId } = generated.json() as { id: string; orderId: string };
+    expect(generate.statusCode).toBe(401);
+    const checkout = await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/checkout`,
+    });
+    expect(checkout.statusCode).toBe(401);
+  });
+  it('custo de IA é persistido por tentativa e agregado no admin', async () => {
+    const app = await appWith(compliantLyrics());
+    const session = await createOrderAndStory(app);
     await app.inject({
       method: 'POST',
-      url: `/api/v1/orders/${session.publicId}/lyrics/${versionId}/approve`,
+      url: `/api/v1/orders/${session.publicId}/lyrics/generate`,
+      headers: { cookie: session.cookie },
+    });
+    const { rows } = await pool.query(
+      'select ai_usage.kind as kind, ai_usage.status as status, model, input_tokens, output_tokens, cost_usd, latency_ms, external_id, attempt from ai_usage join orders on orders.id = ai_usage.order_id where orders.public_id = $1 order by ai_usage.created_at',
+      [session.publicId],
+    );
+    expect(rows.length).toBe(1);
+    expect(rows[0]).toMatchObject({
+      kind: 'lyrics',
+      status: 'ok',
+      model: 'test-model',
+      input_tokens: 100,
+      output_tokens: 200,
+      attempt: 1,
+    });
+    expect(Number(rows[0]?.cost_usd)).toBeCloseTo(0.000123, 6);
+    expect(rows[0]?.external_id).toMatch(/^test-request-/);
+
+    const login = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/session',
+      payload: { email: 'admin@example.test', password: 'a-simple-local-password' },
+    });
+    const cookie = String(login.headers['set-cookie']).split(';')[0] ?? '';
+    const summaryNoAuth = await app.inject({
+      method: 'GET',
+      url: '/api/v1/admin/ai-usage/summary',
+    });
+    expect(summaryNoAuth.statusCode).toBe(401);
+    const summary = await app.inject({
+      method: 'GET',
+      url: '/api/v1/admin/ai-usage/summary',
+      headers: { cookie },
+    });
+    expect(summary.statusCode).toBe(200);
+    const body = summary.json() as {
+      month: { totalUsd: string; lyricsUsd: string; calls: number };
+      byDay: { day: string; totalUsd: string; calls: number }[];
+    };
+    expect(body.month.calls).toBeGreaterThanOrEqual(1);
+    expect(Number(body.month.totalUsd)).toBeGreaterThan(0);
+    expect(Number(body.month.lyricsUsd)).toBeGreaterThan(0);
+    expect(Array.isArray(body.byDay)).toBe(true);
+  });
+
+  it('funil registra etapas server-side e agrega no admin', async () => {
+    const app = await appWith(compliantLyrics());
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/v1/orders',
+      payload: { productType: 'friend_roast' },
+    });
+    expect(created.statusCode).toBe(201);
+    const session = await createOrderAndStory(app);
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/lyrics/generate`,
+      headers: { cookie: session.cookie },
+    });
+    const generated = await app.inject({
+      method: 'GET',
+      url: `/api/v1/orders/${session.publicId}`,
+      headers: { cookie: session.cookie },
+    });
+    const versionNumber = (generated.json() as { lyrics: { number: number }[] }).lyrics[0]?.number;
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/lyrics/${versionNumber}/approve`,
+      headers: { cookie: session.cookie },
     });
     const checkout = await app.inject({
       method: 'POST',
       url: `/api/v1/orders/${session.publicId}/checkout`,
+      headers: { cookie: session.cookie },
+    });
+    const paymentId = (checkout.json() as { paymentId: string }).paymentId;
+    await app.inject({ method: 'POST', url: `/api/v1/dev/payments/${paymentId}/approve` });
+    const { rows } = await pool.query(
+      'select event from analytics_events where order_public_id=$1 order by created_at',
+      [session.publicId],
+    );
+    expect(rows.map((row) => row.event)).toEqual([
+      'order_created',
+      'story_saved',
+      'lyrics_generated',
+      'lyrics_approved',
+      'checkout_started',
+      'paid',
+    ]);
+    const login = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/session',
+      payload: { email: 'admin@example.test', password: 'a-simple-local-password' },
+    });
+    const cookie = String(login.headers['set-cookie']).split(';')[0] ?? '';
+    const noAuth = await app.inject({ method: 'GET', url: '/api/v1/admin/analytics/funnel' });
+    expect(noAuth.statusCode).toBe(401);
+    const funnel = await app.inject({
+      method: 'GET',
+      url: '/api/v1/admin/analytics/funnel?days=abc',
+      headers: { cookie },
+    });
+    expect(funnel.statusCode).toBe(200);
+    const body = funnel.json() as {
+      days: number;
+      steps: { event: string; orders: number; rateFromPrevious: number | null }[];
+      perSaleUsd: string;
+      salesWithCost: number;
+    };
+    expect(body.days).toBe(30);
+    expect(body.steps[0]).toMatchObject({ event: 'order_created' });
+    expect(body.steps.find((step) => step.event === 'paid')?.orders).toBeGreaterThanOrEqual(1);
+  });
+
+  it('beacon público valida whitelist e uuid, sem PII', async () => {
+    const app = await appWith(compliantLyrics());
+    const badEvent = await app.inject({
+      method: 'POST',
+      url: '/api/v1/analytics/beacon',
+      payload: { event: 'story_leak', visitorId: '09b7d5a0-9a1c-4b2e-9c3f-2b7c1e5a6d01' },
+    });
+    expect(badEvent.statusCode).toBe(400);
+    const badVisitor = await app.inject({
+      method: 'POST',
+      url: '/api/v1/analytics/beacon',
+      payload: { event: 'landing_view', visitorId: 'not-a-uuid' },
+    });
+    expect(badVisitor.statusCode).toBe(400);
+    const visitorId = '09b7d5a0-9a1c-4b2e-9c3f-2b7c1e5a6d01';
+    for (const event of ['landing_view', 'form_started', 'form_completed']) {
+      const ok = await app.inject({
+        method: 'POST',
+        url: '/api/v1/analytics/beacon',
+        payload: { event, visitorId },
+      });
+      expect(ok.statusCode).toBe(200);
+    }
+    const login = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/session',
+      payload: { email: 'admin@example.test', password: 'a-simple-local-password' },
+    });
+    const cookie = String(login.headers['set-cookie']).split(';')[0] ?? '';
+    const funnel = await app.inject({
+      method: 'GET',
+      url: '/api/v1/admin/analytics/funnel',
+      headers: { cookie },
+    });
+    const body = funnel.json() as {
+      preOrder: { event: string; visitors: number }[];
+    };
+    expect(
+      body.preOrder.find((step) => step.event === 'landing_view')?.visitors,
+    ).toBeGreaterThanOrEqual(1);
+    let limited = 0;
+    for (let i = 0; i < 61; i += 1) {
+      const probe = await app.inject({
+        method: 'POST',
+        url: '/api/v1/analytics/beacon',
+        payload: { event: 'landing_view', visitorId },
+      });
+      if (probe.statusCode === 429) limited += 1;
+    }
+    expect(limited).toBeGreaterThanOrEqual(1);
+  });
+
+  it('admin revisa a letra aprovada e reinclui o pedido na produção', async () => {
+    const app = await appWith(compliantLyrics());
+    const session = await createOrderAndStory(app);
+    const generated = await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/lyrics/generate`,
+      headers: { cookie: session.cookie },
+    });
+    const { number: versionNumber } = generated.json() as { number: number };
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/lyrics/${versionNumber}/approve`,
+      headers: { cookie: session.cookie },
+    });
+    const { rows: orderRows } = await pool.query('select id from orders where public_id=$1', [
+      session.publicId,
+    ]);
+    const orderId = orderRows[0]?.id as string;
+    expect(orderId).toBeTruthy();
+    const checkout = await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/checkout`,
+      headers: { cookie: session.cookie },
     });
     const paymentId = (checkout.json() as { paymentId: string }).paymentId;
     await app.inject({ method: 'POST', url: `/api/v1/dev/payments/${paymentId}/approve` });
@@ -305,5 +769,43 @@ describe('fluxo completo de pedido', () => {
     expect(rebuilt.statusCode).toBe(200);
     const statusRows = await pool.query('select status from orders where id=$1', [orderId]);
     expect(statusRows.rows[0]?.status).toBe('audio_queued');
+  });
+
+  it('lista admin filtra por busca, status e período; status inválido é 400', async () => {
+    const app = await appWith(compliantLyrics());
+    const first = await createOrderAndStory(app);
+    const second = await createOrderAndStory(app);
+    const login = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/session',
+      payload: { email: 'admin@example.test', password: 'a-simple-local-password' },
+    });
+    const cookie = String(login.headers['set-cookie']).split(';')[0] ?? '';
+    const list = async (query: string) =>
+      app.inject({ method: 'GET', url: `/api/v1/admin/orders${query}`, headers: { cookie } });
+    const byId = await list(`?q=${second.publicId}`);
+    expect(byId.statusCode).toBe(200);
+    const byIdBody = byId.json() as { items: { publicId: string }[] };
+    expect(byIdBody.items.map((item) => item.publicId)).toEqual([second.publicId]);
+    const byStatus = await list('?status=story_completed');
+    expect(byStatus.statusCode).toBe(200);
+    const statusIds = (byStatus.json() as { items: { publicId: string }[] }).items.map(
+      (item) => item.publicId,
+    );
+    expect(statusIds).toContain(first.publicId);
+    expect(statusIds).toContain(second.publicId);
+    const future = await list('?from=2099-01-01');
+    expect((future.json() as { items: unknown[] }).items).toEqual([]);
+    // Borda GMT-3: 02:00Z de 04/09 = 23:00 de 03/09 em São Paulo.
+    await pool.query("update orders set created_at='2026-09-04T02:00:00.000Z' where public_id=$1", [
+      second.publicId,
+    ]);
+    const idsOf = async (query: string) =>
+      ((await list(query)).json() as { items: { publicId: string }[] }).items.map(
+        (item) => item.publicId,
+      );
+    expect(await idsOf('?from=2026-09-03&to=2026-09-03')).toContain(second.publicId);
+    expect(await idsOf('?from=2026-09-04')).not.toContain(second.publicId);
+    expect(await idsOf('?to=2026-09-02')).not.toContain(second.publicId);
   });
 });

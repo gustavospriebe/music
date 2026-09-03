@@ -116,18 +116,35 @@ export type GeneratedLyrics = z.infer<typeof generatedLyricsSchema>;
 
 export const publicIdSchema = z.string().regex(/^[A-Za-z0-9_-]{8,32}$/);
 export const uuidSchema = z.string().uuid();
-export const createOrderSchema = z.object({ productType: productTypeSchema });
+export const createOrderSchema = z.object({
+  productType: productTypeSchema,
+  /** Random per-browser UUID (no PII); links pre-order beacons to the order. */
+  visitorId: uuidSchema.optional(),
+});
+export const beaconEventSchema = z.object({
+  event: z.enum(['landing_view', 'form_started', 'form_completed']),
+  visitorId: uuidSchema,
+  productType: productTypeSchema.optional(),
+});
 export const updateStorySchema = storySchema;
 export const editLyricsSchema = generatedLyricsSchema;
-export const approveLyricsSchema = z.object({}).strict();
+export const approveLyricsSchema = z.object({ content: generatedLyricsSchema.optional() }).strict();
 export const checkoutSchema = z.object({
   idempotencyKey: z.string().trim().min(8).max(180).optional(),
 });
 export const accessExchangeSchema = z.object({ token: z.string().min(32).max(256) });
-export const revisionRequestSchema = z.object({ message: conciseText(2, 1_000) });
+export const deliveryAccessSchema = z.object({}).strict();
 export const paginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
+});
+export const adminOrdersQuerySchema = z.object({
+  status: orderStatusSchema.optional(),
+  productType: productTypeSchema.optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  q: z.string().trim().min(1).max(32).optional(),
+  from: z.string().date().optional(),
+  to: z.string().date().optional(),
 });
 export const adminLoginSchema = z.object({
   email: z.string().trim().email().max(320),

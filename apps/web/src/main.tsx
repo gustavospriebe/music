@@ -11,6 +11,7 @@ import {
   Landing,
   Legal,
   LyricsReview,
+  MyOrders,
   NotFound,
   OrderPlayer,
   OrderStatus,
@@ -37,6 +38,7 @@ function App() {
       <Route path="/criar/historia" element={<CreateStory />} />
       <Route path="/criar/letra" element={<LyricsReview />} />
       <Route path="/criar/checkout" element={<Checkout />} />
+      <Route path="/minhas-musicas" element={<MyOrders />} />
       <Route path="/pedido/:publicOrderId" element={<OrderStatus />} />
       <Route path="/pedido/:publicOrderId/entrega" element={<OrderPlayer />} />
       <Route path="/entrega/:deliveryToken" element={<Delivery />} />

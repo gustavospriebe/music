@@ -169,6 +169,24 @@ export const makeMusicPrompt = (lyrics: GeneratedLyrics): string => {
     `Letra aprovada:\n${lyrics.fullLyrics}`,
   ].join('\n');
 };
+/** Append-only AI cost ledger: one row per provider call. `rejected` passed the provider but failed local validation (still billed). */
+export const aiUsageKinds = ['lyrics', 'audio'] as const;
+export type AiUsageKind = (typeof aiUsageKinds)[number];
+export const aiUsageStatuses = ['ok', 'blocked', 'error', 'rejected'] as const;
+export type AiUsageStatus = (typeof aiUsageStatuses)[number];
+export type AiUsageSample = {
+  requestId: string | null;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  /** Decimal USD string as reported by the provider (`usage.cost`); never converted. */
+  costUsd: string | null;
+  latencyMs: number;
+};
+export const sanitizeAiError = (error: unknown): string =>
+  (error instanceof Error ? error.message : 'unknown provider error')
+    .replace(/[\r\n]+/g, ' ')
+    .slice(0, 500);
 
 export const retryDelayMs = (
   attempt: number,
