@@ -1,0 +1,30 @@
+{
+  "name": "@resenha/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@resenha/contracts": "workspace:*",
+    "@resenha/database": "workspace:*",
+    "@resenha/domain": "workspace:*",
+    "dotenv": "^16.6.1",
+    "drizzle-orm": "^0.44.5",
+    "pg": "^8.16.3",
+    "tsx": "^4.20.5",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.0",
+    "@types/pg": "^8.15.5",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

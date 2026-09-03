@@ -1,0 +1,9 @@
+node_modules
+**/node_modules
+**/dist
+.turbo
+.env
+var
+playwright-report
+test-results
+.github

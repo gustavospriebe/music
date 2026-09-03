@@ -1,0 +1,52 @@
+
+> musica-da-resenha@ dev:web /home/gustavo/projects/music
+> pnpm --filter @resenha/web dev
+
+
+> @resenha/web@0.0.0 dev /home/gustavo/projects/music/apps/web
+> vite
+
+1:58:05 AM [vite] (client) Re-optimizing dependencies because lockfile has changed
+
+  VITE v7.3.6  ready in 469 ms
+
+  ➜  Local:   http://localhost:5175/
+  ➜  Network: http://187.127.5.24:5175/
+  ➜  Network: http://172.20.0.1:5175/
+  ➜  Network: http://100.74.121.80:5175/
+  ➜  Network: http://172.21.0.1:5175/
+2:09:55 AM [vite] ../../.env changed, restarting server...
+2:09:55 AM [vite] server restarted.
+2:16:57 AM [vite] ../../.env changed, restarting server...
+2:16:57 AM [vite] server restarted.
+3:17:13 AM [vite] ../../.env changed, restarting server...
+3:17:14 AM [vite] server restarted.
+10:54:56 AM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+10:55:04 AM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+10:55:05 AM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+10:55:06 AM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+10:55:13 AM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+10:55:14 AM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+10:55:18 AM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+10:55:26 AM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+11:01:24 AM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+11:02:22 AM [vite] (client) hmr update /src/styles.css
+11:02:34 AM [vite] (client) hmr update /src/styles.css
+11:22:53 AM [vite] (client) hmr update /src/pages/public.tsx, /src/admin/routes.tsx, /src/styles.css
+11:22:55 AM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+11:23:03 AM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+11:23:34 AM [vite] (client) hmr update /src/pages/public.tsx, /src/styles.css
+11:23:34 AM [vite] (client) hmr invalidate /src/pages/public.tsx Could not Fast Refresh (new export)
+11:23:34 AM [vite] (client) hmr update /src/main.tsx
+11:23:34 AM [vite] (client) hmr invalidate /src/main.tsx Could not Fast Refresh ("true" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+11:23:34 AM [vite] (client) page reload src/main.tsx
+11:23:45 AM [vite] (client) hmr update /src/main.tsx, /src/styles.css
+11:23:46 AM [vite] (client) hmr invalidate /src/main.tsx Could not Fast Refresh ("true" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+11:23:46 AM [vite] (client) page reload src/main.tsx
+11:23:46 AM [vite] (client) hmr update /src/main.tsx, /src/styles.css
+11:23:47 AM [vite] (client) hmr invalidate /src/main.tsx Could not Fast Refresh ("true" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+11:23:47 AM [vite] (client) page reload src/main.tsx
+11:24:00 AM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+11:24:09 AM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+11:24:20 AM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css
+11:24:22 AM [vite] (client) hmr update /src/admin/routes.tsx, /src/styles.css

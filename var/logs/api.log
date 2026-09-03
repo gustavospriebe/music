@@ -1,0 +1,352 @@
+
+> musica-da-resenha@ dev:api /home/gustavo/projects/music
+> pnpm --filter @resenha/api dev
+
+
+> @resenha/api@0.0.0 dev /home/gustavo/projects/music/apps/api
+> tsx watch src/server.ts
+
+{"level":30,"time":1788417790042,"pid":352663,"hostname":"srv1543950","msg":"Server listening at http://127.0.0.1:3001"}
+{"level":30,"time":1788417790042,"pid":352663,"hostname":"srv1543950","msg":"Server listening at http://187.127.5.24:3001"}
+{"level":30,"time":1788417790042,"pid":352663,"hostname":"srv1543950","msg":"Server listening at http://172.20.0.1:3001"}
+{"level":30,"time":1788417790042,"pid":352663,"hostname":"srv1543950","msg":"Server listening at http://100.74.121.80:3001"}
+{"level":30,"time":1788417790042,"pid":352663,"hostname":"srv1543950","msg":"Server listening at http://172.21.0.1:3001"}
+{"level":30,"time":1788417795341,"pid":352663,"hostname":"srv1543950","reqId":"LLdeofG_Nw3r","req":{"method":"GET","url":"/api/v1/health/ready","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":54844},"msg":"incoming request"}
+{"level":30,"time":1788417795368,"pid":352663,"hostname":"srv1543950","reqId":"LLdeofG_Nw3r","res":{"statusCode":200},"responseTime":24.34465,"msg":"request completed"}
+{"level":30,"time":1788417795386,"pid":352663,"hostname":"srv1543950","reqId":"wayqyxq45ebM","req":{"method":"GET","url":"/api/v1/deliveries/r84NypCwX91uhLHVNNFlp_Hf19qR3woe5Pn5vwINV7o","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":54856},"msg":"incoming request"}
+{"level":30,"time":1788417795418,"pid":352663,"hostname":"srv1543950","reqId":"wayqyxq45ebM","res":{"statusCode":200},"responseTime":31.288101000000097,"msg":"request completed"}
+{"level":30,"time":1788417795444,"pid":352663,"hostname":"srv1543950","reqId":"aEHiHujdP5bW","req":{"method":"GET","url":"/api/v1/deliveries/r84NypCwX91uhLHVNNFlp_Hf19qR3woe5Pn5vwINV7o/files/39a7fda5-6ac4-4675-bb50-abc43cc31949/download","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":54858},"msg":"incoming request"}
+{"level":30,"time":1788417795466,"pid":352663,"hostname":"srv1543950","reqId":"aEHiHujdP5bW","res":{"statusCode":200},"responseTime":21.471470999999838,"msg":"request completed"}
+{"level":30,"time":1788417815813,"pid":352663,"hostname":"srv1543950","reqId":"ItlFfB6TDQwW","req":{"method":"GET","url":"/api/v1/admin/orders","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":40720},"msg":"incoming request"}
+{"level":30,"time":1788417815851,"pid":352663,"hostname":"srv1543950","reqId":"ItlFfB6TDQwW","res":{"statusCode":200},"responseTime":37.847696000000724,"msg":"request completed"}
+{"level":30,"time":1788417816101,"pid":352663,"hostname":"srv1543950","reqId":"TG7Rw5jCJsvW","req":{"method":"GET","url":"/api/v1/admin/orders/03618d24-c48a-4acc-846c-bdc08d0d39af","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":40730},"msg":"incoming request"}
+{"level":30,"time":1788417816126,"pid":352663,"hostname":"srv1543950","reqId":"TG7Rw5jCJsvW","res":{"statusCode":200},"responseTime":24.61927199999991,"msg":"request completed"}
+{"level":30,"time":1788418398653,"pid":352663,"hostname":"srv1543950","reqId":"5y0WSPMVJWDq","req":{"method":"GET","url":"/api/v1/admin/orders","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":34642},"msg":"incoming request"}
+{"level":30,"time":1788418398679,"pid":352663,"hostname":"srv1543950","reqId":"5y0WSPMVJWDq","res":{"statusCode":200},"responseTime":26.514046999975108,"msg":"request completed"}
+{"level":30,"time":1788418486649,"pid":352663,"hostname":"srv1543950","reqId":"l9u9ySZevSsE","req":{"method":"POST","url":"/api/v1/admin/session","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":46188},"msg":"incoming request"}
+{"level":30,"time":1788418486675,"pid":352663,"hostname":"srv1543950","reqId":"l9u9ySZevSsE","res":{"statusCode":200},"responseTime":25.89835400006268,"msg":"request completed"}
+{"level":30,"time":1788418486693,"pid":352663,"hostname":"srv1543950","reqId":"HNrjZHci2jKW","req":{"method":"GET","url":"/api/v1/deliveries/r84NypCwX91uhLHVNNFlp_Hf19qR3woe5Pn5vwINV7o","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":46200},"msg":"incoming request"}
+{"level":30,"time":1788418486703,"pid":352663,"hostname":"srv1543950","reqId":"HNrjZHci2jKW","res":{"statusCode":200},"responseTime":10.474432999966666,"msg":"request completed"}
+{"level":30,"time":1788443134805,"pid":352663,"hostname":"srv1543950","reqId":"atKAdUlj2dB3","req":{"method":"POST","url":"/api/v1/orders","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":60712},"msg":"incoming request"}
+{"level":30,"time":1788443135195,"pid":352663,"hostname":"srv1543950","reqId":"atKAdUlj2dB3","res":{"statusCode":201},"responseTime":371.7066170014441,"msg":"request completed"}
+{"level":30,"time":1788443135283,"pid":352663,"hostname":"srv1543950","reqId":"sk4WwKQESeHs","req":{"method":"PATCH","url":"/api/v1/orders/ojcWEi8iDIKOn6zB/story","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":60728},"msg":"incoming request"}
+{"level":30,"time":1788443135387,"pid":352663,"hostname":"srv1543950","reqId":"sk4WwKQESeHs","res":{"statusCode":200},"responseTime":103.52917600050569,"msg":"request completed"}
+{"level":30,"time":1788443135405,"pid":352663,"hostname":"srv1543950","reqId":"QNTbhFe9w0NR","req":{"method":"POST","url":"/api/v1/orders/ojcWEi8iDIKOn6zB/lyrics/generate","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":60730},"msg":"incoming request"}
+{"level":30,"time":1788443144018,"pid":352663,"hostname":"srv1543950","reqId":"QNTbhFe9w0NR","res":{"statusCode":200},"responseTime":8612.815898001194,"msg":"request completed"}
+{"level":30,"time":1788443144092,"pid":352663,"hostname":"srv1543950","reqId":"B9-gU-jZsrOc","req":{"method":"POST","url":"/api/v1/orders/ojcWEi8iDIKOn6zB/lyrics/2b49de15-608c-4759-8b95-7f04aac3e882/approve","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":56070},"msg":"incoming request"}
+{"level":30,"time":1788443144099,"pid":352663,"hostname":"srv1543950","reqId":"B9-gU-jZsrOc","res":{"statusCode":200},"responseTime":6.667587000876665,"msg":"request completed"}
+{"level":30,"time":1788443144113,"pid":352663,"hostname":"srv1543950","reqId":"E1y_gRpagKfx","req":{"method":"POST","url":"/api/v1/orders/ojcWEi8iDIKOn6zB/checkout","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":56074},"msg":"incoming request"}
+{"level":30,"time":1788443144134,"pid":352663,"hostname":"srv1543950","reqId":"E1y_gRpagKfx","res":{"statusCode":200},"responseTime":20.78379200026393,"msg":"request completed"}
+{"level":30,"time":1788443144190,"pid":352663,"hostname":"srv1543950","reqId":"hlRicBSyS-WW","req":{"method":"POST","url":"/api/v1/dev/payments/d33a6a7c-6b9f-453e-b61c-790b0afa50f6/approve","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":56076},"msg":"incoming request"}
+{"level":30,"time":1788443144211,"pid":352663,"hostname":"srv1543950","reqId":"hlRicBSyS-WW","res":{"statusCode":200},"responseTime":21.06842900067568,"msg":"request completed"}
+{"level":30,"time":1788443234926,"pid":352663,"hostname":"srv1543950","reqId":"uumPg5_mWVHH","req":{"method":"GET","url":"/api/v1/deliveries/6RkszwtYpqYk_PpP6B64jTEV3uYOwQtBjMClLm6kdj4","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":58748},"msg":"incoming request"}
+{"level":30,"time":1788443234960,"pid":352663,"hostname":"srv1543950","reqId":"uumPg5_mWVHH","res":{"statusCode":200},"responseTime":33.49659499898553,"msg":"request completed"}
+{"level":30,"time":1788443234981,"pid":352663,"hostname":"srv1543950","reqId":"s7bjY0dk6Qfy","req":{"method":"GET","url":"/api/v1/deliveries/6RkszwtYpqYk_PpP6B64jTEV3uYOwQtBjMClLm6kdj4/files/e537934c-5a63-4337-9d0e-0da8b9d9685e/download","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":58750},"msg":"incoming request"}
+{"level":30,"time":1788443234994,"pid":352663,"hostname":"srv1543950","reqId":"s7bjY0dk6Qfy","res":{"statusCode":200},"responseTime":13.598695002496243,"msg":"request completed"}
+{"level":30,"time":1788443279960,"pid":352663,"hostname":"srv1543950","reqId":"-2DNF57AhbxU","req":{"method":"POST","url":"/api/v1/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":40872},"msg":"incoming request"}
+{"level":30,"time":1788443279980,"pid":352663,"hostname":"srv1543950","reqId":"-2DNF57AhbxU","res":{"statusCode":201},"responseTime":19.284368000924587,"msg":"request completed"}
+{"level":30,"time":1788443280056,"pid":352663,"hostname":"srv1543950","reqId":"OGi8HoHMl-iA","req":{"method":"PATCH","url":"/api/v1/orders/HabzBsu-Q75NeM5j/story","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":40880},"msg":"incoming request"}
+{"level":30,"time":1788443280081,"pid":352663,"hostname":"srv1543950","reqId":"OGi8HoHMl-iA","res":{"statusCode":400},"responseTime":25.190352998673916,"msg":"request completed"}
+{"level":30,"time":1788443286918,"pid":352663,"hostname":"srv1543950","reqId":"VeY8gk2g19Vn","req":{"method":"POST","url":"/api/v1/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":40884},"msg":"incoming request"}
+{"level":30,"time":1788443286925,"pid":352663,"hostname":"srv1543950","reqId":"VeY8gk2g19Vn","res":{"statusCode":201},"responseTime":6.890519000589848,"msg":"request completed"}
+{"level":30,"time":1788443286967,"pid":352663,"hostname":"srv1543950","reqId":"9TXzrlMfhoFg","req":{"method":"PATCH","url":"/api/v1/orders/qMeXOeZFvg2m2aL2/story","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":40892},"msg":"incoming request"}
+{"level":30,"time":1788443286971,"pid":352663,"hostname":"srv1543950","reqId":"9TXzrlMfhoFg","res":{"statusCode":400},"responseTime":3.5169360004365444,"msg":"request completed"}
+{"level":30,"time":1788443306368,"pid":352663,"hostname":"srv1543950","reqId":"Hq5Nd6TF3J2H","req":{"method":"POST","url":"/api/v1/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":55160},"msg":"incoming request"}
+{"level":30,"time":1788443306401,"pid":352663,"hostname":"srv1543950","reqId":"Hq5Nd6TF3J2H","res":{"statusCode":201},"responseTime":32.426917999982834,"msg":"request completed"}
+{"level":30,"time":1788443306446,"pid":352663,"hostname":"srv1543950","reqId":"pXKbqskKn3h9","req":{"method":"PATCH","url":"/api/v1/orders/9-Co1GOYQvebcwQH/story","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":55168},"msg":"incoming request"}
+{"level":30,"time":1788443306455,"pid":352663,"hostname":"srv1543950","reqId":"pXKbqskKn3h9","res":{"statusCode":400},"responseTime":9.056221999228,"msg":"request completed"}
+{"level":30,"time":1788443312975,"pid":352663,"hostname":"srv1543950","reqId":"BGAnInIb-HdI","req":{"method":"POST","url":"/api/v1/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":43928},"msg":"incoming request"}
+{"level":30,"time":1788443312982,"pid":352663,"hostname":"srv1543950","reqId":"BGAnInIb-HdI","res":{"statusCode":201},"responseTime":7.151039000600576,"msg":"request completed"}
+{"level":30,"time":1788443313043,"pid":352663,"hostname":"srv1543950","reqId":"LK6vGMsNEIt0","req":{"method":"PATCH","url":"/api/v1/orders/dN_q0hIn8nkhRmPp/story","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":43944},"msg":"incoming request"}
+{"level":30,"time":1788443313045,"pid":352663,"hostname":"srv1543950","reqId":"LK6vGMsNEIt0","res":{"statusCode":400},"responseTime":2.616466999053955,"msg":"request completed"}
+{"level":30,"time":1788443345528,"pid":352663,"hostname":"srv1543950","reqId":"fjLqpzVRcT-L","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":42288},"msg":"incoming request"}
+{"level":30,"time":1788443345531,"pid":352663,"hostname":"srv1543950","reqId":"fjLqpzVRcT-L","res":{"statusCode":401},"responseTime":2.5637790001928806,"msg":"request completed"}
+{"level":30,"time":1788443346563,"pid":352663,"hostname":"srv1543950","reqId":"qKyVOfJffmK5","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":42290},"msg":"incoming request"}
+{"level":30,"time":1788443346564,"pid":352663,"hostname":"srv1543950","reqId":"qKyVOfJffmK5","res":{"statusCode":401},"responseTime":0.7791359983384609,"msg":"request completed"}
+{"level":30,"time":1788443348593,"pid":352663,"hostname":"srv1543950","reqId":"r7KdfUkQ9ISu","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":42292},"msg":"incoming request"}
+{"level":30,"time":1788443348595,"pid":352663,"hostname":"srv1543950","reqId":"r7KdfUkQ9ISu","res":{"statusCode":401},"responseTime":1.2198669984936714,"msg":"request completed"}
+{"level":30,"time":1788443349635,"pid":352663,"hostname":"srv1543950","reqId":"RXaQGSRNiJgO","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":42300},"msg":"incoming request"}
+{"level":30,"time":1788443349636,"pid":352663,"hostname":"srv1543950","reqId":"RXaQGSRNiJgO","res":{"statusCode":401},"responseTime":0.6891320012509823,"msg":"request completed"}
+{"level":30,"time":1788443350705,"pid":352663,"hostname":"srv1543950","reqId":"58mTeV48Ap-z","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":60204},"msg":"incoming request"}
+{"level":30,"time":1788443350706,"pid":352663,"hostname":"srv1543950","reqId":"58mTeV48Ap-z","res":{"statusCode":401},"responseTime":0.7172229997813702,"msg":"request completed"}
+{"level":30,"time":1788443351748,"pid":352663,"hostname":"srv1543950","reqId":"SmSb2o0rNp7s","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":60218},"msg":"incoming request"}
+{"level":30,"time":1788443351749,"pid":352663,"hostname":"srv1543950","reqId":"SmSb2o0rNp7s","res":{"statusCode":401},"responseTime":0.7716550007462502,"msg":"request completed"}
+{"level":30,"time":1788443432395,"pid":352663,"hostname":"srv1543950","reqId":"AFajppzfzrbA","req":{"method":"POST","url":"/api/v1/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":44678},"msg":"incoming request"}
+{"level":30,"time":1788443432416,"pid":352663,"hostname":"srv1543950","reqId":"AFajppzfzrbA","res":{"statusCode":201},"responseTime":20.526301000267267,"msg":"request completed"}
+{"level":30,"time":1788443432457,"pid":352663,"hostname":"srv1543950","reqId":"Q8o5JXzO1_b9","req":{"method":"PATCH","url":"/api/v1/orders/brjbYGtCJbUMRlxu/story","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":44684},"msg":"incoming request"}
+{"level":30,"time":1788443432463,"pid":352663,"hostname":"srv1543950","reqId":"Q8o5JXzO1_b9","res":{"statusCode":400},"responseTime":5.399073000997305,"msg":"request completed"}
+{"level":30,"time":1788443448323,"pid":352663,"hostname":"srv1543950","reqId":"mVAqROWB3sP0","req":{"method":"POST","url":"/api/v1/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":54442},"msg":"incoming request"}
+{"level":30,"time":1788443448339,"pid":352663,"hostname":"srv1543950","reqId":"mVAqROWB3sP0","res":{"statusCode":201},"responseTime":15.780505999922752,"msg":"request completed"}
+{"level":30,"time":1788443448379,"pid":352663,"hostname":"srv1543950","reqId":"izN4RND0o0fX","req":{"method":"PATCH","url":"/api/v1/orders/6tuqTEq0_8pTY6kL/story","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":54458},"msg":"incoming request"}
+{"level":30,"time":1788443448388,"pid":352663,"hostname":"srv1543950","reqId":"izN4RND0o0fX","res":{"statusCode":400},"responseTime":8.695298999547958,"msg":"request completed"}
+{"level":30,"time":1788443484984,"pid":352663,"hostname":"srv1543950","reqId":"gpMIQFV3EIgj","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":54454},"msg":"incoming request"}
+{"level":30,"time":1788443484985,"pid":352663,"hostname":"srv1543950","reqId":"gpMIQFV3EIgj","res":{"statusCode":401},"responseTime":0.8136489987373352,"msg":"request completed"}
+{"level":30,"time":1788443486007,"pid":352663,"hostname":"srv1543950","reqId":"kVW0vH1AJlfF","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":54468},"msg":"incoming request"}
+{"level":30,"time":1788443486008,"pid":352663,"hostname":"srv1543950","reqId":"kVW0vH1AJlfF","res":{"statusCode":401},"responseTime":0.5572150014340878,"msg":"request completed"}
+{"level":30,"time":1788443489041,"pid":352663,"hostname":"srv1543950","reqId":"p005Mi0j4eXT","req":{"method":"DELETE","url":"/api/v1/admin/session","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":54470},"msg":"incoming request"}
+{"level":30,"time":1788443489043,"pid":352663,"hostname":"srv1543950","reqId":"p005Mi0j4eXT","res":{"statusCode":400},"responseTime":2.534535001963377,"msg":"request completed"}
+{"level":30,"time":1788443500202,"pid":352663,"hostname":"srv1543950","reqId":"jzoTtAum9JBc","req":{"method":"POST","url":"/api/v1/admin/session","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":54294},"msg":"incoming request"}
+{"level":30,"time":1788443500203,"pid":352663,"hostname":"srv1543950","reqId":"jzoTtAum9JBc","res":{"statusCode":401},"responseTime":1.0890210010111332,"msg":"request completed"}
+{"level":30,"time":1788443503294,"pid":352663,"hostname":"srv1543950","reqId":"ossu1A-7drZs","req":{"method":"POST","url":"/api/v1/admin/session","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":54310},"msg":"incoming request"}
+{"level":30,"time":1788443503294,"pid":352663,"hostname":"srv1543950","reqId":"ossu1A-7drZs","res":{"statusCode":401},"responseTime":0.7493320032954216,"msg":"request completed"}
+{"level":30,"time":1788443508809,"pid":352663,"hostname":"srv1543950","reqId":"K3xu-d7TaOz2","req":{"method":"POST","url":"/api/v1/admin/session","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":54324},"msg":"incoming request"}
+{"level":30,"time":1788443508835,"pid":352663,"hostname":"srv1543950","reqId":"K3xu-d7TaOz2","res":{"statusCode":200},"responseTime":25.764842998236418,"msg":"request completed"}
+{"level":30,"time":1788443508887,"pid":352663,"hostname":"srv1543950","reqId":"pY9jAmxEV-aJ","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":54340},"msg":"incoming request"}
+{"level":30,"time":1788443508895,"pid":352663,"hostname":"srv1543950","reqId":"pY9jAmxEV-aJ","res":{"statusCode":200},"responseTime":7.963300000876188,"msg":"request completed"}
+{"level":30,"time":1788443515021,"pid":352663,"hostname":"srv1543950","reqId":"FTL_uZM8VhZ-","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":52888},"msg":"incoming request"}
+{"level":30,"time":1788443515028,"pid":352663,"hostname":"srv1543950","reqId":"FTL_uZM8VhZ-","res":{"statusCode":200},"responseTime":6.625529997050762,"msg":"request completed"}
+{"level":30,"time":1788443519660,"pid":352663,"hostname":"srv1543950","reqId":"peQGjnW20SkH","req":{"method":"GET","url":"/api/v1/admin/orders/6af1aef1-9762-47ba-91b4-82c4f69a17f9","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":52896},"msg":"incoming request"}
+{"level":30,"time":1788443519694,"pid":352663,"hostname":"srv1543950","reqId":"peQGjnW20SkH","res":{"statusCode":200},"responseTime":33.75958000123501,"msg":"request completed"}
+{"level":30,"time":1788443522278,"pid":352663,"hostname":"srv1543950","reqId":"f2zCZTRhP1ls","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":57168},"msg":"incoming request"}
+{"level":30,"time":1788443522324,"pid":352663,"hostname":"srv1543950","reqId":"f2zCZTRhP1ls","res":{"statusCode":200},"responseTime":45.21059500053525,"msg":"request completed"}
+{"level":30,"time":1788443524492,"pid":352663,"hostname":"srv1543950","reqId":"UBkWRnyF8XVl","req":{"method":"GET","url":"/api/v1/admin/orders/d44069b7-05af-4ac0-b624-8a1452bfe511","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":57178},"msg":"incoming request"}
+{"level":30,"time":1788443524505,"pid":352663,"hostname":"srv1543950","reqId":"UBkWRnyF8XVl","res":{"statusCode":200},"responseTime":12.358542002737522,"msg":"request completed"}
+{"level":30,"time":1788443531916,"pid":352663,"hostname":"srv1543950","reqId":"Ou-hKLzkAJim","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":42704},"msg":"incoming request"}
+{"level":30,"time":1788443531920,"pid":352663,"hostname":"srv1543950","reqId":"Ou-hKLzkAJim","res":{"statusCode":200},"responseTime":3.2881920002400875,"msg":"request completed"}
+{"level":30,"time":1788443535822,"pid":352663,"hostname":"srv1543950","reqId":"FS_KumpuNuDr","req":{"method":"GET","url":"/api/v1/admin/orders/b11e2ac6-9602-486c-97c7-a4f108b75308","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":42714},"msg":"incoming request"}
+{"level":30,"time":1788443535834,"pid":352663,"hostname":"srv1543950","reqId":"FS_KumpuNuDr","res":{"statusCode":200},"responseTime":12.481093998998404,"msg":"request completed"}
+{"level":30,"time":1788443538123,"pid":352663,"hostname":"srv1543950","reqId":"Wd7Eb8R2stKE","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":42726},"msg":"incoming request"}
+{"level":30,"time":1788443538127,"pid":352663,"hostname":"srv1543950","reqId":"Wd7Eb8R2stKE","res":{"statusCode":200},"responseTime":3.8067690022289753,"msg":"request completed"}
+{"level":30,"time":1788443611399,"pid":352663,"hostname":"srv1543950","reqId":"bteEkKN25hkj","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":49850},"msg":"incoming request"}
+{"level":30,"time":1788443611425,"pid":352663,"hostname":"srv1543950","reqId":"bteEkKN25hkj","res":{"statusCode":200},"responseTime":25.240694001317024,"msg":"request completed"}
+{"level":30,"time":1788443667014,"pid":352663,"hostname":"srv1543950","reqId":"v7jg-McqgfES","req":{"method":"POST","url":"/api/v1/admin/session","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":47034},"msg":"incoming request"}
+{"level":30,"time":1788443667037,"pid":352663,"hostname":"srv1543950","reqId":"v7jg-McqgfES","res":{"statusCode":200},"responseTime":22.55503299832344,"msg":"request completed"}
+{"level":30,"time":1788443667056,"pid":352663,"hostname":"srv1543950","reqId":"rq6oqFzuAQPu","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":47044},"msg":"incoming request"}
+{"level":30,"time":1788443667062,"pid":352663,"hostname":"srv1543950","reqId":"rq6oqFzuAQPu","res":{"statusCode":200},"responseTime":6.073821999132633,"msg":"request completed"}
+{"level":30,"time":1788443667081,"pid":352663,"hostname":"srv1543950","reqId":"DxpJcsTXG0ZC","req":{"method":"POST","url":"/api/v1/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":47046},"msg":"incoming request"}
+{"level":30,"time":1788443667091,"pid":352663,"hostname":"srv1543950","reqId":"DxpJcsTXG0ZC","res":{"statusCode":201},"responseTime":9.302273999899626,"msg":"request completed"}
+{"level":30,"time":1788443667114,"pid":352663,"hostname":"srv1543950","reqId":"Xqfm8I22pPzr","req":{"method":"PATCH","url":"/api/v1/orders/evQby_1JyxXzS0Hu/story","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":47054},"msg":"incoming request"}
+{"level":30,"time":1788443667118,"pid":352663,"hostname":"srv1543950","reqId":"Xqfm8I22pPzr","res":{"statusCode":400},"responseTime":3.973427001386881,"msg":"request completed"}
+10:54:55 AM [tsx] change in ./src/app.ts Restarting...
+{"level":30,"time":1788443698279,"pid":1022429,"hostname":"srv1543950","msg":"Server listening at http://127.0.0.1:3001"}
+{"level":30,"time":1788443698279,"pid":1022429,"hostname":"srv1543950","msg":"Server listening at http://187.127.5.24:3001"}
+{"level":30,"time":1788443698279,"pid":1022429,"hostname":"srv1543950","msg":"Server listening at http://172.20.0.1:3001"}
+{"level":30,"time":1788443698279,"pid":1022429,"hostname":"srv1543950","msg":"Server listening at http://100.74.121.80:3001"}
+{"level":30,"time":1788443698279,"pid":1022429,"hostname":"srv1543950","msg":"Server listening at http://172.21.0.1:3001"}
+{"level":30,"time":1788443706919,"pid":1022429,"hostname":"srv1543950","reqId":"MQXW8mLXOawx","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":54522},"msg":"incoming request"}
+{"level":30,"time":1788443706998,"pid":1022429,"hostname":"srv1543950","reqId":"MQXW8mLXOawx","res":{"statusCode":200},"responseTime":78.25091000000066,"msg":"request completed"}
+{"level":30,"time":1788443713896,"pid":1022429,"hostname":"srv1543950","reqId":"dWQ-VQkfHhO8","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":38526},"msg":"incoming request"}
+{"level":30,"time":1788443713908,"pid":1022429,"hostname":"srv1543950","reqId":"dWQ-VQkfHhO8","res":{"statusCode":200},"responseTime":11.969696000000113,"msg":"request completed"}
+{"level":30,"time":1788443726893,"pid":1022429,"hostname":"srv1543950","reqId":"bkBlDlamwCWT","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":44518},"msg":"incoming request"}
+{"level":30,"time":1788443726914,"pid":1022429,"hostname":"srv1543950","reqId":"bkBlDlamwCWT","res":{"statusCode":200},"responseTime":21.010149000001547,"msg":"request completed"}
+10:55:27 AM [tsx] change in ./src/app.ts Restarting...
+{"level":30,"time":1788443729116,"pid":1023270,"hostname":"srv1543950","msg":"Server listening at http://127.0.0.1:3001"}
+{"level":30,"time":1788443729116,"pid":1023270,"hostname":"srv1543950","msg":"Server listening at http://187.127.5.24:3001"}
+{"level":30,"time":1788443729116,"pid":1023270,"hostname":"srv1543950","msg":"Server listening at http://172.20.0.1:3001"}
+{"level":30,"time":1788443729116,"pid":1023270,"hostname":"srv1543950","msg":"Server listening at http://100.74.121.80:3001"}
+{"level":30,"time":1788443729116,"pid":1023270,"hostname":"srv1543950","msg":"Server listening at http://172.21.0.1:3001"}
+10:55:49 AM [tsx] change in ./src/app.ts Restarting...
+{"level":30,"time":1788443750608,"pid":1023837,"hostname":"srv1543950","msg":"Server listening at http://127.0.0.1:3001"}
+{"level":30,"time":1788443750609,"pid":1023837,"hostname":"srv1543950","msg":"Server listening at http://187.127.5.24:3001"}
+{"level":30,"time":1788443750609,"pid":1023837,"hostname":"srv1543950","msg":"Server listening at http://172.20.0.1:3001"}
+{"level":30,"time":1788443750609,"pid":1023837,"hostname":"srv1543950","msg":"Server listening at http://100.74.121.80:3001"}
+{"level":30,"time":1788443750609,"pid":1023837,"hostname":"srv1543950","msg":"Server listening at http://172.21.0.1:3001"}
+10:55:51 AM [tsx] change in ./src/app.ts Restarting...
+{"level":30,"time":1788443753074,"pid":1023927,"hostname":"srv1543950","msg":"Server listening at http://127.0.0.1:3001"}
+{"level":30,"time":1788443753074,"pid":1023927,"hostname":"srv1543950","msg":"Server listening at http://187.127.5.24:3001"}
+{"level":30,"time":1788443753074,"pid":1023927,"hostname":"srv1543950","msg":"Server listening at http://172.20.0.1:3001"}
+{"level":30,"time":1788443753074,"pid":1023927,"hostname":"srv1543950","msg":"Server listening at http://100.74.121.80:3001"}
+{"level":30,"time":1788443753074,"pid":1023927,"hostname":"srv1543950","msg":"Server listening at http://172.21.0.1:3001"}
+{"level":30,"time":1788443836555,"pid":1023927,"hostname":"srv1543950","reqId":"aO1fG2wGuHTt","req":{"method":"POST","url":"/api/v1/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":49992},"msg":"incoming request"}
+{"level":30,"time":1788443836611,"pid":1023927,"hostname":"srv1543950","reqId":"aO1fG2wGuHTt","res":{"statusCode":201},"responseTime":55.38074100000085,"msg":"request completed"}
+{"level":30,"time":1788443836646,"pid":1023927,"hostname":"srv1543950","reqId":"LZZuaELVVnzF","req":{"method":"PATCH","url":"/api/v1/orders/bH4MWE7rp7ul4eIl/story","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":50006},"msg":"incoming request"}
+{"level":30,"time":1788443836656,"pid":1023927,"hostname":"srv1543950","reqId":"LZZuaELVVnzF","res":{"statusCode":400},"responseTime":9.811646000001929,"msg":"request completed"}
+{"level":30,"time":1788443836682,"pid":1023927,"hostname":"srv1543950","reqId":"BXQxVddRsVEp","req":{"method":"POST","url":"/api/v1/admin/session","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":50018},"msg":"incoming request"}
+{"level":30,"time":1788443836693,"pid":1023927,"hostname":"srv1543950","reqId":"BXQxVddRsVEp","res":{"statusCode":200},"responseTime":11.663927999994485,"msg":"request completed"}
+{"level":30,"time":1788443837867,"pid":1023927,"hostname":"srv1543950","reqId":"cujA_auUvWbx","req":{"method":"GET","url":"/api/v1/admin/orders/d44069b7-05af-4ac0-b624-8a1452bfe511","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":50026},"msg":"incoming request"}
+{"level":30,"time":1788443837894,"pid":1023927,"hostname":"srv1543950","reqId":"cujA_auUvWbx","res":{"statusCode":200},"responseTime":27.50082200000179,"msg":"request completed"}
+{"level":30,"time":1788443837921,"pid":1023927,"hostname":"srv1543950","reqId":"F5OeFe1lzU7j","req":{"method":"GET","url":"/api/v1/admin/orders/d44069b7-05af-4ac0-b624-8a1452bfe511/assets/e537934c-5a63-4337-9d0e-0da8b9d9685e/stream","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":50038},"msg":"incoming request"}
+{"level":30,"time":1788443837971,"pid":1023927,"hostname":"srv1543950","reqId":"F5OeFe1lzU7j","res":{"statusCode":200},"responseTime":48.99462299999141,"msg":"request completed"}
+{"level":30,"time":1788443838102,"pid":1023927,"hostname":"srv1543950","reqId":"_hqYMV_Mn9Ob","req":{"method":"GET","url":"/api/v1/admin/orders/d44069b7-05af-4ac0-b624-8a1452bfe511/assets/e537934c-5a63-4337-9d0e-0da8b9d9685e/stream","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":50042},"msg":"incoming request"}
+{"level":30,"time":1788443838103,"pid":1023927,"hostname":"srv1543950","reqId":"_hqYMV_Mn9Ob","res":{"statusCode":401},"responseTime":0.7561920000007376,"msg":"request completed"}
+{"level":30,"time":1788443955368,"pid":1023927,"hostname":"srv1543950","reqId":"y13DhEaLFZ_T","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":53846},"msg":"incoming request"}
+{"level":30,"time":1788443955393,"pid":1023927,"hostname":"srv1543950","reqId":"y13DhEaLFZ_T","res":{"statusCode":200},"responseTime":24.96826900000451,"msg":"request completed"}
+{"level":30,"time":1788443955901,"pid":1023927,"hostname":"srv1543950","reqId":"hassaXWyuOOp","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":53860},"msg":"incoming request"}
+{"level":30,"time":1788443955908,"pid":1023927,"hostname":"srv1543950","reqId":"hassaXWyuOOp","res":{"statusCode":200},"responseTime":6.957354000012856,"msg":"request completed"}
+{"level":30,"time":1788443958650,"pid":1023927,"hostname":"srv1543950","reqId":"aU2he0mMq9sR","req":{"method":"GET","url":"/api/v1/admin/orders/b11e2ac6-9602-486c-97c7-a4f108b75308","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":53864},"msg":"incoming request"}
+{"level":30,"time":1788443958677,"pid":1023927,"hostname":"srv1543950","reqId":"aU2he0mMq9sR","res":{"statusCode":200},"responseTime":27.261289999994915,"msg":"request completed"}
+{"level":30,"time":1788443961191,"pid":1023927,"hostname":"srv1543950","reqId":"kRXjooYrMx83","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":34386},"msg":"incoming request"}
+{"level":30,"time":1788443961198,"pid":1023927,"hostname":"srv1543950","reqId":"kRXjooYrMx83","res":{"statusCode":200},"responseTime":6.97054300000309,"msg":"request completed"}
+{"level":30,"time":1788443963468,"pid":1023927,"hostname":"srv1543950","reqId":"cQIRuNlbMu71","req":{"method":"DELETE","url":"/api/v1/admin/session","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":34400},"msg":"incoming request"}
+{"level":30,"time":1788443963469,"pid":1023927,"hostname":"srv1543950","reqId":"cQIRuNlbMu71","res":{"statusCode":400},"responseTime":1.3535250000131782,"msg":"request completed"}
+{"level":30,"time":1788443989729,"pid":1023927,"hostname":"srv1543950","reqId":"9QETSDGsSVW6","req":{"method":"POST","url":"/api/v1/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":49532},"msg":"incoming request"}
+{"level":30,"time":1788443989747,"pid":1023927,"hostname":"srv1543950","reqId":"9QETSDGsSVW6","res":{"statusCode":201},"responseTime":18.5902140000253,"msg":"request completed"}
+{"level":30,"time":1788443989790,"pid":1023927,"hostname":"srv1543950","reqId":"qBkAOgR9-2k0","req":{"method":"PATCH","url":"/api/v1/orders/awz0bkdYx8rGFPSg/story","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":49536},"msg":"incoming request"}
+{"level":30,"time":1788443989810,"pid":1023927,"hostname":"srv1543950","reqId":"qBkAOgR9-2k0","res":{"statusCode":200},"responseTime":19.432895000005374,"msg":"request completed"}
+{"level":30,"time":1788443989877,"pid":1023927,"hostname":"srv1543950","reqId":"Ycz_4PcfNU74","req":{"method":"GET","url":"/api/v1/orders/awz0bkdYx8rGFPSg","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":36034},"msg":"incoming request"}
+{"level":30,"time":1788443989888,"pid":1023927,"hostname":"srv1543950","reqId":"Ycz_4PcfNU74","res":{"statusCode":200},"responseTime":10.508587999996962,"msg":"request completed"}
+{"level":30,"time":1788443992129,"pid":1023927,"hostname":"srv1543950","reqId":"KLvm_st0qIzM","req":{"method":"POST","url":"/api/v1/orders/awz0bkdYx8rGFPSg/lyrics/generate","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":36048},"msg":"incoming request"}
+{"level":30,"time":1788443992131,"pid":1023927,"hostname":"srv1543950","reqId":"KLvm_st0qIzM","res":{"statusCode":400},"responseTime":1.0839510000078008,"msg":"request completed"}
+{"level":30,"time":1788443994182,"pid":1023927,"hostname":"srv1543950","reqId":"anzj_mWQXxUZ","req":{"method":"POST","url":"/api/v1/orders/awz0bkdYx8rGFPSg/lyrics/generate","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":36056},"msg":"incoming request"}
+{"level":30,"time":1788443994183,"pid":1023927,"hostname":"srv1543950","reqId":"anzj_mWQXxUZ","res":{"statusCode":400},"responseTime":0.7385550000180956,"msg":"request completed"}
+{"level":30,"time":1788443996246,"pid":1023927,"hostname":"srv1543950","reqId":"hEf0PEQrf0Qg","req":{"method":"POST","url":"/api/v1/orders/awz0bkdYx8rGFPSg/lyrics/generate","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":36058},"msg":"incoming request"}
+{"level":30,"time":1788443996247,"pid":1023927,"hostname":"srv1543950","reqId":"hEf0PEQrf0Qg","res":{"statusCode":400},"responseTime":0.7116559999994934,"msg":"request completed"}
+{"level":30,"time":1788444022158,"pid":1023927,"hostname":"srv1543950","reqId":"lnDOzr9trSFw","req":{"method":"POST","url":"/api/v1/orders/awz0bkdYx8rGFPSg/lyrics/generate","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":46330},"msg":"incoming request"}
+{"level":30,"time":1788444022160,"pid":1023927,"hostname":"srv1543950","reqId":"lnDOzr9trSFw","res":{"statusCode":400},"responseTime":1.7606050000176765,"msg":"request completed"}
+{"level":30,"time":1788444031141,"pid":1023927,"hostname":"srv1543950","reqId":"3zWUDx3F7z4x","req":{"method":"POST","url":"/api/v1/orders/awz0bkdYx8rGFPSg/lyrics/generate","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":39936},"msg":"incoming request"}
+{"level":30,"time":1788444031144,"pid":1023927,"hostname":"srv1543950","reqId":"3zWUDx3F7z4x","res":{"statusCode":400},"responseTime":3.4000790000427514,"msg":"request completed"}
+11:01:26 AM [tsx] change in ./src/app.ts Restarting...
+{"level":30,"time":1788444089804,"pid":1033350,"hostname":"srv1543950","msg":"Server listening at http://127.0.0.1:3001"}
+{"level":30,"time":1788444089805,"pid":1033350,"hostname":"srv1543950","msg":"Server listening at http://187.127.5.24:3001"}
+{"level":30,"time":1788444089805,"pid":1033350,"hostname":"srv1543950","msg":"Server listening at http://172.20.0.1:3001"}
+{"level":30,"time":1788444089805,"pid":1033350,"hostname":"srv1543950","msg":"Server listening at http://100.74.121.80:3001"}
+{"level":30,"time":1788444089805,"pid":1033350,"hostname":"srv1543950","msg":"Server listening at http://172.21.0.1:3001"}
+11:02:00 AM [tsx] change in ./src/app.ts Restarting...
+11:02:03 AM [tsx] change in ./src/app.ts Restarting...
+11:02:03 AM [tsx] change in ./src/app.ts Restarting...
+{"level":30,"time":1788444125770,"pid":1034298,"hostname":"srv1543950","msg":"Server listening at http://127.0.0.1:3001"}
+{"level":30,"time":1788444125770,"pid":1034298,"hostname":"srv1543950","msg":"Server listening at http://187.127.5.24:3001"}
+{"level":30,"time":1788444125770,"pid":1034298,"hostname":"srv1543950","msg":"Server listening at http://172.20.0.1:3001"}
+{"level":30,"time":1788444125770,"pid":1034298,"hostname":"srv1543950","msg":"Server listening at http://100.74.121.80:3001"}
+{"level":30,"time":1788444125770,"pid":1034298,"hostname":"srv1543950","msg":"Server listening at http://172.21.0.1:3001"}
+11:02:34 AM [tsx] change in ./src/app.ts Restarting...
+{"level":30,"time":1788444156110,"pid":1035114,"hostname":"srv1543950","msg":"Server listening at http://127.0.0.1:3001"}
+{"level":30,"time":1788444156111,"pid":1035114,"hostname":"srv1543950","msg":"Server listening at http://187.127.5.24:3001"}
+{"level":30,"time":1788444156111,"pid":1035114,"hostname":"srv1543950","msg":"Server listening at http://172.20.0.1:3001"}
+{"level":30,"time":1788444156111,"pid":1035114,"hostname":"srv1543950","msg":"Server listening at http://100.74.121.80:3001"}
+{"level":30,"time":1788444156111,"pid":1035114,"hostname":"srv1543950","msg":"Server listening at http://172.21.0.1:3001"}
+{"level":30,"time":1788444214199,"pid":1035114,"hostname":"srv1543950","reqId":"03CdvxKlINxW","req":{"method":"POST","url":"/api/v1/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":40362},"msg":"incoming request"}
+{"level":30,"time":1788444214210,"pid":1035114,"hostname":"srv1543950","reqId":"03CdvxKlINxW","res":{"statusCode":400},"responseTime":11.047961999996915,"msg":"request completed"}
+{"level":30,"time":1788444214232,"pid":1035114,"hostname":"srv1543950","reqId":"Vu_gsQ0h9dbT","req":{"method":"GET","url":"/api/v1/health/live","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":40364},"msg":"incoming request"}
+{"level":30,"time":1788444214236,"pid":1035114,"hostname":"srv1543950","reqId":"Vu_gsQ0h9dbT","res":{"statusCode":200},"responseTime":1.68449099999998,"msg":"request completed"}
+{"level":30,"time":1788444214321,"pid":1035114,"hostname":"srv1543950","reqId":"mVkV64JlNxVI","req":{"method":"POST","url":"/api/v1/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":40372},"msg":"incoming request"}
+{"level":30,"time":1788444214383,"pid":1035114,"hostname":"srv1543950","reqId":"mVkV64JlNxVI","res":{"statusCode":201},"responseTime":61.38191999999981,"msg":"request completed"}
+{"level":30,"time":1788444214421,"pid":1035114,"hostname":"srv1543950","reqId":"E9gTp99C65Mj","req":{"method":"PATCH","url":"/api/v1/orders/LapnX3lDYu2Cd8uu/story","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":40382},"msg":"incoming request"}
+{"level":30,"time":1788444214446,"pid":1035114,"hostname":"srv1543950","reqId":"E9gTp99C65Mj","res":{"statusCode":200},"responseTime":24.622809000000416,"msg":"request completed"}
+{"level":30,"time":1788444214465,"pid":1035114,"hostname":"srv1543950","reqId":"4tCRXladXHvR","req":{"method":"POST","url":"/api/v1/orders/LapnX3lDYu2Cd8uu/lyrics/generate","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":40384},"msg":"incoming request"}
+{"level":30,"time":1788444224466,"pid":1035114,"hostname":"srv1543950","reqId":"4tCRXladXHvR","res":{"statusCode":200},"responseTime":10001.593890000004,"msg":"request completed"}
+{"level":30,"time":1788444239153,"pid":1035114,"hostname":"srv1543950","reqId":"Tt4rax-aof9h","req":{"method":"POST","url":"/api/v1/orders/awz0bkdYx8rGFPSg/lyrics/generate","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":48186},"msg":"incoming request"}
+{"level":30,"time":1788444244848,"pid":1035114,"hostname":"srv1543950","reqId":"vfeUagVmfd4Z","req":{"method":"GET","url":"/api/v1/orders/awz0bkdYx8rGFPSg","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":47210},"msg":"incoming request"}
+{"level":30,"time":1788444244862,"pid":1035114,"hostname":"srv1543950","reqId":"vfeUagVmfd4Z","res":{"statusCode":200},"responseTime":13.71970099999453,"msg":"request completed"}
+{"level":30,"time":1788444250353,"pid":1035114,"hostname":"srv1543950","reqId":"Tt4rax-aof9h","res":{"statusCode":400},"responseTime":11199.778468999997,"msg":"request completed"}
+{"level":30,"time":1788444254110,"pid":1035114,"hostname":"srv1543950","reqId":"b1_KltFr6Tjr","req":{"method":"POST","url":"/api/v1/orders/awz0bkdYx8rGFPSg/lyrics/generate","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":44668},"msg":"incoming request"}
+{"level":30,"time":1788444254113,"pid":1035114,"hostname":"srv1543950","reqId":"b1_KltFr6Tjr","res":{"statusCode":400},"responseTime":3.5564329999906477,"msg":"request completed"}
+{"level":30,"time":1788444276061,"pid":1035114,"hostname":"srv1543950","reqId":"V7Nb1aB-sxly","req":{"method":"POST","url":"/api/v1/orders/awz0bkdYx8rGFPSg/lyrics/generate","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":39478},"msg":"incoming request"}
+{"level":30,"time":1788444276085,"pid":1035114,"hostname":"srv1543950","reqId":"V7Nb1aB-sxly","res":{"statusCode":400},"responseTime":23.72610600000189,"msg":"request completed"}
+{"level":30,"time":1788444285075,"pid":1035114,"hostname":"srv1543950","reqId":"5pgiuucb2RFt","req":{"method":"POST","url":"/api/v1/orders/awz0bkdYx8rGFPSg/lyrics/generate","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":37520},"msg":"incoming request"}
+{"level":30,"time":1788444285078,"pid":1035114,"hostname":"srv1543950","reqId":"5pgiuucb2RFt","res":{"statusCode":400},"responseTime":2.0523810000013327,"msg":"request completed"}
+11:06:24 AM [tsx] change in ./src/providers.ts Restarting...
+{"level":30,"time":1788444386704,"pid":1041858,"hostname":"srv1543950","msg":"Server listening at http://127.0.0.1:3001"}
+{"level":30,"time":1788444386705,"pid":1041858,"hostname":"srv1543950","msg":"Server listening at http://187.127.5.24:3001"}
+{"level":30,"time":1788444386705,"pid":1041858,"hostname":"srv1543950","msg":"Server listening at http://172.20.0.1:3001"}
+{"level":30,"time":1788444386705,"pid":1041858,"hostname":"srv1543950","msg":"Server listening at http://100.74.121.80:3001"}
+{"level":30,"time":1788444386705,"pid":1041858,"hostname":"srv1543950","msg":"Server listening at http://172.21.0.1:3001"}
+11:06:33 AM [tsx] change in ./src/app.ts Restarting...
+11:06:34 AM [tsx] change in ./src/app.ts Restarting...
+{"level":30,"time":1788444395854,"pid":1042179,"hostname":"srv1543950","msg":"Server listening at http://127.0.0.1:3001"}
+{"level":30,"time":1788444395854,"pid":1042179,"hostname":"srv1543950","msg":"Server listening at http://187.127.5.24:3001"}
+{"level":30,"time":1788444395854,"pid":1042179,"hostname":"srv1543950","msg":"Server listening at http://172.20.0.1:3001"}
+{"level":30,"time":1788444395854,"pid":1042179,"hostname":"srv1543950","msg":"Server listening at http://100.74.121.80:3001"}
+{"level":30,"time":1788444395854,"pid":1042179,"hostname":"srv1543950","msg":"Server listening at http://172.21.0.1:3001"}
+11:06:51 AM [tsx] change in ./src/app.ts Restarting...
+{"level":30,"time":1788444412426,"pid":1042599,"hostname":"srv1543950","msg":"Server listening at http://127.0.0.1:3001"}
+{"level":30,"time":1788444412426,"pid":1042599,"hostname":"srv1543950","msg":"Server listening at http://187.127.5.24:3001"}
+{"level":30,"time":1788444412426,"pid":1042599,"hostname":"srv1543950","msg":"Server listening at http://172.20.0.1:3001"}
+{"level":30,"time":1788444412426,"pid":1042599,"hostname":"srv1543950","msg":"Server listening at http://100.74.121.80:3001"}
+{"level":30,"time":1788444412426,"pid":1042599,"hostname":"srv1543950","msg":"Server listening at http://172.21.0.1:3001"}
+11:11:27 AM [tsx] change in ./src/app.ts Restarting...
+{"level":30,"time":1788444688923,"pid":1050765,"hostname":"srv1543950","msg":"Server listening at http://127.0.0.1:3001"}
+{"level":30,"time":1788444688923,"pid":1050765,"hostname":"srv1543950","msg":"Server listening at http://187.127.5.24:3001"}
+{"level":30,"time":1788444688923,"pid":1050765,"hostname":"srv1543950","msg":"Server listening at http://172.20.0.1:3001"}
+{"level":30,"time":1788444688923,"pid":1050765,"hostname":"srv1543950","msg":"Server listening at http://100.74.121.80:3001"}
+{"level":30,"time":1788444688923,"pid":1050765,"hostname":"srv1543950","msg":"Server listening at http://172.21.0.1:3001"}
+{"level":30,"time":1788444780898,"pid":1050765,"hostname":"srv1543950","reqId":"MtSvzaHPfAgG","req":{"method":"POST","url":"/api/v1/orders/awz0bkdYx8rGFPSg/lyrics/generate","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":36216},"msg":"incoming request"}
+{"level":30,"time":1788444790361,"pid":1050765,"hostname":"srv1543950","reqId":"MtSvzaHPfAgG","res":{"statusCode":200},"responseTime":9462.007134999993,"msg":"request completed"}
+{"level":30,"time":1788444935873,"pid":1050765,"hostname":"srv1543950","reqId":"1KEVH7_qt8Nf","req":{"method":"POST","url":"/api/v1/orders/awz0bkdYx8rGFPSg/lyrics/generate","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":39722},"msg":"incoming request"}
+{"level":30,"time":1788444944572,"pid":1050765,"hostname":"srv1543950","reqId":"1KEVH7_qt8Nf","res":{"statusCode":200},"responseTime":8698.958360999997,"msg":"request completed"}
+{"level":30,"time":1788444944626,"pid":1050765,"hostname":"srv1543950","reqId":"eI1yK6yV4J7Y","req":{"method":"GET","url":"/api/v1/orders/awz0bkdYx8rGFPSg","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":59470},"msg":"incoming request"}
+{"level":30,"time":1788444944634,"pid":1050765,"hostname":"srv1543950","reqId":"eI1yK6yV4J7Y","res":{"statusCode":200},"responseTime":7.755154999991646,"msg":"request completed"}
+{"level":30,"time":1788444985104,"pid":1050765,"hostname":"srv1543950","reqId":"-OlI3YfHzLhb","req":{"method":"POST","url":"/api/v1/orders/awz0bkdYx8rGFPSg/lyrics/273ff174-72e8-4b2c-9f36-f0be89d1bfd0/approve","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":39686},"msg":"incoming request"}
+{"level":30,"time":1788444985124,"pid":1050765,"hostname":"srv1543950","reqId":"-OlI3YfHzLhb","res":{"statusCode":200},"responseTime":20.10394299996551,"msg":"request completed"}
+{"level":30,"time":1788444988478,"pid":1050765,"hostname":"srv1543950","reqId":"nYdxWUA9DOez","req":{"method":"POST","url":"/api/v1/orders/awz0bkdYx8rGFPSg/checkout","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":39688},"msg":"incoming request"}
+{"level":30,"time":1788444988503,"pid":1050765,"hostname":"srv1543950","reqId":"nYdxWUA9DOez","res":{"statusCode":200},"responseTime":23.923829999985173,"msg":"request completed"}
+{"level":30,"time":1788444988548,"pid":1050765,"hostname":"srv1543950","reqId":"x1KSOZAMWmpE","req":{"method":"POST","url":"/api/v1/dev/payments/0b44831a-6ddc-4e29-a9b8-63532a5c0719/approve","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":39704},"msg":"incoming request"}
+{"level":30,"time":1788444988560,"pid":1050765,"hostname":"srv1543950","reqId":"x1KSOZAMWmpE","res":{"statusCode":200},"responseTime":11.937132999999449,"msg":"request completed"}
+{"level":30,"time":1788445001100,"pid":1050765,"hostname":"srv1543950","reqId":"Cb-5cFJKZi32","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":50250},"msg":"incoming request"}
+{"level":30,"time":1788445001127,"pid":1050765,"hostname":"srv1543950","reqId":"Cb-5cFJKZi32","res":{"statusCode":200},"responseTime":26.733705000020564,"msg":"request completed"}
+{"level":30,"time":1788445005948,"pid":1050765,"hostname":"srv1543950","reqId":"buPLYxHVZFZs","req":{"method":"GET","url":"/api/v1/admin/orders/f4616773-a02e-4bb9-93ed-136bb0295f9f","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":50262},"msg":"incoming request"}
+{"level":30,"time":1788445005966,"pid":1050765,"hostname":"srv1543950","reqId":"buPLYxHVZFZs","res":{"statusCode":200},"responseTime":17.230872999993153,"msg":"request completed"}
+{"level":30,"time":1788445015553,"pid":1050765,"hostname":"srv1543950","reqId":"hoF9TgKqAc-7","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":33928},"msg":"incoming request"}
+{"level":30,"time":1788445015558,"pid":1050765,"hostname":"srv1543950","reqId":"hoF9TgKqAc-7","res":{"statusCode":200},"responseTime":3.9584129999857396,"msg":"request completed"}
+{"level":30,"time":1788445016402,"pid":1050765,"hostname":"srv1543950","reqId":"ojdXHP7qdmM7","req":{"method":"GET","url":"/api/v1/admin/orders/62e90be3-5ed1-4b2a-8eac-0a1a7b02880a","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":33944},"msg":"incoming request"}
+{"level":30,"time":1788445016415,"pid":1050765,"hostname":"srv1543950","reqId":"ojdXHP7qdmM7","res":{"statusCode":200},"responseTime":10.43620599998394,"msg":"request completed"}
+{"level":30,"time":1788445049456,"pid":1050765,"hostname":"srv1543950","reqId":"fSFtmnqMDBR6","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":51258},"msg":"incoming request"}
+{"level":30,"time":1788445049471,"pid":1050765,"hostname":"srv1543950","reqId":"fSFtmnqMDBR6","res":{"statusCode":200},"responseTime":15.454035999951884,"msg":"request completed"}
+{"level":30,"time":1788445082002,"pid":1050765,"hostname":"srv1543950","reqId":"JtJsFl6Wk_2x","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":52202},"msg":"incoming request"}
+{"level":30,"time":1788445082080,"pid":1050765,"hostname":"srv1543950","reqId":"JtJsFl6Wk_2x","res":{"statusCode":200},"responseTime":78.38267999998061,"msg":"request completed"}
+{"level":30,"time":1788445085766,"pid":1050765,"hostname":"srv1543950","reqId":"Vow-v_9oU2iX","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":52218},"msg":"incoming request"}
+{"level":30,"time":1788445085775,"pid":1050765,"hostname":"srv1543950","reqId":"Vow-v_9oU2iX","res":{"statusCode":200},"responseTime":8.548171999980696,"msg":"request completed"}
+{"level":30,"time":1788445087041,"pid":1050765,"hostname":"srv1543950","reqId":"p0LtLKygTsef","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":52232},"msg":"incoming request"}
+{"level":30,"time":1788445087045,"pid":1050765,"hostname":"srv1543950","reqId":"p0LtLKygTsef","res":{"statusCode":200},"responseTime":4.345622000051662,"msg":"request completed"}
+{"level":30,"time":1788445144113,"pid":1050765,"hostname":"srv1543950","reqId":"OOAkeMiKLPy5","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":47608},"msg":"incoming request"}
+{"level":30,"time":1788445144145,"pid":1050765,"hostname":"srv1543950","reqId":"OOAkeMiKLPy5","res":{"statusCode":200},"responseTime":32.11228999996092,"msg":"request completed"}
+{"level":30,"time":1788445145089,"pid":1050765,"hostname":"srv1543950","reqId":"SpOF0F3vvuo5","req":{"method":"GET","url":"/api/v1/admin/orders/8e901182-4ea3-4102-b722-dd37ba4cff99","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":47624},"msg":"incoming request"}
+{"level":30,"time":1788445145136,"pid":1050765,"hostname":"srv1543950","reqId":"SpOF0F3vvuo5","res":{"statusCode":200},"responseTime":46.693823000008706,"msg":"request completed"}
+{"level":30,"time":1788445148885,"pid":1050765,"hostname":"srv1543950","reqId":"axQ-zW5TZwfc","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":47640},"msg":"incoming request"}
+{"level":30,"time":1788445148890,"pid":1050765,"hostname":"srv1543950","reqId":"axQ-zW5TZwfc","res":{"statusCode":200},"responseTime":5.489612000004854,"msg":"request completed"}
+{"level":30,"time":1788445149895,"pid":1050765,"hostname":"srv1543950","reqId":"exCI8WFV-18x","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":57324},"msg":"incoming request"}
+{"level":30,"time":1788445149906,"pid":1050765,"hostname":"srv1543950","reqId":"exCI8WFV-18x","res":{"statusCode":200},"responseTime":10.897232000017539,"msg":"request completed"}
+{"level":30,"time":1788445150752,"pid":1050765,"hostname":"srv1543950","reqId":"LcK6VHjq4goI","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":57336},"msg":"incoming request"}
+{"level":30,"time":1788445150757,"pid":1050765,"hostname":"srv1543950","reqId":"LcK6VHjq4goI","res":{"statusCode":200},"responseTime":3.9653619999880902,"msg":"request completed"}
+{"level":30,"time":1788445151477,"pid":1050765,"hostname":"srv1543950","reqId":"SSSOc_kcuz16","req":{"method":"DELETE","url":"/api/v1/admin/session","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":57352},"msg":"incoming request"}
+{"level":30,"time":1788445151488,"pid":1050765,"hostname":"srv1543950","reqId":"SSSOc_kcuz16","res":{"statusCode":204},"responseTime":10.687016999989282,"msg":"request completed"}
+{"level":30,"time":1788445162905,"pid":1050765,"hostname":"srv1543950","reqId":"XeDl-DRCbvV7","req":{"method":"POST","url":"/api/v1/orders/awz0bkdYx8rGFPSg/checkout","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":59666},"msg":"incoming request"}
+{"level":30,"time":1788445162925,"pid":1050765,"hostname":"srv1543950","reqId":"XeDl-DRCbvV7","res":{"statusCode":400},"responseTime":19.252051000017673,"msg":"request completed"}
+{"level":30,"time":1788445166044,"pid":1050765,"hostname":"srv1543950","reqId":"FLWrg8LcKoLa","req":{"method":"GET","url":"/api/v1/orders/awz0bkdYx8rGFPSg","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":59682},"msg":"incoming request"}
+{"level":30,"time":1788445166067,"pid":1050765,"hostname":"srv1543950","reqId":"FLWrg8LcKoLa","res":{"statusCode":200},"responseTime":22.658207000000402,"msg":"request completed"}
+{"level":30,"time":1788445167068,"pid":1050765,"hostname":"srv1543950","reqId":"yWNL4KFUliWr","req":{"method":"POST","url":"/api/v1/orders/awz0bkdYx8rGFPSg/lyrics/273ff174-72e8-4b2c-9f36-f0be89d1bfd0/approve","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":59696},"msg":"incoming request"}
+{"level":30,"time":1788445167070,"pid":1050765,"hostname":"srv1543950","reqId":"yWNL4KFUliWr","res":{"statusCode":400},"responseTime":1.9009740000474267,"msg":"request completed"}
+{"level":30,"time":1788445167921,"pid":1050765,"hostname":"srv1543950","reqId":"IqxAtP1gcsaf","req":{"method":"POST","url":"/api/v1/orders/awz0bkdYx8rGFPSg/lyrics/273ff174-72e8-4b2c-9f36-f0be89d1bfd0/approve","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":59708},"msg":"incoming request"}
+{"level":30,"time":1788445167926,"pid":1050765,"hostname":"srv1543950","reqId":"IqxAtP1gcsaf","res":{"statusCode":400},"responseTime":4.629845999996178,"msg":"request completed"}
+{"level":30,"time":1788445173199,"pid":1050765,"hostname":"srv1543950","reqId":"1Z3SZyGE-8iG","req":{"method":"GET","url":"/api/v1/orders/awz0bkdYx8rGFPSg","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":35718},"msg":"incoming request"}
+{"level":30,"time":1788445173207,"pid":1050765,"hostname":"srv1543950","reqId":"1Z3SZyGE-8iG","res":{"statusCode":200},"responseTime":8.329761000000872,"msg":"request completed"}
+{"level":30,"time":1788445177768,"pid":1050765,"hostname":"srv1543950","reqId":"_QfnP_azIi2R","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":35728},"msg":"incoming request"}
+{"level":30,"time":1788445177769,"pid":1050765,"hostname":"srv1543950","reqId":"_QfnP_azIi2R","res":{"statusCode":401},"responseTime":0.7026809999952093,"msg":"request completed"}
+{"level":30,"time":1788445178816,"pid":1050765,"hostname":"srv1543950","reqId":"YZ512xPEQ_SK","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":35730},"msg":"incoming request"}
+{"level":30,"time":1788445178817,"pid":1050765,"hostname":"srv1543950","reqId":"YZ512xPEQ_SK","res":{"statusCode":401},"responseTime":0.8878189999959432,"msg":"request completed"}
+{"level":30,"time":1788445182766,"pid":1050765,"hostname":"srv1543950","reqId":"YP1b-DPxlpCl","req":{"method":"POST","url":"/api/v1/admin/session","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":54966},"msg":"incoming request"}
+{"level":30,"time":1788445182775,"pid":1050765,"hostname":"srv1543950","reqId":"YP1b-DPxlpCl","res":{"statusCode":200},"responseTime":8.989889000018593,"msg":"request completed"}
+{"level":30,"time":1788445182821,"pid":1050765,"hostname":"srv1543950","reqId":"9wgBINp61vV7","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":54972},"msg":"incoming request"}
+{"level":30,"time":1788445182826,"pid":1050765,"hostname":"srv1543950","reqId":"9wgBINp61vV7","res":{"statusCode":200},"responseTime":4.722375000012107,"msg":"request completed"}
+{"level":30,"time":1788445270151,"pid":1050765,"hostname":"srv1543950","reqId":"16N2B5L9q9dl","req":{"method":"POST","url":"/api/v1/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":53900},"msg":"incoming request"}
+{"level":30,"time":1788445270175,"pid":1050765,"hostname":"srv1543950","reqId":"16N2B5L9q9dl","res":{"statusCode":201},"responseTime":23.33138400001917,"msg":"request completed"}
+{"level":30,"time":1788445270185,"pid":1050765,"hostname":"srv1543950","reqId":"sZEeEkApo5vv","req":{"method":"PATCH","url":"/api/v1/orders/fAznEUplF1Yy7YlO/story","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":53902},"msg":"incoming request"}
+{"level":30,"time":1788445270199,"pid":1050765,"hostname":"srv1543950","reqId":"sZEeEkApo5vv","res":{"statusCode":200},"responseTime":14.061487999977544,"msg":"request completed"}
+{"level":30,"time":1788445270255,"pid":1050765,"hostname":"srv1543950","reqId":"uA3JyFGvFSBG","req":{"method":"GET","url":"/api/v1/orders/fAznEUplF1Yy7YlO","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":53908},"msg":"incoming request"}
+{"level":30,"time":1788445270279,"pid":1050765,"hostname":"srv1543950","reqId":"uA3JyFGvFSBG","res":{"statusCode":200},"responseTime":24.070249999989755,"msg":"request completed"}
+{"level":30,"time":1788445270358,"pid":1050765,"hostname":"srv1543950","reqId":"78louF9mEUsN","req":{"method":"POST","url":"/api/v1/orders/fAznEUplF1Yy7YlO/lyrics/generate","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":53922},"msg":"incoming request"}
+{"level":30,"time":1788445279248,"pid":1050765,"hostname":"srv1543950","reqId":"78louF9mEUsN","res":{"statusCode":200},"responseTime":8889.62758500001,"msg":"request completed"}
+{"level":30,"time":1788445279255,"pid":1050765,"hostname":"srv1543950","reqId":"BReIBCiqEQBt","req":{"method":"GET","url":"/api/v1/orders/fAznEUplF1Yy7YlO","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":53934},"msg":"incoming request"}
+{"level":30,"time":1788445279264,"pid":1050765,"hostname":"srv1543950","reqId":"BReIBCiqEQBt","res":{"statusCode":200},"responseTime":8.182001000037417,"msg":"request completed"}
+{"level":30,"time":1788445279829,"pid":1050765,"hostname":"srv1543950","reqId":"WbHQ2OhfWn2N","req":{"method":"POST","url":"/api/v1/orders/fAznEUplF1Yy7YlO/lyrics/0d2338d1-aed3-4cbd-b56d-ec2cd7daf84f/approve","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":53948},"msg":"incoming request"}
+{"level":30,"time":1788445279840,"pid":1050765,"hostname":"srv1543950","reqId":"WbHQ2OhfWn2N","res":{"statusCode":200},"responseTime":10.408440999919549,"msg":"request completed"}
+{"level":30,"time":1788445279922,"pid":1050765,"hostname":"srv1543950","reqId":"cCZWM-b-6LI1","req":{"method":"POST","url":"/api/v1/orders/fAznEUplF1Yy7YlO/checkout","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":33840},"msg":"incoming request"}
+{"level":30,"time":1788445279932,"pid":1050765,"hostname":"srv1543950","reqId":"cCZWM-b-6LI1","res":{"statusCode":200},"responseTime":9.72774300002493,"msg":"request completed"}
+{"level":30,"time":1788445279939,"pid":1050765,"hostname":"srv1543950","reqId":"83PKoEqhdP2T","req":{"method":"POST","url":"/api/v1/dev/payments/20358f1b-77c4-4694-bb00-6e52505b11e7/approve","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":33846},"msg":"incoming request"}
+{"level":30,"time":1788445279948,"pid":1050765,"hostname":"srv1543950","reqId":"83PKoEqhdP2T","res":{"statusCode":200},"responseTime":9.151090999948792,"msg":"request completed"}
+{"level":30,"time":1788445281969,"pid":1050765,"hostname":"srv1543950","reqId":"AOL73csmfBJf","req":{"method":"GET","url":"/api/v1/orders/fAznEUplF1Yy7YlO","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":33862},"msg":"incoming request"}
+{"level":30,"time":1788445281980,"pid":1050765,"hostname":"srv1543950","reqId":"AOL73csmfBJf","res":{"statusCode":200},"responseTime":10.668361000018194,"msg":"request completed"}
+{"level":30,"time":1788445283986,"pid":1050765,"hostname":"srv1543950","reqId":"BTXFhyLT4X1a","req":{"method":"GET","url":"/api/v1/orders/fAznEUplF1Yy7YlO","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":33870},"msg":"incoming request"}
+{"level":30,"time":1788445283995,"pid":1050765,"hostname":"srv1543950","reqId":"BTXFhyLT4X1a","res":{"statusCode":200},"responseTime":9.04896800010465,"msg":"request completed"}
+{"level":30,"time":1788445364033,"pid":1050765,"hostname":"srv1543950","reqId":"PV2zTCYhgAAE","req":{"method":"GET","url":"/api/v1/admin/orders","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":57926},"msg":"incoming request"}
+{"level":30,"time":1788445364054,"pid":1050765,"hostname":"srv1543950","reqId":"PV2zTCYhgAAE","res":{"statusCode":200},"responseTime":21.03608200000599,"msg":"request completed"}
+11:22:44 AM [tsx] change in ./src/app.ts Restarting...
+{"level":30,"time":1788445365553,"pid":1069517,"hostname":"srv1543950","msg":"Server listening at http://127.0.0.1:3001"}
+{"level":30,"time":1788445365554,"pid":1069517,"hostname":"srv1543950","msg":"Server listening at http://187.127.5.24:3001"}
+{"level":30,"time":1788445365554,"pid":1069517,"hostname":"srv1543950","msg":"Server listening at http://172.20.0.1:3001"}
+{"level":30,"time":1788445365554,"pid":1069517,"hostname":"srv1543950","msg":"Server listening at http://100.74.121.80:3001"}
+{"level":30,"time":1788445365554,"pid":1069517,"hostname":"srv1543950","msg":"Server listening at http://172.21.0.1:3001"}
+{"level":30,"time":1788445372977,"pid":1069517,"hostname":"srv1543950","reqId":"MUVrKK4OU3Wh","req":{"method":"GET","url":"/api/v1/admin/orders/fce5f1eb-f604-49dd-9021-82c5df40166d","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":59318},"msg":"incoming request"}
+{"level":30,"time":1788445373041,"pid":1069517,"hostname":"srv1543950","reqId":"MUVrKK4OU3Wh","res":{"statusCode":200},"responseTime":63.26152600000023,"msg":"request completed"}
+{"level":30,"time":1788445376084,"pid":1069517,"hostname":"srv1543950","reqId":"leapU_CMKfBQ","req":{"method":"GET","url":"/api/v1/admin/orders/fce5f1eb-f604-49dd-9021-82c5df40166d/assets/ba2c8ffb-e27e-4e3e-be89-0220ae3f7b0a/stream","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":59332},"msg":"incoming request"}
+{"level":30,"time":1788445376096,"pid":1069517,"hostname":"srv1543950","reqId":"leapU_CMKfBQ","res":{"statusCode":200},"responseTime":12.578348000000915,"msg":"request completed"}
+{"level":30,"time":1788445415472,"pid":1069517,"hostname":"srv1543950","reqId":"M4sAFGgafZZz","req":{"method":"GET","url":"/api/v1/admin/orders/fce5f1eb-f604-49dd-9021-82c5df40166d","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":57060},"msg":"incoming request"}
+{"level":30,"time":1788445415500,"pid":1069517,"hostname":"srv1543950","reqId":"M4sAFGgafZZz","res":{"statusCode":200},"responseTime":28.060411999998905,"msg":"request completed"}
+{"level":30,"time":1788445426613,"pid":1069517,"hostname":"srv1543950","reqId":"OeFaLY7_uzGd","req":{"method":"GET","url":"/api/v1/admin/orders/fce5f1eb-f604-49dd-9021-82c5df40166d","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":33340},"msg":"incoming request"}
+{"level":30,"time":1788445426644,"pid":1069517,"hostname":"srv1543950","reqId":"OeFaLY7_uzGd","res":{"statusCode":200},"responseTime":30.499330999999074,"msg":"request completed"}
+{"level":30,"time":1788445427603,"pid":1069517,"hostname":"srv1543950","reqId":"ht02Gc9oxFON","req":{"method":"GET","url":"/api/v1/admin/orders/fce5f1eb-f604-49dd-9021-82c5df40166d","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":33350},"msg":"incoming request"}
+{"level":30,"time":1788445427612,"pid":1069517,"hostname":"srv1543950","reqId":"ht02Gc9oxFON","res":{"statusCode":200},"responseTime":8.353939000000537,"msg":"request completed"}
+{"level":30,"time":1788445450905,"pid":1069517,"hostname":"srv1543950","reqId":"JM1nBQOJllcr","req":{"method":"GET","url":"/api/v1/admin/orders/fce5f1eb-f604-49dd-9021-82c5df40166d","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":51484},"msg":"incoming request"}
+{"level":30,"time":1788445450944,"pid":1069517,"hostname":"srv1543950","reqId":"JM1nBQOJllcr","res":{"statusCode":200},"responseTime":38.963452999989386,"msg":"request completed"}
+{"level":30,"time":1788445460900,"pid":1069517,"hostname":"srv1543950","reqId":"ZTHUrTP_nVg0","req":{"method":"GET","url":"/api/v1/admin/orders/fce5f1eb-f604-49dd-9021-82c5df40166d","host":"127.0.0.1:3001","remoteAddress":"127.0.0.1","remotePort":60884},"msg":"incoming request"}
+{"level":30,"time":1788445460910,"pid":1069517,"hostname":"srv1543950","reqId":"ZTHUrTP_nVg0","res":{"statusCode":200},"responseTime":9.77579600000172,"msg":"request completed"}
