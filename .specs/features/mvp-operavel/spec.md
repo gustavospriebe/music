@@ -201,7 +201,7 @@ A aplicação possui as peças do fluxo de música personalizada, mas ainda acei
 | Requirement ID | Story                  | Phase          | Status    |
 | -------------- | ---------------------- | -------------- | --------- |
 | FLOW-01        | Criar história         | T1, T2, T5     | Done      |
-| FLOW-02        | Criar história         | T5, F2         | Needs Fix |
+| FLOW-02        | Criar história         | T5, F2         | Done      |
 | FLOW-03        | Criar história         | T5             | Done      |
 | FLOW-04        | Criar história         | T5             | Done      |
 | FLOW-05        | Criar história         | T2, T5         | Done      |
@@ -211,7 +211,7 @@ A aplicação possui as peças do fluxo de música personalizada, mas ainda acei
 | GEN-04         | Gerar letra            | T4             | Done      |
 | GEN-05         | Gerar letra            | T6             | Done      |
 | GEN-06         | Gerar letra            | T4, T6         | Done      |
-| LYRIC-01       | Revisar letra          | T4, F2         | Needs Fix |
+| LYRIC-01       | Revisar letra          | T4, F2         | Done      |
 | LYRIC-02       | Revisar letra          | T4             | Done      |
 | LYRIC-03       | Revisar letra          | T6             | Done      |
 | LYRIC-04       | Revisar letra          | T6             | Done      |
@@ -220,10 +220,10 @@ A aplicação possui as peças do fluxo de música personalizada, mas ainda acei
 | PAY-03         | Pagamento              | T3, T5         | Done      |
 | PAY-04         | Pagamento              | T3             | Done      |
 | PAY-05         | Pagamento              | T5             | Done      |
-| ASYNC-01       | Produção e entrega     | T6, F2         | Needs Fix |
-| ASYNC-02       | Produção e entrega     | T6, F2         | Needs Fix |
+| ASYNC-01       | Produção e entrega     | T6, F2         | Done      |
+| ASYNC-02       | Produção e entrega     | T6, F2         | Done      |
 | ASYNC-03       | Produção e entrega     | T6             | Done      |
-| ASYNC-04       | Produção e entrega     | T6, F2         | Needs Fix |
+| ASYNC-04       | Produção e entrega     | T6, F2         | Done      |
 | ASYNC-05       | Produção e entrega     | T1, T6         | Done      |
 | ASYNC-06       | Produção e entrega     | T1, T6         | Done      |
 | ASYNC-07       | Produção e entrega     | T6             | Done      |

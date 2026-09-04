@@ -179,6 +179,10 @@ test('link de entrega recupera o acesso ao pedido neste navegador', async ({ pag
   await page.goto('/entrega/token-recovery-123');
   await page.getByRole('button', { name: /acompanhar pedido neste navegador/i }).click();
   await expect(page).toHaveURL(/\/pedido\/order-recovered-1/);
+  expect(new URL(page.url()).pathname).toBe('/pedido/order-recovered-1');
+  await expect
+    .poll(() => page.evaluate(() => window.localStorage.getItem('resenha:my-orders')))
+    .toBe(JSON.stringify(['order-recovered-1']));
 });
 
 test('pedido com falha explica e orienta sem prometer causa', async ({ page }) => {

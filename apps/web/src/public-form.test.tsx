@@ -51,6 +51,35 @@ describe('formulário público', () => {
     expect(screen.getByText(/pelo menos 2 lembranças/i)).toBeInTheDocument();
   });
 
+  it('associa uma mensagem específica a cada campo obrigatório', async () => {
+    renderForm();
+    await userEvent.click(screen.getByRole('button', { name: /gerar minha letra/i }));
+
+    const required = [
+      [
+        screen.getByRole('textbox', { name: /para quem é a música/i }),
+        'Informe o nome da homenagem',
+      ],
+      [screen.getByRole('textbox', { name: /qual é a ocasião/i }), 'Conte a ocasião'],
+      [screen.getByRole('textbox', { name: /^seu nome$/i }), 'Informe seu nome'],
+      [screen.getByRole('textbox', { name: /^seu e-mail$/i }), 'Informe um e-mail válido'],
+      [
+        screen.getByRole('textbox', { name: /histórias, apelidos/i }),
+        'Escreva pelo menos 2 lembranças, uma em cada linha',
+      ],
+      [
+        screen.getByRole('checkbox', { name: /aceito os termos/i }),
+        'Aceite os termos para continuar',
+      ],
+    ] as const;
+
+    await waitFor(() => expect(required[0][0]).toHaveFocus());
+    for (const [control, message] of required) {
+      expect(control).toHaveAttribute('aria-invalid', 'true');
+      expect(control).toHaveAccessibleDescription(message);
+    }
+  });
+
   it('repete create e story com uma única chave até o salvamento concluir', async () => {
     apiMock.createOrder.mockResolvedValue({ publicId: 'order-retry-123' });
     apiMock.saveStory.mockRejectedValueOnce(new Error('rede indisponível')).mockResolvedValue({

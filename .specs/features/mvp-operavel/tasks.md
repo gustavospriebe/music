@@ -284,18 +284,18 @@ T8
 
 ### F2: Complete resumability and delivery assertions
 
-**Status**: Pending
+**Status**: Complete
 **What**: Prove all form associations, lyric-save feedback, production polling, delivered assets and recovery history.
 **Where**: React/Playwright tests for the public journey
 **Depends on**: F1
 **Requirement**: FLOW-02, LYRIC-01, ASYNC-01, ASYNC-02, ASYNC-04
 **Done when**:
 
-- [ ] Every enumerated invalid form control has its own accessible message assertion.
-- [ ] Successful lyric save announces “Nova versão salva”.
-- [ ] Active production states poll and terminal states stop polling.
-- [ ] Delivery renders exactly two players and two downloads.
-- [ ] Delivery-token recovery removes the token and records the `publicId` locally.
+- [x] Every enumerated invalid form control has its own accessible message assertion.
+- [x] Successful lyric save announces “Nova versão salva”.
+- [x] Active production states poll and terminal states stop polling.
+- [x] Delivery renders exactly two players and two downloads.
+- [x] Delivery-token recovery removes the token and records the `publicId` locally.
 
 **Gate**: Full
 
@@ -338,5 +338,5 @@ T8
 | T7   | Presentation + journey | RTL/Playwright keyboard, focus, responsive and screenshot checks        | Build | ✅     |
 | T8   | Operations/config/docs | Full gates, DB replay, UAT, React Doctor and link review                | Build | ⚠️     |
 | F1   | API boundary           | Exact HTTP-log and delivery DTO assertions                              | Full  | ✅     |
-| F2   | Public journey         | RTL/Playwright for resumability and delivered assets                    | Full  | ⏳     |
+| F2   | Public journey         | RTL/Playwright for resumability and delivered assets                    | Full  | ✅     |
 | F3   | Accessibility          | Computed contrast and all-route heading assertions                      | Build | ⏳     |

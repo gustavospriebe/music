@@ -85,6 +85,58 @@ test('falha de letra oferece retry e erro de edição mantém o texto visível',
   await expect(editor).toHaveValue('Texto que não pode sumir');
 });
 
+test('salvar letra confirma a nova versão no status acessível', async ({ page }) => {
+  await page.route('**/api/v1/orders/order-lyrics-saved**', (route) => {
+    const request = route.request();
+    if (request.method() === 'PATCH') return route.fulfill({ json: { number: 4, kind: 'edited' } });
+    return route.fulfill({
+      json: {
+        order: { publicId: 'order-lyrics-saved', status: 'lyrics_ready', priceCents: 4990 },
+        lyrics: [lyric],
+        audio: [],
+      },
+    });
+  });
+  await page.goto('/criar/letra?pedido=order-lyrics-saved');
+  await page.getByRole('textbox', { name: /letra da música/i }).fill('Versão quatro');
+  await page.getByRole('button', { name: /salvar nova versão/i }).click();
+  await expect(page.getByRole('status')).toHaveText('Nova versão salva.');
+});
+
+test('produção consulta estados ativos e para o polling na entrega', async ({ page }) => {
+  const states = [
+    'paid',
+    'audio_queued',
+    'audio_generating',
+    'review_required',
+    'revision_requested',
+    'delivered',
+  ] as const;
+  let reads = 0;
+  await page.route('**/api/v1/orders/order-polling-1', (route) => {
+    const status = states[Math.min(reads, states.length - 1)];
+    reads += 1;
+    return route.fulfill({
+      json: {
+        order: { publicId: 'order-polling-1', status, priceCents: 4990 },
+        lyrics: [{ ...lyric, kind: 'approved', approvedAt: new Date().toISOString() }],
+        audio:
+          status === 'delivered'
+            ? [
+                { variant: 1, status: 'completed' },
+                { variant: 2, status: 'completed' },
+              ]
+            : [],
+      },
+    });
+  });
+  await page.goto('/pedido/order-polling-1');
+  await expect(page.getByRole('link', { name: /ouvir versões/i })).toBeVisible({ timeout: 15_000 });
+  expect(reads).toBe(states.length);
+  await page.waitForTimeout(2_200);
+  expect(reads).toBe(states.length);
+});
+
 test('status inconsistente não oferece mutação e falha paga não promete regeneração', async ({
   page,
 }) => {
@@ -140,7 +192,18 @@ test('entrega parcial é inconsistente; duas variantes concluem as cinco etapas'
   await expect(
     page.getByRole('list', { name: /produção da música/i }).getByText('Concluído'),
   ).toHaveCount(5);
-  await expect(page.getByRole('link', { name: /ouvir versões/i })).toBeVisible();
+  await page.getByRole('link', { name: /ouvir versões/i }).click();
+  await expect(page.getByRole('main').locator('audio')).toHaveCount(2);
+  const downloads = page.getByRole('main').getByRole('link', { name: /baixar versão/i });
+  await expect(downloads).toHaveCount(2);
+  await expect(downloads.nth(0)).toHaveAttribute(
+    'href',
+    '/api/v1/orders/order-delivery-1/assets/1/download',
+  );
+  await expect(downloads.nth(1)).toHaveAttribute(
+    'href',
+    '/api/v1/orders/order-delivery-1/assets/2/download',
+  );
 });
 
 test('histórico vazio explica o navegador e oferece criar música', async ({ page }) => {
