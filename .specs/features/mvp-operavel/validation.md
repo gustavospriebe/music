@@ -1,10 +1,10 @@
 # MVP Operável Validation
 
-**Verdict**: PASS ✅ — os 45/45 critérios de aceitação têm prova spec-anchored, o gate passa com 97 Vitest + 28 Playwright e o sensor P0-full desta rodada matou 7/7 mutações válidas sem alterar o baseline real.
+**Verdict**: PASS ✅ — os 45/45 critérios de aceitação têm prova spec-anchored, o gate passa com 97 Vitest + 28 Playwright, o sensor P0-full matou 7/7 mutações válidas e a auditoria visual final cobre os 15 estados do baseline.
 **Date**: 2026-09-04
 **Spec**: `.specs/features/mvp-operavel/spec.md`
-**Diff range**: `cd487b771e2f0ecbc85105454ccd86004bcd1f32..9fcb327`
-**Verifier**: independent fresh sub-agent `mvp_operavel_verifier_round3` (author ≠ verifier)
+**Diff range**: `cd487b771e2f0ecbc85105454ccd86004bcd1f32..b6e27c8`
+**Verifier**: independent fresh sub-agent `mvp_operavel_verifier_round3` (author ≠ verifier), including a supplemental check of F5
 **Round**: 3 of at most 3 fix→reverify iterations
 
 ---
@@ -14,23 +14,25 @@
 - **Rodada 1 (`e0873f5`)**: FAIL com 36/45 ACs e nove gaps de evidence-or-zero: FLOW-02, LYRIC-01, ASYNC-01/02/04, A11Y-02/05 e SAFE-03/04.
 - **Rodada 2 (`5a944f0`)**: FAIL com 45/45 ACs e sensor 10/10, porque `README.md:66` e `docs/runbook.md:25` ainda prometiam `method` no log HTTP após F1 restringir o contexto.
 - **Correções**: F1–F3 fecharam as nove provas; F4 alinhou a documentação ao contrato real do logger. Esta rodada rederivou os 45 critérios no diff final e repetiu gate e sensor do zero.
+- **Auditoria de conclusão (`b6e27c8`)**: encontrou só 4 capturas finais para 15 estados do baseline. F5 completou os 15 pares e manteve os CTAs da revisão dentro de 1280 × 720. O mesmo Verifier fez uma checagem suplementar independente e retornou PASS sem gaps.
 
 ## Task Completion
 
-| Task | Status  | Independent evidence                                                                                                                              |
-| ---- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T1   | ✅ Done | Contratos fechados e rejeição de campos/status em `packages/contracts/src/index.test.ts:70-139`.                                                  |
-| T2   | ✅ Done | Um hash/pedido/evento por tentativa em `apps/api/src/flow.test.ts:174-210`; sensor M8.                                                            |
-| T3   | ✅ Done | Cookie assinado, checkout sem UUID e job único em `apps/api/src/flow.test.ts:213-288,708-766`.                                                    |
-| T4   | ✅ Done | Claim temporal e versões append-only em `apps/api/src/flow.test.ts:291-387,598-693`; sensor M9.                                                   |
-| T5   | ✅ Done | Draft, validação completa, retry e preço em `apps/web/src/public-form.test.tsx:38-105` e `apps/web/e2e/mvp-operable-t5.spec.ts:3-118`.            |
-| T6   | ✅ Done | Polling, falhas, entrega e recovery em `apps/web/e2e/mvp-operable-t6.spec.ts:22-261` e `apps/web/e2e/mvp-flows.spec.ts:162-185`.                  |
-| T7   | ✅ Done | Foco, contraste, headings, 390 px e motion em `apps/web/e2e/mvp-operable-t7.spec.ts:24-204`.                                                      |
-| T8   | ✅ Done | Gates/UAT passam e a documentação operacional coincide com `httpLogContext`: `README.md:66`, `docs/runbook.md:25`, `apps/api/src/app.ts:120-145`. |
-| F1   | ✅ Done | DTO de entrega e contexto HTTP exatos em `apps/api/src/flow.test.ts:449-476` e `apps/api/src/app.test.ts:24-29`.                                  |
-| F2   | ✅ Done | Os cinco gaps funcionais têm asserções em `public-form.test.tsx:54-80`, `mvp-operable-t6.spec.ts:88-207` e `mvp-flows.spec.ts:179-185`.           |
-| F3   | ✅ Done | Contraste calculado e matriz de rotas em `mvp-operable-t7.spec.ts:58-147`.                                                                        |
-| F4   | ✅ Done | README e runbook enumeram request ID, template, status e duração, sem prometer método: `README.md:66`; `docs/runbook.md:25`.                      |
+| Task | Status  | Independent evidence                                                                                                                                                         |
+| ---- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T1   | ✅ Done | Contratos fechados e rejeição de campos/status em `packages/contracts/src/index.test.ts:70-139`.                                                                             |
+| T2   | ✅ Done | Um hash/pedido/evento por tentativa em `apps/api/src/flow.test.ts:174-210`; sensor M8.                                                                                       |
+| T3   | ✅ Done | Cookie assinado, checkout sem UUID e job único em `apps/api/src/flow.test.ts:213-288,708-766`.                                                                               |
+| T4   | ✅ Done | Claim temporal e versões append-only em `apps/api/src/flow.test.ts:291-387,598-693`; sensor M9.                                                                              |
+| T5   | ✅ Done | Draft, validação completa, retry e preço em `apps/web/src/public-form.test.tsx:38-105` e `apps/web/e2e/mvp-operable-t5.spec.ts:3-118`.                                       |
+| T6   | ✅ Done | Polling, falhas, entrega e recovery em `apps/web/e2e/mvp-operable-t6.spec.ts:22-261` e `apps/web/e2e/mvp-flows.spec.ts:162-185`.                                             |
+| T7   | ✅ Done | Foco, contraste, headings, 390 px e motion em `apps/web/e2e/mvp-operable-t7.spec.ts:24-204`.                                                                                 |
+| T8   | ✅ Done | Gates/UAT passam e a documentação operacional coincide com `httpLogContext`: `README.md:66`, `docs/runbook.md:25`, `apps/api/src/app.ts:120-145`.                            |
+| F1   | ✅ Done | DTO de entrega e contexto HTTP exatos em `apps/api/src/flow.test.ts:449-476` e `apps/api/src/app.test.ts:24-29`.                                                             |
+| F2   | ✅ Done | Os cinco gaps funcionais têm asserções em `public-form.test.tsx:54-80`, `mvp-operable-t6.spec.ts:88-207` e `mvp-flows.spec.ts:179-185`.                                      |
+| F3   | ✅ Done | Contraste calculado e matriz de rotas em `mvp-operable-t7.spec.ts:58-147`.                                                                                                   |
+| F4   | ✅ Done | README e runbook enumeram request ID, template, status e duração, sem prometer método: `README.md:66`; `docs/runbook.md:25`.                                                 |
+| F5   | ✅ Done | Quinze pares before/after, fixtures determinísticas e CTAs visíveis em `apps/web/e2e/mvp-operable-t7.spec.ts:207-340`; inspeção em `docs/audits/mvp-operavel/final.md:9-29`. |
 
 ## Spec-Anchored Acceptance Criteria
 
@@ -66,7 +68,7 @@
 | A11Y-01  | Pathname novo rola a zero e foca main fora do Tab normal.                                           | `apps/web/e2e/mvp-operable-t7.spec.ts:44-55` — main focado, `tabindex=-1`, `scrollY=0`.                                                                                                                                                                                  | ✅ PASS |
 | A11Y-02  | Foco por teclado tem contraste de contorno ≥3:1.                                                    | `apps/web/e2e/mvp-operable-t7.spec.ts:58-74` — estilo/3 px e `expect(contrast(...)).toBeGreaterThanOrEqual(3)`; sensor M6.                                                                                                                                               | ✅ PASS |
 | A11Y-03  | Menu sincroniza nome/expansão/visibilidade; Escape fecha e restaura foco.                           | `apps/web/e2e/mvp-operable-t7.spec.ts:24-41` — nomes Abrir/Fechar, `aria-expanded`, nav/overflow e foco após Escape.                                                                                                                                                     | ✅ PASS |
-| A11Y-04  | 390 px sem overflow e CTA ≥44×44.                                                                   | `apps/web/e2e/mvp-operable-t7.spec.ts:149-163` — `{clientWidth:390,scrollWidth:390}` e box ≥44 nas duas dimensões.                                                                                                                                                       | ✅ PASS |
+| A11Y-04  | 390 px sem overflow e CTA ≥44×44.                                                                   | `apps/web/e2e/mvp-operable-t7.spec.ts:149-163` prova 390 px e alvo ≥44; `:298-304` mantém os dois CTAs de revisão dentro de 1280 × 720.                                                                                                                                  | ✅ PASS |
 | A11Y-05  | Cada rota pública tem um h1, line-height ≥1.05 e tracking legível.                                  | `apps/web/e2e/mvp-operable-t7.spec.ts:77-147` — 12 rotas; `toHaveCount(1)`, visível, line-height ratio ≥1.05, tracking ≥−0.04em e sem palavra contínua de 45 chars; sensor M7.                                                                                           | ✅ PASS |
 | A11Y-06  | Loading, erro, vazio e sucesso usam texto explícito.                                                | `apps/web/e2e/mvp-operable-t6.spec.ts:44,157-169,186-206,209-216` — texto em status/alert/entrega/vazio, não apenas cor/ícone.                                                                                                                                           | ✅ PASS |
 | A11Y-07  | Reduced motion remove animação decorativa.                                                          | `apps/web/e2e/mvp-operable-t7.spec.ts:173-194` — animationName ativo e depois `none` sob reduce.                                                                                                                                                                         | ✅ PASS |
@@ -79,8 +81,8 @@
 | SAFE-07  | Cookie literal forjado recebe 401; assinado funciona.                                               | `apps/api/src/flow.test.ts:203-210` — cookie emitido permite mutação; `:708-726` — full/view literais retornam 401.                                                                                                                                                      | ✅ PASS |
 | TEST-01  | E2E afirma história, letra, preço, produção e entrega sob status conhecidos.                        | `apps/web/e2e/mvp-flows.spec.ts:67-88` — jornada até produção/preço; `apps/web/e2e/mvp-operable-t6.spec.ts:172-206` — entrega completa/partial.                                                                                                                          | ✅ PASS |
 | TEST-02  | Regressões de criação, geração, checkout e job único fazem testes falhar.                           | Sensores M3 (`apps/api/src/flow.test.ts:189`), M4 (`:615-617,673`) e M7 (`:288`) mataram criação, claim e pagamento/job; checkout repetido tem igualdade/contagem em `:239-249`.                                                                                         | ✅ PASS |
-| TEST-03  | Regressões de scroll, foco, menu e estados acessíveis falham.                                       | Sensor M6 e assertions `apps/web/e2e/mvp-operable-t7.spec.ts:24-74,77-147`; scroll/menu/foco têm valores exatos em `:28-55`.                                                                                                                                             | ✅ PASS |
-| TEST-04  | Gate final cobre check, E2E, DB, Doctor e UAT nos viewports.                                        | `package.json:11-23` define check/test:E2E/migrate/seed; execução independente abaixo passou 97+28; `mvp-operable-t7.spec.ts:149-232` prova mobile/desktop; evidência operacional anterior registra DB/Doctor.                                                           | ✅ PASS |
+| TEST-03  | Regressões de scroll, foco, menu e estados acessíveis falham.                                       | Sensor M6 e assertions `apps/web/e2e/mvp-operable-t7.spec.ts:24-74,77-147`; `:298-304` falha se as ações da revisão saírem da viewport.                                                                                                                                  | ✅ PASS |
+| TEST-04  | Gate final cobre check, E2E, DB, Doctor e UAT nos viewports.                                        | `package.json:11-23` define os gates; execução no HEAD passou 97+28; `mvp-operable-t7.spec.ts:207-340` captura 12 estados em 1280 × 720 e três em 390 × 844; DB/Doctor têm prova operacional.                                                                            | ✅ PASS |
 
 **Acceptance status**: ✅ 45/45 matched; 0 uncovered; 0 spec-precision gaps.
 
@@ -102,6 +104,19 @@
 - **Integrity**: nenhuma ocorrência de `.skip`; asserções foram adicionadas/estreitadas. O gate Prettier passa; os espaços finais vistos por `git diff --check` estão em hard breaks Markdown dos artefatos, não em código-fonte.
 - **Operational evidence retained**: migrate/seed 2× em dev e test, React Doctor exit 0 (71/100), API/web/worker ativos e UAT nos dois viewports estão registrados na rodada 1 e em `docs/audits/mvp-operavel/final.md:7-47`.
 - **Non-blocking debt**: bundle público ~671 kB; quatro warnings do Doctor; Fastify 6; browsers/leitor de tela real/providers externos não validados.
+
+## Original Objective Completion Audit
+
+| Required outcome                                                   | Authoritative evidence                                                                                                              | Result |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| Fluxos essenciais funcionam de ponta a ponta                       | `mvp-flows.spec.ts:27-88` e `mvp-operable-t6.spec.ts:22-261` cobrem história, letra, pagamento, produção, entrega, erro e retomada. | ✅     |
+| Bloqueadores e alto impacto foram corrigidos                       | `docs/audits/mvp-operavel/final.md:31-46` fecha AUD-001–011 e AUD-014, todos P0/P1.                                                 | ✅     |
+| UI clara, responsiva e consistente                                 | Quinze pares em `docs/audits/mvp-operavel/{before,after}` têm nomes e dimensões idênticos; a tabela visual está em `final.md:9-29`. | ✅     |
+| Loading, validação, erro, vazio, sucesso e retomada são explícitos | `mvp-operable-t5.spec.ts:3-118`, `mvp-operable-t6.spec.ts:22-261` e capturas 03/06/10/11/12 provam os estados.                      | ✅     |
+| Testes verificam resultados da especificação                       | 45/45 ACs abaixo têm assertion/value; o sensor matou 7/7 mutações P0.                                                               | ✅     |
+| Format, lint, typecheck, testes e build passam                     | `corepack pnpm check` passou no HEAD com 97 Vitest; `test:e2e` passou 28/28.                                                        | ✅     |
+| Aplicação foi executada e revalidada visual/funcionalmente         | UAT Chromium gerou os 15 estados finais; API live/ready, web e worker foram verificados localmente.                                 | ✅     |
+| Restante não bloqueador está priorizado                            | `docs/audits/mvp-operavel/final.md:48-54` registra cinco itens P2, incluindo capa por IA e bundle.                                  | ✅     |
 
 ## Discrimination Sensor
 
@@ -128,20 +143,20 @@ Uma sondagem preliminar que apenas removeu `unsigned.valid`, mantendo a compara�
 | -------------------------------------- | ------ | ------------------------------------------------------------------------------- |
 | Jornada nominal + preço                | ✅     | `apps/web/e2e/mvp-flows.spec.ts:27-88`.                                         |
 | Reload, retry, erro, polling e entrega | ✅     | `apps/web/e2e/mvp-operable-t5.spec.ts:3-118`; `mvp-operable-t6.spec.ts:22-261`. |
-| Desktop 1280×720                       | ✅     | `mvp-operable-t7.spec.ts:207-226` e screenshots after 01/09.                    |
-| Mobile 390×844 + teclado               | ✅     | `mvp-operable-t7.spec.ts:24-74,149-163,228-232` e screenshots after 13/14.      |
+| Desktop 1280×720                       | ✅     | `mvp-operable-t7.spec.ts:257-327` e 12 screenshots after 01–12.                 |
+| Mobile 390×844 + teclado               | ✅     | `mvp-operable-t7.spec.ts:24-74,149-171,329-340` e screenshots after 13–15.      |
 
 ## Code Quality
 
 | Principle                              | Status | Evidence                                                                                                   |
 | -------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------- |
 | Minimum code / no needless abstraction | ✅     | Helpers locais, contratos Zod e funções puras; nenhuma camada service/DI nova.                             |
-| Surgical scope                         | ✅     | Diff mapeia T1–T8/F1–F4; capa por IA ficou em backlog.                                                     |
+| Surgical scope                         | ✅     | Diff mapeia T1–T8/F1–F5; capa por IA ficou em backlog.                                                     |
 | Existing patterns                      | ✅     | Fastify inject, PostgreSQL/Drizzle, React Query, RTL e Playwright seguem o repositório.                    |
 | Test integrity                         | ✅     | 62→97 Vitest e 8→28 Playwright; zero skip/deleção e 7/7 mutações válidas mortas nesta rodada.              |
 | Spec-anchored outcomes                 | ✅     | 45/45 com valor/estado exato; zero gap de precisão.                                                        |
 | Per-layer coverage                     | ✅     | Contratos/domain unitários; rotas PostgreSQL happy/error/retry; UI unit/E2E e borda exata.                 |
-| Every in-scope test claimed            | ✅     | Novos testes mapeiam AC, edge case ou Done-when F1–F4.                                                     |
+| Every in-scope test claimed            | ✅     | Novos testes mapeiam AC, edge case ou Done-when F1–F5.                                                     |
 | Project guidelines                     | ✅     | `AGENTS.md` atendido; `README.md:66` e `docs/runbook.md:25` coincidem com `apps/api/src/app.ts:120-145`.   |
 | Senior approval                        | ✅     | Contrato, runtime, testes e documentação de logging estão alinhados; dívidas restantes são P2 registradas. |
 
@@ -155,7 +170,7 @@ PASS limpo: nenhum AC gap, mutante sobrevivente, gap de precisão, `SPEC_DEVIATI
 
 ## Summary
 
-**Overall**: ✅ Ready. Os 45 critérios, T1–T8 e F1–F4 passam; a documentação operacional coincide com o logger após F4.
+**Overall**: ✅ Ready. Os 45 critérios, T1–T8 e F1–F5 passam; a documentação operacional coincide com o runtime e os 15 estados do baseline têm prova visual equivalente.
 
 **Spec-anchored check**: 45/45 matched, 0 gaps, 0 spec-precision gaps.
 **Gate**: 125 tests passed (97 Vitest + 28 Playwright), 0 failed, 0 skipped.
