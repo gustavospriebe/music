@@ -90,6 +90,7 @@ T8
 
 ### T2: Make order creation retry-safe in PostgreSQL
 
+**Status**: Complete  
 **What**: Persist a hashed creation key and make repeated order creation return the same public order without duplicating events or secrets.  
 **Where**: `orders persistence slice`  
 **Depends on**: T1  
@@ -103,10 +104,10 @@ T8
 
 **Done when**:
 
-- [ ] Migration `0004` adds a nullable unique hash column without changing existing rows.
-- [ ] Two sequential or concurrent creates with one attempt key return one `publicId` and one creation event.
-- [ ] The raw attempt key never reaches the database, response or logs.
-- [ ] A retry receives a valid signed order session for the reused order.
+- [x] Migration `0004` adds a nullable unique hash column without changing existing rows.
+- [x] Two sequential or concurrent creates with one attempt key return one `publicId` and one creation event.
+- [x] The raw attempt key never reaches the database, response or logs.
+- [x] A retry receives a valid order session for the reused order; T3 upgrades its marker to a signed capability.
 
 **Tests**: PostgreSQL integration through `fastify.inject`, including sequential, concurrent and payload inspection  
 **Gate**: Full

@@ -200,11 +200,11 @@ A aplicação possui as peças do fluxo de música personalizada, mas ainda acei
 
 | Requirement ID | Story | Phase | Status |
 | --- | --- | --- | --- |
-| FLOW-01 | Criar história | T1, T2, T5 | In Progress (T1 done) |
+| FLOW-01 | Criar história | T1, T2, T5 | In Progress (T1-T2 done) |
 | FLOW-02 | Criar história | T5 | Pending |
 | FLOW-03 | Criar história | T5 | Pending |
 | FLOW-04 | Criar história | T5 | Pending |
-| FLOW-05 | Criar história | T2, T5 | Pending |
+| FLOW-05 | Criar história | T2, T5 | In Progress (T2 done) |
 | GEN-01 | Gerar letra | T4 | Pending |
 | GEN-02 | Gerar letra | T6 | Pending |
 | GEN-03 | Gerar letra | T6 | Pending |
@@ -236,7 +236,7 @@ A aplicação possui as peças do fluxo de música personalizada, mas ainda acei
 | A11Y-07 | Navegação acessível | T7 | Pending |
 | SAFE-01 | Borda pública | T1, T3 | In Progress (T1 done) |
 | SAFE-02 | Borda pública | T1, T3 | In Progress (T1 done) |
-| SAFE-03 | Borda pública | T1, T2, T3 | In Progress (T1 done) |
+| SAFE-03 | Borda pública | T1, T2, T3 | In Progress (T1-T2 done) |
 | SAFE-04 | Borda pública | T8 | Pending |
 | SAFE-05 | Borda pública | T4 | Pending |
 | SAFE-06 | Borda pública | T8 | Pending |

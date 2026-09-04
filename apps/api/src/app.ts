@@ -307,6 +307,21 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
   );
   app.post('/api/v1/orders', async (request, reply) => {
     const input = createOrderSchema.parse(request.body);
+    const creationKeyHash = hashToken(input.creationKey, env.CUSTOMER_ACCESS_TOKEN_PEPPER);
+    const [existing] = await db
+      .select()
+      .from(orders)
+      .where(eq(orders.creationKeyHash, creationKeyHash));
+    if (existing) {
+      reply.setCookie(`order_${existing.publicId}`, '1', {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: env.NODE_ENV === 'production',
+        path: '/',
+      });
+      const { publicId, productType, status, priceCents, createdAt } = existing;
+      return reply.status(201).send({ publicId, productType, status, priceCents, createdAt });
+    }
     const [product] = await db
       .select()
       .from(products)
@@ -320,16 +335,28 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
         productType: input.productType,
         priceCents: product.priceCents,
         accessTokenHash: hashToken(token, env.CUSTOMER_ACCESS_TOKEN_PEPPER),
+        creationKeyHash,
       })
+      .onConflictDoNothing({ target: orders.creationKeyHash })
       .returning();
-    reply.setCookie(`order_${order!.publicId}`, '1', {
+    const created = Boolean(order);
+    const resolved =
+      order ??
+      (
+        await db
+          .select()
+          .from(orders)
+          .where(eq(orders.creationKeyHash, creationKeyHash))
+      )[0];
+    if (!resolved) throw fail('Não foi possível criar o pedido.', 503);
+    reply.setCookie(`order_${resolved.publicId}`, '1', {
       httpOnly: true,
       sameSite: 'lax',
       secure: env.NODE_ENV === 'production',
       path: '/',
     });
-    const { publicId, productType, status, priceCents, createdAt } = order!;
-    await recordEvent('order_created', order!, input.visitorId);
+    const { publicId, productType, status, priceCents, createdAt } = resolved;
+    if (created) await recordEvent('order_created', resolved, input.visitorId);
     return reply.status(201).send({ publicId, productType, status, priceCents, createdAt });
   });
   app.patch('/api/v1/orders/:publicId/story', async (request) => {

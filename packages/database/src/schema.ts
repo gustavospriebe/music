@@ -61,6 +61,7 @@ export const orders = pgTable('orders', {
   status: orderStatus('status').default('draft').notNull(),
   priceCents: integer('price_cents').notNull(),
   accessTokenHash: text('access_token_hash').notNull(),
+  creationKeyHash: text('creation_key_hash').unique(),
   accessRevokedAt: timestamp('access_revoked_at', { withTimezone: true }),
   ...dates,
 });

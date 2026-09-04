@@ -145,6 +145,45 @@ const createOrderAndStory = async (app: FastifyInstance): Promise<Session> => {
 };
 
 describe('fluxo completo de pedido', () => {
+  it('reutiliza um único pedido e evento para a mesma chave de criação', async () => {
+    const app = await appWith(compliantLyrics());
+    const creationKey = randomUUID();
+    const create = () =>
+      app.inject({
+        method: 'POST',
+        url: '/api/v1/orders',
+        payload: { productType: 'friend_roast', creationKey },
+      });
+    const [first, concurrent] = await Promise.all([create(), create()]);
+    const retry = await create();
+    expect([first.statusCode, concurrent.statusCode, retry.statusCode]).toEqual([201, 201, 201]);
+    const publicIds = [first, concurrent, retry].map(
+      (response) => (response.json() as { publicId: string }).publicId,
+    );
+    expect(new Set(publicIds).size).toBe(1);
+    const publicId = publicIds[0] as string;
+    const { rows: orderRows } = await pool.query(
+      'select creation_key_hash from orders where public_id=$1',
+      [publicId],
+    );
+    expect(orderRows).toHaveLength(1);
+    expect(orderRows[0]?.creation_key_hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(orderRows[0]?.creation_key_hash).not.toBe(creationKey);
+    const { rows: eventRows } = await pool.query(
+      "select event from analytics_events where order_public_id=$1 and event='order_created'",
+      [publicId],
+    );
+    expect(eventRows).toHaveLength(1);
+    const cookie = String(retry.headers['set-cookie']).split(';')[0] ?? '';
+    const authorized = await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/orders/${publicId}/story`,
+      payload: story,
+      headers: { cookie },
+    });
+    expect(authorized.statusCode).toBe(200);
+  });
+
   it('história → letra → aprovação → checkout dev → fila de áudio', async () => {
     const app = await appWith(compliantLyrics());
     const session = await createOrderAndStory(app);
