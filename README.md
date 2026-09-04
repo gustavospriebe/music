@@ -63,7 +63,7 @@ Há imagens de produção multi-stage e não-root em `docker/api/Dockerfile`, `d
 
 ## Custo de IA
 
-Cada chamada ao OpenRouter grava uma linha em `ai_usage` (pedido, `kind` letra/áudio, modelo, tokens, `cost_usd` em dólar como devolvido em `usage.cost`, latência, status `ok`/`blocked`/`error`/`rejected`, `requestId` e tentativa, inclusive bloqueios do filtro e tentativas reprovadas na validação local). Somas em USD usam `numeric` no PostgreSQL e trafegam como string decimal exata até o painel. O admin vê o custo por pedido, o agregado do mês/30 dias em `GET /admin/ai-usage/summary` e o uso da key em `GET /key`, gratuito e best-effort. Respostas públicas carregam só referências públicas. Logs HTTP usam request ID, template de rota, método, status e duração; logs do worker usam tipo, status, tentativa e duração, sem UUID de job/pedido, token, letra ou formulário.
+Cada chamada ao OpenRouter grava uma linha em `ai_usage` (pedido, `kind` letra/áudio, modelo, tokens, `cost_usd` em dólar como devolvido em `usage.cost`, latência, status `ok`/`blocked`/`error`/`rejected`, `requestId` e tentativa, inclusive bloqueios do filtro e tentativas reprovadas na validação local). Somas em USD usam `numeric` no PostgreSQL e trafegam como string decimal exata até o painel. O admin vê o custo por pedido, o agregado do mês/30 dias em `GET /admin/ai-usage/summary` e o uso da key em `GET /key`, gratuito e best-effort. Respostas públicas carregam só referências públicas. Logs HTTP usam request ID, template de rota, status e duração; logs do worker usam tipo, status, tentativa e duração, sem UUID de job/pedido, token, letra ou formulário.
 
 ## Limites do MVP
 

@@ -313,6 +313,19 @@ T8
 
 **Gate**: Build
 
+### F4: Align operational logging documentation
+
+**Status**: Complete
+**What**: Remove the stale claim that HTTP completion logs include the request method.
+**Where**: `README.md`, `docs/runbook.md`
+**Depends on**: F1
+**Requirement**: SAFE-04, T8 documentation Done-when
+**Done when**:
+
+- [x] README and runbook list the actual bounded HTTP context: request ID, route template, status and duration.
+
+**Gate**: Quick
+
 ## Diagram-Definition Cross-Check
 
 | Diagram edge        | Matching dependency | Result                             |
@@ -340,3 +353,4 @@ T8
 | F1   | API boundary           | Exact HTTP-log and delivery DTO assertions                              | Full  | ✅     |
 | F2   | Public journey         | RTL/Playwright for resumability and delivered assets                    | Full  | ✅     |
 | F3   | Accessibility          | Computed contrast and all-route heading assertions                      | Build | ✅     |
+| F4   | Operations/docs        | Logger description matches bounded runtime context                      | Quick | ✅     |

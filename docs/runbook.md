@@ -22,4 +22,4 @@ Assets são privados. Em desenvolvimento, `var/storage` é descartável; em prod
 
 ## Observabilidade mínima
 
-HTTP registra request ID, template de rota, método, status e duração. Worker registra tipo do job, status, tentativa e duração, sem UUID interno. O ledger de IA guarda provider/modelo e custo sob acesso administrativo. Nunca registre letra inteira, formulário, e-mail, token, cookie, senha ou chave. Alarmes: jobs falhos, backlog, pagamento sem job e falhas de e-mail.
+HTTP registra request ID, template de rota, status e duração. Worker registra tipo do job, status, tentativa e duração, sem UUID interno. O ledger de IA guarda provider/modelo e custo sob acesso administrativo. Nunca registre letra inteira, formulário, e-mail, token, cookie, senha ou chave. Alarmes: jobs falhos, backlog, pagamento sem job e falhas de e-mail.
