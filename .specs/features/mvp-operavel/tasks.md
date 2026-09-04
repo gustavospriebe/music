@@ -216,6 +216,7 @@ T8
 
 ### T7: Finish accessible navigation and responsive visual hierarchy
 
+**Status**: Complete
 **What**: Apply the approved studio identity, route focus behavior and keyboard-safe mobile navigation across the public journey.  
 **Where**: `web presentation system`  
 **Depends on**: T6  
@@ -229,11 +230,11 @@ T8
 
 **Done when**:
 
-- [ ] Path changes scroll to zero and focus one `main` with `tabIndex=-1`.
-- [ ] Menu exposes expanded/name state, closes on Escape, restores focus and locks page scroll while open.
-- [ ] Headings preserve word spacing; focus rings pass 3:1; primary targets are at least 44 px.
-- [ ] The five-step rail is the single visual signature and all decorative motion stops under reduced-motion.
-- [ ] Desktop and 390 × 844 captures show no horizontal overflow, clipped headings or hidden primary action.
+- [x] Path changes scroll to zero and focus one `main` with `tabIndex=-1`.
+- [x] Menu exposes expanded/name state, closes on Escape, restores focus and locks page scroll while open.
+- [x] Headings preserve word spacing; focus rings pass 3:1; primary targets are at least 44 px.
+- [x] The five-step rail is the single visual signature and all decorative motion stops under reduced-motion.
+- [x] Desktop and 390 × 844 captures show no horizontal overflow, clipped headings or hidden primary action.
 
 **Tests**: RTL interaction plus Playwright keyboard/scroll/mobile/reduced-motion assertions and final screenshot capture  
 **Gate**: Build

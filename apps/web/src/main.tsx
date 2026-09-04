@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Toaster } from 'sonner';
-import { Loading } from './components';
+import { Loading, RouteFocus } from './components';
 import {
   Checkout,
   CreateStory,
@@ -92,6 +92,7 @@ function App() {
 createRoot(document.getElementById('root')!).render(
   <QueryClientProvider client={client}>
     <BrowserRouter>
+      <RouteFocus />
       <App />
       <Toaster richColors position="top-center" />
     </BrowserRouter>
