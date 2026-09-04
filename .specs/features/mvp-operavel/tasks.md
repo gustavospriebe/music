@@ -243,7 +243,7 @@ T8
 
 ### T8: Prove and document the operable MVP
 
-**Status**: Complete
+**Status**: Needs Fix (Verifier round 1)
 **What**: Update operator/product documentation, record the researched album-cover extension, and run the complete local UAT and quality gates.  
 **Where**: `MVP operational evidence`  
 **Depends on**: T7  
@@ -264,6 +264,53 @@ T8
 - [x] Before/after audit evidence and ranked backlog close every P0/P1 or name a concrete blocker.
 
 **Tests**: Complete operational gate, migration/seed replay, Playwright UAT, React Doctor and documentation/link review  
+**Gate**: Build
+
+### Phase 4: Verifier gap fixes
+
+### F1: Close public logging and delivery evidence
+
+**Status**: Pending
+**What**: Align the HTTP log with SAFE-04 and assert the exact public delivery projection.
+**Where**: `apps/api/src/app.ts`, API integration tests
+**Depends on**: T8
+**Requirement**: SAFE-03, SAFE-04
+**Done when**:
+
+- [ ] HTTP completion logs contain only the permitted operational keys and have an exact assertion.
+- [ ] A valid delivery response asserts exact top-level, lyric and audio keys.
+
+**Gate**: Full
+
+### F2: Complete resumability and delivery assertions
+
+**Status**: Pending
+**What**: Prove all form associations, lyric-save feedback, production polling, delivered assets and recovery history.
+**Where**: React/Playwright tests for the public journey
+**Depends on**: F1
+**Requirement**: FLOW-02, LYRIC-01, ASYNC-01, ASYNC-02, ASYNC-04
+**Done when**:
+
+- [ ] Every enumerated invalid form control has its own accessible message assertion.
+- [ ] Successful lyric save announces “Nova versão salva”.
+- [ ] Active production states poll and terminal states stop polling.
+- [ ] Delivery renders exactly two players and two downloads.
+- [ ] Delivery-token recovery removes the token and records the `publicId` locally.
+
+**Gate**: Full
+
+### F3: Measure focus and heading accessibility
+
+**Status**: Pending
+**What**: Add deterministic browser assertions for focus contrast and heading typography across every public route.
+**Where**: `apps/web/e2e/mvp-operable-t7.spec.ts`
+**Depends on**: F2
+**Requirement**: A11Y-02, A11Y-05
+**Done when**:
+
+- [ ] Keyboard focus outline has a computed contrast ratio of at least 3:1.
+- [ ] Every public route fixture renders one `h1`, line-height at least 1.05 and non-collapsed word spacing/tracking.
+
 **Gate**: Build
 
 ## Diagram-Definition Cross-Check
@@ -289,4 +336,7 @@ T8
 | T5   | React + journey        | RTL/Playwright for draft, retry, validation, price and checkout         | Full  | ✅     |
 | T6   | React + journey        | RTL/Playwright status and recovery matrix                               | Full  | ✅     |
 | T7   | Presentation + journey | RTL/Playwright keyboard, focus, responsive and screenshot checks        | Build | ✅     |
-| T8   | Operations/config/docs | Full gates, DB replay, UAT, React Doctor and link review                | Build | ✅     |
+| T8   | Operations/config/docs | Full gates, DB replay, UAT, React Doctor and link review                | Build | ⚠️     |
+| F1   | API boundary           | Exact HTTP-log and delivery DTO assertions                              | Full  | ⏳     |
+| F2   | Public journey         | RTL/Playwright for resumability and delivered assets                    | Full  | ⏳     |
+| F3   | Accessibility          | Computed contrast and all-route heading assertions                      | Build | ⏳     |
