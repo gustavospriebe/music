@@ -13,24 +13,24 @@ Implement these tasks with the `tlc-spec-driven` skill: **activate it by name an
 
 > Generated from codebase, project guidelines, and spec - confirm before Execute. Guidelines found: `AGENTS.md`, `README.md`, `.github/workflows/ci.yml`, `package.json`, and `docs/mvp-spec-full.md`. Samples: `packages/contracts/src/index.test.ts`, `packages/domain/src/index.test.ts`, `apps/api/src/app.test.ts`, `apps/api/src/flow.test.ts`, `apps/web/src/components.test.tsx`, `apps/web/e2e/mvp-flows.spec.ts`, and `apps/worker/src/flow.test.ts`.
 
-| Code Layer | Required Test Type | Coverage Expectation | Location Pattern | Run Command |
-| ---------- | ------------------ | -------------------- | ---------------- | ----------- |
-| Contracts and pure domain rules | unit | All branches changed; 1:1 assertions for applicable ACs and listed validation/status edges | `packages/{contracts,domain}/src/*.test.ts` | `corepack pnpm test` |
-| PostgreSQL schema and data access | integration | Unique/conditional query paths, retry behavior, history preservation, and error paths on real PostgreSQL | `apps/{api,worker}/src/*flow.test.ts` | `corepack pnpm test` |
-| Fastify public routes | integration via `fastify.inject` | Every changed route: happy path, every specified edge, authorization failure, concurrency/retry, and exact public payload | `apps/api/src/*.test.ts` | `corepack pnpm test` |
-| React components and client state | unit with RTL | Every changed state derivation and accessible interaction, including unknown/loading/error/empty/success | `apps/web/src/*.test.tsx` | `corepack pnpm test` |
-| Public customer journey | Playwright e2e | Happy path plus reload, failure, keyboard, focus/scroll, mobile 390 px, exact price and all known/unknown statuses | `apps/web/e2e/*.spec.ts` | `corepack pnpm test:e2e` |
-| Config, styles and documentation | build/UAT | Type/build validity, responsive visual comparison, no overflow, reduced motion, documented operational commands and provider claims | config/CSS/docs plus audit captures | `corepack pnpm check && corepack pnpm test:e2e` |
+| Code Layer                        | Required Test Type               | Coverage Expectation                                                                                                                | Location Pattern                            | Run Command                                     |
+| --------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | ----------------------------------------------- |
+| Contracts and pure domain rules   | unit                             | All branches changed; 1:1 assertions for applicable ACs and listed validation/status edges                                          | `packages/{contracts,domain}/src/*.test.ts` | `corepack pnpm test`                            |
+| PostgreSQL schema and data access | integration                      | Unique/conditional query paths, retry behavior, history preservation, and error paths on real PostgreSQL                            | `apps/{api,worker}/src/*flow.test.ts`       | `corepack pnpm test`                            |
+| Fastify public routes             | integration via `fastify.inject` | Every changed route: happy path, every specified edge, authorization failure, concurrency/retry, and exact public payload           | `apps/api/src/*.test.ts`                    | `corepack pnpm test`                            |
+| React components and client state | unit with RTL                    | Every changed state derivation and accessible interaction, including unknown/loading/error/empty/success                            | `apps/web/src/*.test.tsx`                   | `corepack pnpm test`                            |
+| Public customer journey           | Playwright e2e                   | Happy path plus reload, failure, keyboard, focus/scroll, mobile 390 px, exact price and all known/unknown statuses                  | `apps/web/e2e/*.spec.ts`                    | `corepack pnpm test:e2e`                        |
+| Config, styles and documentation  | build/UAT                        | Type/build validity, responsive visual comparison, no overflow, reduced motion, documented operational commands and provider claims | config/CSS/docs plus audit captures         | `corepack pnpm check && corepack pnpm test:e2e` |
 
 ## Gate Check Commands
 
 > Generated from codebase - confirmed by the autonomous execution authorization. PostgreSQL must be healthy and migrations applied before integration gates.
 
-| Gate Level | When to Use | Command |
-| ---------- | ----------- | ------- |
-| Quick | After tasks with unit tests only | `corepack pnpm test` |
-| Full | After tasks with integration or E2E coverage | `corepack pnpm test && corepack pnpm test:e2e` |
-| Build | At each phase boundary and final operational proof | `corepack pnpm check && corepack pnpm test:e2e` |
+| Gate Level | When to Use                                        | Command                                         |
+| ---------- | -------------------------------------------------- | ----------------------------------------------- |
+| Quick      | After tasks with unit tests only                   | `corepack pnpm test`                            |
+| Full       | After tasks with integration or E2E coverage       | `corepack pnpm test && corepack pnpm test:e2e`  |
+| Build      | At each phase boundary and final operational proof | `corepack pnpm check && corepack pnpm test:e2e` |
 
 ## Execution Plan
 
@@ -263,25 +263,25 @@ T8
 
 ## Diagram-Definition Cross-Check
 
-| Diagram edge | Matching dependency | Result |
-| ------------ | ------------------- | ------ |
-| T1 → T2 | T2 depends on T1 | ✅ |
-| T2 → T3 | T3 depends on T2 | ✅ |
-| T3 → T4 | T4 depends on T3 | ✅ |
-| T5 → T6 | T6 depends on T5 | ✅ |
-| T6 → T7 | T7 depends on T6 | ✅ |
-| Cross-phase T4 → T5 | T5 depends on T4 | ✅ backward cross-phase dependency |
-| Cross-phase T7 → T8 | T8 depends on T7 | ✅ backward cross-phase dependency |
+| Diagram edge        | Matching dependency | Result                             |
+| ------------------- | ------------------- | ---------------------------------- |
+| T1 → T2             | T2 depends on T1    | ✅                                 |
+| T2 → T3             | T3 depends on T2    | ✅                                 |
+| T3 → T4             | T4 depends on T3    | ✅                                 |
+| T5 → T6             | T6 depends on T5    | ✅                                 |
+| T6 → T7             | T7 depends on T6    | ✅                                 |
+| Cross-phase T4 → T5 | T5 depends on T4    | ✅ backward cross-phase dependency |
+| Cross-phase T7 → T8 | T8 depends on T7    | ✅ backward cross-phase dependency |
 
 ## Test Co-location Validation
 
-| Task | Layer from matrix | Tests included with task | Gate | Result |
-| ---- | ----------------- | ------------------------ | ---- | ------ |
-| T1 | Contracts | Unit assertions for exact public schemas and state rejection | Quick | ✅ |
-| T2 | PostgreSQL + route | Integration assertions for hash uniqueness, retry and event count | Full | ✅ |
-| T3 | Public routes | Integration assertions for access, exact DTOs, payment/job idempotency | Full | ✅ |
-| T4 | PostgreSQL + route | Integration assertions for concurrency, recovery and immutable versions | Build | ✅ |
-| T5 | React + journey | RTL/Playwright for draft, retry, validation, price and checkout | Full | ✅ |
-| T6 | React + journey | RTL/Playwright status and recovery matrix | Full | ✅ |
-| T7 | Presentation + journey | RTL/Playwright keyboard, focus, responsive and screenshot checks | Build | ✅ |
-| T8 | Operations/config/docs | Full gates, DB replay, UAT, React Doctor and link review | Build | ✅ |
+| Task | Layer from matrix      | Tests included with task                                                | Gate  | Result |
+| ---- | ---------------------- | ----------------------------------------------------------------------- | ----- | ------ |
+| T1   | Contracts              | Unit assertions for exact public schemas and state rejection            | Quick | ✅     |
+| T2   | PostgreSQL + route     | Integration assertions for hash uniqueness, retry and event count       | Full  | ✅     |
+| T3   | Public routes          | Integration assertions for access, exact DTOs, payment/job idempotency  | Full  | ✅     |
+| T4   | PostgreSQL + route     | Integration assertions for concurrency, recovery and immutable versions | Build | ✅     |
+| T5   | React + journey        | RTL/Playwright for draft, retry, validation, price and checkout         | Full  | ✅     |
+| T6   | React + journey        | RTL/Playwright status and recovery matrix                               | Full  | ✅     |
+| T7   | Presentation + journey | RTL/Playwright keyboard, focus, responsive and screenshot checks        | Build | ✅     |
+| T8   | Operations/config/docs | Full gates, DB replay, UAT, React Doctor and link review                | Build | ✅     |

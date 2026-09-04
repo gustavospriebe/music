@@ -14,28 +14,28 @@ A aplicação possui as peças do fluxo de música personalizada, mas ainda acei
 
 ## Out of Scope
 
-| Feature | Reason |
-| --- | --- |
-| Deploy, push ou publicação | Não autorizados nesta execução. |
-| Chamada real a OpenRouter, Mercado Pago ou Resend | Exige autorização adicional e pode gerar custo ou efeito externo. |
-| Revisão jurídica final de termos e privacidade | Depende de jurídico/comercial. |
-| Cadastro e sincronização multi-dispositivo | O MVP mantém histórico local por navegador. |
-| Clonagem de voz, imitação de artista e vídeo | Fora da proposta e das regras de conteúdo. |
-| Capa gerada por IA e foto de referência | Faz sentido como P2, mas requer consentimento, retenção, moderação, storage e limite de custo próprios; pesquisa registrada em `docs/album-cover-backlog.md`. |
-| Reestruturação ampla do monólito | Não é necessária para corrigir o caminho crítico. |
+| Feature                                           | Reason                                                                                                                                                        |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Deploy, push ou publicação                        | Não autorizados nesta execução.                                                                                                                               |
+| Chamada real a OpenRouter, Mercado Pago ou Resend | Exige autorização adicional e pode gerar custo ou efeito externo.                                                                                             |
+| Revisão jurídica final de termos e privacidade    | Depende de jurídico/comercial.                                                                                                                                |
+| Cadastro e sincronização multi-dispositivo        | O MVP mantém histórico local por navegador.                                                                                                                   |
+| Clonagem de voz, imitação de artista e vídeo      | Fora da proposta e das regras de conteúdo.                                                                                                                    |
+| Capa gerada por IA e foto de referência           | Faz sentido como P2, mas requer consentimento, retenção, moderação, storage e limite de custo próprios; pesquisa registrada em `docs/album-cover-backlog.md`. |
+| Reestruturação ampla do monólito                  | Não é necessária para corrigir o caminho crítico.                                                                                                             |
 
 ## Assumptions & Open Questions
 
-| Assumption / decision | Chosen default | Rationale | Confirmed? |
-| --- | --- | --- | --- |
-| Continuação após os artefatos | Implementar e validar sem nova pausa de aprovação | O pedido autoriza execução autônoma, commits e delegação local até PASS. | y |
-| Direção visual | Evoluir a paleta pêssego, laranja e tinta já existente | O pedido exige preservar identidade útil e evitar redesign desconectado. | y |
-| Falha de letra | Permitir retry pelo cliente após mensagem acionável | A geração ocorre antes do pagamento e o retry é recuperável. | y |
-| Falha de áudio pago | Orientar acompanhamento e deixar retry operacional no admin | Repetição de áudio tem custo e não deve ser disparada anonimamente pelo cliente. | y |
-| Providers sem credencial | Pagamento e e-mail usam fallback local fora de produção; letra e áudio usam doubles somente nos testes | Esta é a convenção explícita do repositório e evita fingir integração real. | y |
-| Preço público indisponível | Mostrar pacote sem preço numérico até o catálogo responder | Um valor estático divergente é pior que um estado temporariamente neutro. | y |
-| Histórico | Manter os 20 pedidos mais recentes no navegador | É o limite atual documentado e não exige cadastro. | y |
-| Retomada de geração abandonada | Liberar novo claim apenas após cinco minutos sem atualização | Evita custo duplicado durante chamadas normais e recupera processos interrompidos. | y |
+| Assumption / decision          | Chosen default                                                                                         | Rationale                                                                          | Confirmed? |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- | ---------- |
+| Continuação após os artefatos  | Implementar e validar sem nova pausa de aprovação                                                      | O pedido autoriza execução autônoma, commits e delegação local até PASS.           | y          |
+| Direção visual                 | Evoluir a paleta pêssego, laranja e tinta já existente                                                 | O pedido exige preservar identidade útil e evitar redesign desconectado.           | y          |
+| Falha de letra                 | Permitir retry pelo cliente após mensagem acionável                                                    | A geração ocorre antes do pagamento e o retry é recuperável.                       | y          |
+| Falha de áudio pago            | Orientar acompanhamento e deixar retry operacional no admin                                            | Repetição de áudio tem custo e não deve ser disparada anonimamente pelo cliente.   | y          |
+| Providers sem credencial       | Pagamento e e-mail usam fallback local fora de produção; letra e áudio usam doubles somente nos testes | Esta é a convenção explícita do repositório e evita fingir integração real.        | y          |
+| Preço público indisponível     | Mostrar pacote sem preço numérico até o catálogo responder                                             | Um valor estático divergente é pior que um estado temporariamente neutro.          | y          |
+| Histórico                      | Manter os 20 pedidos mais recentes no navegador                                                        | É o limite atual documentado e não exige cadastro.                                 | y          |
+| Retomada de geração abandonada | Liberar novo claim apenas após cinco minutos sem atualização                                           | Evita custo duplicado durante chamadas normais e recupera processos interrompidos. | y          |
 
 **Open questions: none.**
 
@@ -184,67 +184,67 @@ A aplicação possui as peças do fluxo de música personalizada, mas ainda acei
 
 ## Implicit-Requirement Dimensions
 
-| Dimension | Resolution |
-| --- | --- |
-| Input validation & bounds | FLOW-02 e schemas Zod compartilhados. |
-| Failure / partial-failure states | GEN-05, LYRIC-03, ASYNC-03 e edge case de variante parcial. |
-| Idempotency / retry / duplicate handling | FLOW-01/05, GEN-01/04 e PAY-02/03. |
-| Auth boundaries & rate limits | PAY-04, SAFE-02/03; rate limit existente de geração permanece em cinco por hora. |
-| Concurrency / ordering | GEN-01/04, PAY-02 e ordenação de versões no edge case. |
-| Data lifecycle / expiry | Histórico local limitado a 20; alteração de retenção no PostgreSQL é N/A porque exige política jurídica fora do escopo. |
-| Observability | SAFE-04/05. |
-| External-dependency failure | SAFE-05/06 e fallbacks decididos nas suposições. |
-| State-transition integrity | GEN-04, ASYNC-01/02/05/06 e `assertTransition` obrigatório. |
+| Dimension                                | Resolution                                                                                                              |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Input validation & bounds                | FLOW-02 e schemas Zod compartilhados.                                                                                   |
+| Failure / partial-failure states         | GEN-05, LYRIC-03, ASYNC-03 e edge case de variante parcial.                                                             |
+| Idempotency / retry / duplicate handling | FLOW-01/05, GEN-01/04 e PAY-02/03.                                                                                      |
+| Auth boundaries & rate limits            | PAY-04, SAFE-02/03; rate limit existente de geração permanece em cinco por hora.                                        |
+| Concurrency / ordering                   | GEN-01/04, PAY-02 e ordenação de versões no edge case.                                                                  |
+| Data lifecycle / expiry                  | Histórico local limitado a 20; alteração de retenção no PostgreSQL é N/A porque exige política jurídica fora do escopo. |
+| Observability                            | SAFE-04/05.                                                                                                             |
+| External-dependency failure              | SAFE-05/06 e fallbacks decididos nas suposições.                                                                        |
+| State-transition integrity               | GEN-04, ASYNC-01/02/05/06 e `assertTransition` obrigatório.                                                             |
 
 ## Requirement Traceability
 
-| Requirement ID | Story | Phase | Status |
-| --- | --- | --- | --- |
-| FLOW-01 | Criar história | T1, T2, T5 | In Progress (T1-T2 done) |
-| FLOW-02 | Criar história | T5 | Pending |
-| FLOW-03 | Criar história | T5 | Pending |
-| FLOW-04 | Criar história | T5 | Pending |
-| FLOW-05 | Criar história | T2, T5 | In Progress (T2 done) |
-| GEN-01 | Gerar letra | T4 | Pending |
-| GEN-02 | Gerar letra | T6 | Pending |
-| GEN-03 | Gerar letra | T6 | Pending |
-| GEN-04 | Gerar letra | T4 | Pending |
-| GEN-05 | Gerar letra | T6 | Pending |
-| GEN-06 | Gerar letra | T4, T6 | Pending |
-| LYRIC-01 | Revisar letra | T4 | Pending |
-| LYRIC-02 | Revisar letra | T4 | Pending |
-| LYRIC-03 | Revisar letra | T6 | Pending |
-| LYRIC-04 | Revisar letra | T6 | Pending |
-| PAY-01 | Pagamento | T1, T5 | In Progress (T1 done) |
-| PAY-02 | Pagamento | T3 | Done |
-| PAY-03 | Pagamento | T3, T5 | In Progress (T3 done) |
-| PAY-04 | Pagamento | T3 | Done |
-| PAY-05 | Pagamento | T5 | Pending |
-| ASYNC-01 | Produção e entrega | T6 | Pending |
-| ASYNC-02 | Produção e entrega | T6 | Pending |
-| ASYNC-03 | Produção e entrega | T6 | Pending |
-| ASYNC-04 | Produção e entrega | T6 | Pending |
-| ASYNC-05 | Produção e entrega | T1, T6 | In Progress (T1 done) |
-| ASYNC-06 | Produção e entrega | T1, T6 | In Progress (T1 done) |
-| ASYNC-07 | Produção e entrega | T6 | Pending |
-| A11Y-01 | Navegação acessível | T7 | Pending |
-| A11Y-02 | Navegação acessível | T7 | Pending |
-| A11Y-03 | Navegação acessível | T7 | Pending |
-| A11Y-04 | Navegação acessível | T7 | Pending |
-| A11Y-05 | Navegação acessível | T7 | Pending |
-| A11Y-06 | Navegação acessível | T7 | Pending |
-| A11Y-07 | Navegação acessível | T7 | Pending |
-| SAFE-01 | Borda pública | T1, T3 | Done |
-| SAFE-02 | Borda pública | T1, T3 | Done |
-| SAFE-03 | Borda pública | T1, T2, T3 | Done |
-| SAFE-04 | Borda pública | T8 | Pending |
-| SAFE-05 | Borda pública | T4 | Pending |
-| SAFE-06 | Borda pública | T8 | Pending |
-| SAFE-07 | Borda pública | T3 | Done |
-| TEST-01 | Prova de comportamento | T7, T8 | Pending |
-| TEST-02 | Prova de comportamento | T8 | Pending |
-| TEST-03 | Prova de comportamento | T7, T8 | Pending |
-| TEST-04 | Prova de comportamento | T8 | Pending |
+| Requirement ID | Story                  | Phase      | Status                   |
+| -------------- | ---------------------- | ---------- | ------------------------ |
+| FLOW-01        | Criar história         | T1, T2, T5 | In Progress (T1-T2 done) |
+| FLOW-02        | Criar história         | T5         | Pending                  |
+| FLOW-03        | Criar história         | T5         | Pending                  |
+| FLOW-04        | Criar história         | T5         | Pending                  |
+| FLOW-05        | Criar história         | T2, T5     | In Progress (T2 done)    |
+| GEN-01         | Gerar letra            | T4         | Pending                  |
+| GEN-02         | Gerar letra            | T6         | Pending                  |
+| GEN-03         | Gerar letra            | T6         | Pending                  |
+| GEN-04         | Gerar letra            | T4         | Pending                  |
+| GEN-05         | Gerar letra            | T6         | Pending                  |
+| GEN-06         | Gerar letra            | T4, T6     | Pending                  |
+| LYRIC-01       | Revisar letra          | T4         | Pending                  |
+| LYRIC-02       | Revisar letra          | T4         | Pending                  |
+| LYRIC-03       | Revisar letra          | T6         | Pending                  |
+| LYRIC-04       | Revisar letra          | T6         | Pending                  |
+| PAY-01         | Pagamento              | T1, T5     | In Progress (T1 done)    |
+| PAY-02         | Pagamento              | T3         | Done                     |
+| PAY-03         | Pagamento              | T3, T5     | In Progress (T3 done)    |
+| PAY-04         | Pagamento              | T3         | Done                     |
+| PAY-05         | Pagamento              | T5         | Pending                  |
+| ASYNC-01       | Produção e entrega     | T6         | Pending                  |
+| ASYNC-02       | Produção e entrega     | T6         | Pending                  |
+| ASYNC-03       | Produção e entrega     | T6         | Pending                  |
+| ASYNC-04       | Produção e entrega     | T6         | Pending                  |
+| ASYNC-05       | Produção e entrega     | T1, T6     | In Progress (T1 done)    |
+| ASYNC-06       | Produção e entrega     | T1, T6     | In Progress (T1 done)    |
+| ASYNC-07       | Produção e entrega     | T6         | Pending                  |
+| A11Y-01        | Navegação acessível    | T7         | Pending                  |
+| A11Y-02        | Navegação acessível    | T7         | Pending                  |
+| A11Y-03        | Navegação acessível    | T7         | Pending                  |
+| A11Y-04        | Navegação acessível    | T7         | Pending                  |
+| A11Y-05        | Navegação acessível    | T7         | Pending                  |
+| A11Y-06        | Navegação acessível    | T7         | Pending                  |
+| A11Y-07        | Navegação acessível    | T7         | Pending                  |
+| SAFE-01        | Borda pública          | T1, T3     | Done                     |
+| SAFE-02        | Borda pública          | T1, T3     | Done                     |
+| SAFE-03        | Borda pública          | T1, T2, T3 | Done                     |
+| SAFE-04        | Borda pública          | T8         | Pending                  |
+| SAFE-05        | Borda pública          | T4         | Pending                  |
+| SAFE-06        | Borda pública          | T8         | Pending                  |
+| SAFE-07        | Borda pública          | T3         | Done                     |
+| TEST-01        | Prova de comportamento | T7, T8     | Pending                  |
+| TEST-02        | Prova de comportamento | T8         | Pending                  |
+| TEST-03        | Prova de comportamento | T7, T8     | Pending                  |
+| TEST-04        | Prova de comportamento | T8         | Pending                  |
 
 **Coverage:** 45 total, 45 mapped to tasks, 0 pending design.
 

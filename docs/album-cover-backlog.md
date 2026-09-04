@@ -10,11 +10,11 @@ A capa aumenta o caráter presenteável e compartilhável do pedido. O melhor po
 
 Valores públicos consultados em 04/09/2026, em dólar, antes de impostos, câmbio, armazenamento e margem:
 
-| Opção | Uso recomendado | Custo de saída 1K |
-| --- | --- | ---: |
-| Gemini 3.1 Flash Lite Image (“Nano Banana 2 Lite”) | Capa somente por texto, rápida e econômica | ~US$ 0,0336 |
-| Gemini 3.1 Flash Image (“Nano Banana 2”) | Capa com foto de referência e melhor consistência | ~US$ 0,067 |
-| Gemini 2.5 Flash Image | Modelo anterior; não iniciar integração nova nele | ~US$ 0,039 |
+| Opção                                              | Uso recomendado                                   | Custo de saída 1K |
+| -------------------------------------------------- | ------------------------------------------------- | ----------------: |
+| Gemini 3.1 Flash Lite Image (“Nano Banana 2 Lite”) | Capa somente por texto, rápida e econômica        |       ~US$ 0,0336 |
+| Gemini 3.1 Flash Image (“Nano Banana 2”)           | Capa com foto de referência e melhor consistência |        ~US$ 0,067 |
+| Gemini 2.5 Flash Image                             | Modelo anterior; não iniciar integração nova nele |        ~US$ 0,039 |
 
 O desenho comercial recomendado inclui **uma capa 1:1 de 1024 px e uma regeneração limitada**. No pior caso de duas tentativas com referência, a saída fica em torno de US$ 0,134, além do pequeno custo de entrada. O modelo Lite pode reduzir pela metade a saída de pedidos sem foto. Batch é mais barato, mas não combina com expectativa interativa imediata.
 
@@ -48,4 +48,3 @@ Todas as imagens geradas pelos modelos Gemini recebem SynthID. Antes de implemen
 ## Critério para promover a P1
 
 Rodar um piloto autorizado com pelo menos 20 pedidos sintéticos, medir latência, aderência visual, taxa de regeneração, custo p95 e falhas de referência. Promover somente se custo p95 ficar dentro da margem definida pelo produto, nenhuma foto original vazar em logs/URLs e a capa não atrasar a entrega das faixas.
-

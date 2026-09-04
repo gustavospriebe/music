@@ -69,7 +69,8 @@ describe('storySchema', () => {
 describe('public order contracts', () => {
   it('requires an idempotency UUID for order creation', () => {
     expect(
-      createOrderSchema.safeParse({ productType: 'friend_roast', creationKey: 'repeat-me' }).success,
+      createOrderSchema.safeParse({ productType: 'friend_roast', creationKey: 'repeat-me' })
+        .success,
     ).toBe(false);
     expect(
       createOrderSchema.parse({
