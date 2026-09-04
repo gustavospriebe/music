@@ -8,14 +8,25 @@ Data: 2026-09-04. Escopo: jornada pública, borda HTTP, retomada assíncrona e o
 
 ## Comparação visual
 
-As imagens usam os mesmos estados e viewports do baseline. A comparação foi feita lado a lado em Chromium antes deste veredito.
+As 15 imagens finais repetem os mesmos estados, nomes e viewports do baseline. Cada par foi combinado lado a lado e inspecionado em Chromium antes deste veredito.
 
-| Estado              | Antes                                                  | Depois                                                 | Resultado                                                                         |
-| ------------------- | ------------------------------------------------------ | ------------------------------------------------------ | --------------------------------------------------------------------------------- |
-| Entrada 1280 × 720  | ![Entrada antes](before/01-entrada-desktop.png)        | ![Entrada depois](after/01-entrada-desktop.png)        | Identidade preservada; display ganhou espaçamento e line-height legíveis.         |
-| Produção 1280 × 720 | ![Produção antes](before/09-processamento-desktop.png) | ![Produção depois](after/09-processamento-desktop.png) | Rota abre no topo; título, mensagem e faixa de cinco etapas cabem na viewport.    |
-| Entrada 390 × 844   | ![Mobile antes](before/13-entrada-mobile.png)          | ![Mobile depois](after/13-entrada-mobile.png)          | Sem overflow ou CTA cortado; alvo primário mede ao menos 44 × 44 px.              |
-| Menu 390 × 844      | ![Menu antes](before/14-menu-mobile.png)               | ![Menu depois](after/14-menu-mobile.png)               | Menu ocupa largura útil, mantém alvos grandes e deixa o estado aberto inequívoco. |
+| Estado                    | Antes                                                                       | Depois                                                                      | Resultado                                                                      |
+| ------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| 01. Entrada desktop       | ![Entrada antes](before/01-entrada-desktop.png)                             | ![Entrada depois](after/01-entrada-desktop.png)                             | Identidade preservada; display ganhou espaçamento e hierarquia legíveis.       |
+| 02. Formulário vazio      | ![Formulário vazio antes](before/02-formulario-vazio-desktop.png)           | ![Formulário vazio depois](after/02-formulario-vazio-desktop.png)           | Título e campos têm separação clara; progresso continua visível.               |
+| 03. Validação             | ![Validação antes](before/03-validacao-desktop.png)                         | ![Validação depois](after/03-validacao-desktop.png)                         | Primeiro erro recebe foco visível e cada mensagem descreve seu controle.       |
+| 04. Formulário preenchido | ![Formulário preenchido antes](before/04-formulario-preenchido-desktop.png) | ![Formulário preenchido depois](after/04-formulario-preenchido-desktop.png) | Conteúdo, consentimentos e CTA permanecem legíveis no fim do formulário.       |
+| 05. Pronto para gerar     | ![Geração pronta antes](before/05-geracao-pronta-para-iniciar-desktop.png)  | ![Geração pronta depois](after/05-geracao-pronta-para-iniciar-desktop.png)  | A etapa agora é 2 de 5, com título e ação inequívocos.                         |
+| 06. Geração em andamento  | ![Geração antes](before/06-geracao-loading-desktop.png)                     | ![Geração depois](after/06-geracao-loading-desktop.png)                     | Status persistente explica que reload não interrompe nem reinicia a criação.   |
+| 07. Revisão da letra      | ![Revisão antes](before/07-revisao-letra-desktop.png)                       | ![Revisão depois](after/07-revisao-letra-desktop.png)                       | Editor preserva espaço de trabalho e os dois CTAs cabem em 1280 × 720.         |
+| 08. Checkout              | ![Checkout antes](before/08-checkout-desktop.png)                           | ![Checkout depois](after/08-checkout-desktop.png)                           | Preço, pacote e pagamento formam uma hierarquia única e legível.               |
+| 09. Processamento         | ![Processamento antes](before/09-processamento-desktop.png)                 | ![Processamento depois](after/09-processamento-desktop.png)                 | Rota abre no topo; título, mensagem e faixa de cinco etapas cabem na viewport. |
+| 10. Sucesso               | ![Sucesso antes](before/10-sucesso-desktop.png)                             | ![Sucesso depois](after/10-sucesso-desktop.png)                             | Cinco etapas concluídas e CTA para as duas versões ficam juntos.               |
+| 11. Erro                  | ![Erro antes](before/11-erro-desktop.png)                                   | ![Erro depois](after/11-erro-desktop.png)                                   | Mensagem não promete nova geração e mantém o acompanhamento honesto.           |
+| 12. Histórico vazio       | ![Vazio antes](before/12-vazio-desktop.png)                                 | ![Vazio depois](after/12-vazio-desktop.png)                                 | Escopo por navegador e CTA de criação aparecem sem heading comprimido.         |
+| 13. Entrada mobile        | ![Entrada mobile antes](before/13-entrada-mobile.png)                       | ![Entrada mobile depois](after/13-entrada-mobile.png)                       | Sem overflow ou CTA cortado; alvo primário mede ao menos 44 × 44 px.           |
+| 14. Menu mobile           | ![Menu antes](before/14-menu-mobile.png)                                    | ![Menu depois](after/14-menu-mobile.png)                                    | Menu ocupa largura útil, trava scroll e expõe a ação principal.                |
+| 15. Formulário mobile     | ![Formulário mobile antes](before/15-formulario-mobile.png)                 | ![Formulário mobile depois](after/15-formulario-mobile.png)                 | Título refluído, campos de uma coluna e texto sem colisão em 390 × 844.        |
 
 ## Fechamento dos achados
 

@@ -326,6 +326,22 @@ T8
 
 **Gate**: Quick
 
+### F5: Complete equivalent visual evidence
+
+**Status**: Complete
+**What**: Repeat every baseline state in the final audit and keep the lyric-review actions visible in the audited desktop viewport.
+**Where**: public journey Playwright evidence, styles and final audit
+**Depends on**: F4
+**Requirement**: A11Y-04, TEST-03, TEST-04
+**Done when**:
+
+- [x] The final audit contains all 15 baseline names with matching desktop/mobile viewports.
+- [x] Each final state is rendered from deterministic public fixtures and has an observable assertion before capture.
+- [x] Save and approve remain inside the 1280 × 720 review viewport.
+- [x] Before/after pairs are inspected together and their findings are recorded in the audit.
+
+**Gate**: Build
+
 ## Diagram-Definition Cross-Check
 
 | Diagram edge        | Matching dependency | Result                             |
@@ -354,3 +370,4 @@ T8
 | F2   | Public journey         | RTL/Playwright for resumability and delivered assets                    | Full  | ✅     |
 | F3   | Accessibility          | Computed contrast and all-route heading assertions                      | Build | ✅     |
 | F4   | Operations/docs        | Logger description matches bounded runtime context                      | Quick | ✅     |
+| F5   | Visual evidence        | Fifteen paired captures and lyric-review actions in viewport            | Build | ✅     |

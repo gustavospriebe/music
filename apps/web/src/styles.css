@@ -488,7 +488,7 @@ h2 {
 }
 .lyrics-editor {
   width: 100%;
-  min-height: 430px;
+  min-height: clamp(240px, 38vh, 430px);
   line-height: 1.5;
   margin: 1.5rem 0;
 }

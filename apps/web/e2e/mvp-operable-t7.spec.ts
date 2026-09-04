@@ -205,29 +205,137 @@ test('estado de erro mantém um único conteúdo principal e um único título',
 });
 
 test('captura os estados finais nos viewports da auditoria', async ({ page }) => {
+  const visualLyric = {
+    number: 1,
+    kind: 'approved',
+    approvedAt: '2026-09-04T12:00:00.000Z',
+    content: {
+      title: 'A Resenha da Bia',
+      fullLyrics: 'Bia chegou\nA turma canta junto\nBia, vem cantar!',
+    },
+  };
+  const visualOrders = {
+    'order-story-visual': { status: 'story_completed', lyrics: [], audio: [] },
+    'order-generating-visual': { status: 'lyrics_generating', lyrics: [], audio: [] },
+    'order-ready-visual': {
+      status: 'lyrics_ready',
+      lyrics: [{ ...visualLyric, kind: 'generated', approvedAt: null }],
+      audio: [],
+    },
+    'order-approved-visual': { status: 'lyrics_approved', lyrics: [visualLyric], audio: [] },
+    'order-production-visual': { status: 'audio_generating', lyrics: [visualLyric], audio: [] },
+    'order-delivered-visual': {
+      status: 'delivered',
+      lyrics: [visualLyric],
+      audio: [
+        { variant: 1, status: 'completed' },
+        { variant: 2, status: 'completed' },
+      ],
+    },
+    'order-failed-visual': { status: 'failed', lyrics: [visualLyric], audio: [] },
+  } as const;
+  await page.route('**/api/v1/**', (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith('/analytics/beacon')) return route.fulfill({ json: { accepted: true } });
+    if (path.endsWith('/products'))
+      return route.fulfill({
+        json: [{ type: 'friend_roast', name: 'Música da Resenha', priceCents: 4990, active: true }],
+      });
+    const publicId = path.match(/\/orders\/([^/]+)$/)?.[1];
+    const order = publicId ? visualOrders[publicId as keyof typeof visualOrders] : undefined;
+    if (order)
+      return route.fulfill({
+        json: {
+          order: { publicId, status: order.status, priceCents: 4990 },
+          lyrics: order.lyrics,
+          audio: order.audio,
+        },
+      });
+    return route.fulfill({ status: 404, json: { error: { message: 'Rota visual ausente' } } });
+  });
+
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto('/');
+  await expect(page.getByRole('heading', { name: /sua história merece/i })).toBeVisible();
   await page.screenshot({ path: '../../docs/audits/mvp-operavel/after/01-entrada-desktop.png' });
 
-  await page.route('**/api/v1/orders/order-visual-1', (route) =>
-    route.fulfill({
-      json: {
-        order: { publicId: 'order-visual-1', status: 'audio_generating', priceCents: 4990 },
-        lyrics: [],
-        audio: [],
-      },
-    }),
-  );
-  await page.goto('/pedido/order-visual-1');
+  await page.goto('/criar');
+  await expect(page.getByRole('heading', { name: /conte a resenha/i })).toBeVisible();
+  await page.screenshot({
+    path: '../../docs/audits/mvp-operavel/after/02-formulario-vazio-desktop.png',
+  });
+
+  await page.getByRole('button', { name: /gerar minha letra/i }).click();
+  await expect(page.getByLabel(/qual é a ocasião/i)).toHaveAttribute('aria-invalid', 'true');
+  await page.screenshot({ path: '../../docs/audits/mvp-operavel/after/03-validacao-desktop.png' });
+
+  await page.getByLabel(/para quem é a música/i).fill('Bia');
+  await page.getByLabel(/qual é a ocasião/i).fill('Aniversário');
+  await page.getByLabel(/^seu nome$/i).fill('Nina');
+  await page.getByLabel(/^seu e-mail$/i).fill('nina@example.test');
+  await page
+    .getByLabel(/histórias, apelidos/i)
+    .fill('Sempre chega cantando\nTodo churrasco vira show');
+  await page.getByLabel(/aceito os termos/i).check();
+  await expect(page.getByRole('status')).toContainText('Rascunho salvo');
+  await page.screenshot({
+    path: '../../docs/audits/mvp-operavel/after/04-formulario-preenchido-desktop.png',
+  });
+
+  await page.goto('/criar/letra?pedido=order-story-visual');
+  await expect(page.getByRole('button', { name: /criar letra agora/i })).toBeVisible();
+  await page.screenshot({
+    path: '../../docs/audits/mvp-operavel/after/05-geracao-pronta-para-iniciar-desktop.png',
+  });
+
+  await page.goto('/criar/letra?pedido=order-generating-visual');
+  await expect(page.getByRole('status')).toContainText('Criando sua letra');
+  await page.screenshot({
+    path: '../../docs/audits/mvp-operavel/after/06-geracao-loading-desktop.png',
+  });
+
+  await page.goto('/criar/letra?pedido=order-ready-visual');
+  await expect(page.getByRole('textbox', { name: /letra da música/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: /salvar nova versão/i })).toBeInViewport();
+  await expect(page.getByRole('button', { name: /aprovar letra/i })).toBeInViewport();
+  await page.screenshot({
+    path: '../../docs/audits/mvp-operavel/after/07-revisao-letra-desktop.png',
+  });
+
+  await page.goto('/criar/checkout?pedido=order-approved-visual');
+  await expect(page.getByRole('button', { name: /pagar com mercado pago/i })).toBeVisible();
+  await page.screenshot({ path: '../../docs/audits/mvp-operavel/after/08-checkout-desktop.png' });
+
+  await page.goto('/pedido/order-production-visual');
   await expect(page.getByRole('heading', { name: /sendo produzida/i })).toBeVisible();
   await page.screenshot({
     path: '../../docs/audits/mvp-operavel/after/09-processamento-desktop.png',
   });
 
+  await page.goto('/pedido/order-delivered-visual');
+  await expect(page.getByRole('heading', { name: /música está pronta/i })).toBeVisible();
+  await page.screenshot({ path: '../../docs/audits/mvp-operavel/after/10-sucesso-desktop.png' });
+
+  await page.goto('/pedido/order-failed-visual');
+  await expect(page.getByRole('heading', { name: /problema na produção/i })).toBeVisible();
+  await page.screenshot({ path: '../../docs/audits/mvp-operavel/after/11-erro-desktop.png' });
+
+  await page.evaluate(() => window.localStorage.removeItem('resenha:my-orders'));
+  await page.goto('/minhas-musicas');
+  await expect(page.getByRole('heading', { name: /ainda não criou/i })).toBeVisible();
+  await page.screenshot({ path: '../../docs/audits/mvp-operavel/after/12-vazio-desktop.png' });
+
+  await page.evaluate(() => window.localStorage.removeItem('resenha:story-draft'));
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
+  await expect(page.getByRole('heading', { name: /sua história merece/i })).toBeVisible();
   await page.screenshot({ path: '../../docs/audits/mvp-operavel/after/13-entrada-mobile.png' });
   await page.getByRole('button', { name: 'Abrir menu' }).click();
+  await expect(page.getByRole('button', { name: 'Fechar menu' })).toBeVisible();
   await page.screenshot({ path: '../../docs/audits/mvp-operavel/after/14-menu-mobile.png' });
+
+  await page.goto('/criar');
+  await expect(page.getByRole('heading', { name: /conte a resenha/i })).toBeVisible();
+  await page.screenshot({ path: '../../docs/audits/mvp-operavel/after/15-formulario-mobile.png' });
 });

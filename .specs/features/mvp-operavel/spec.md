@@ -230,7 +230,7 @@ A aplicação possui as peças do fluxo de música personalizada, mas ainda acei
 | A11Y-01        | Navegação acessível    | T7             | Done   |
 | A11Y-02        | Navegação acessível    | T7, F3         | Done   |
 | A11Y-03        | Navegação acessível    | T7             | Done   |
-| A11Y-04        | Navegação acessível    | T7             | Done   |
+| A11Y-04        | Navegação acessível    | T7, F5         | Done   |
 | A11Y-05        | Navegação acessível    | T7, F3         | Done   |
 | A11Y-06        | Navegação acessível    | T7             | Done   |
 | A11Y-07        | Navegação acessível    | T7             | Done   |
@@ -243,8 +243,8 @@ A aplicação possui as peças do fluxo de música personalizada, mas ainda acei
 | SAFE-07        | Borda pública          | T3             | Done   |
 | TEST-01        | Prova de comportamento | T7, T8         | Done   |
 | TEST-02        | Prova de comportamento | T8             | Done   |
-| TEST-03        | Prova de comportamento | T7, T8         | Done   |
-| TEST-04        | Prova de comportamento | T8             | Done   |
+| TEST-03        | Prova de comportamento | T7, T8, F5     | Done   |
+| TEST-04        | Prova de comportamento | T8, F5         | Done   |
 
 **Coverage:** 45 total, 45 mapped to tasks, 0 pending design.
 
