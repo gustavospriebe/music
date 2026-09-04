@@ -446,6 +446,34 @@ describe('fluxo completo de pedido', () => {
     );
     expect(jobRows[0]?.count).toBe(1);
     const deliveryToken = (delivered.json() as { deliveryToken: string }).deliveryToken;
+    const delivery = await app.inject({
+      method: 'GET',
+      url: `/api/v1/deliveries/${deliveryToken}`,
+    });
+    expect(delivery.statusCode).toBe(200);
+    const deliveryBody = delivery.json() as {
+      publicOrderId: string;
+      lyrics: Array<{ number: number; kind: string; content: Record<string, unknown> }>;
+      audio: Array<{ variant: number }>;
+    };
+    expect(Object.keys(deliveryBody).sort()).toEqual(['audio', 'lyrics', 'publicOrderId']);
+    expect(deliveryBody.publicOrderId).toBe(session.publicId);
+    expect(deliveryBody.lyrics).toHaveLength(1);
+    expect(Object.keys(deliveryBody.lyrics[0] ?? {}).sort()).toEqual(['content', 'kind', 'number']);
+    expect(Object.keys(deliveryBody.lyrics[0]?.content ?? {}).sort()).toEqual(
+      [
+        'fullLyrics',
+        'language',
+        'musicalDirection',
+        'pronunciationNotes',
+        'safetyNotes',
+        'sections',
+        'summary',
+        'title',
+      ].sort(),
+    );
+    expect(deliveryBody.audio).toHaveLength(2);
+    for (const track of deliveryBody.audio) expect(Object.keys(track)).toEqual(['variant']);
     // Sem cookie (aparelho novo): o token do e-mail recupera o acesso.
     const recovered = await app.inject({
       method: 'POST',

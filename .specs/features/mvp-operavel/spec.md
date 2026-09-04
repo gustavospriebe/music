@@ -236,8 +236,8 @@ A aplicação possui as peças do fluxo de música personalizada, mas ainda acei
 | A11Y-07        | Navegação acessível    | T7             | Done      |
 | SAFE-01        | Borda pública          | T1, T3         | Done      |
 | SAFE-02        | Borda pública          | T1, T3         | Done      |
-| SAFE-03        | Borda pública          | T1, T2, T3, F1 | Needs Fix |
-| SAFE-04        | Borda pública          | T8, F1         | Needs Fix |
+| SAFE-03        | Borda pública          | T1, T2, T3, F1 | Done      |
+| SAFE-04        | Borda pública          | T8, F1         | Done      |
 | SAFE-05        | Borda pública          | T4             | Done      |
 | SAFE-06        | Borda pública          | T8             | Done      |
 | SAFE-07        | Borda pública          | T3             | Done      |

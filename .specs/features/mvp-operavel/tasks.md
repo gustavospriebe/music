@@ -270,15 +270,15 @@ T8
 
 ### F1: Close public logging and delivery evidence
 
-**Status**: Pending
+**Status**: Complete
 **What**: Align the HTTP log with SAFE-04 and assert the exact public delivery projection.
 **Where**: `apps/api/src/app.ts`, API integration tests
 **Depends on**: T8
 **Requirement**: SAFE-03, SAFE-04
 **Done when**:
 
-- [ ] HTTP completion logs contain only the permitted operational keys and have an exact assertion.
-- [ ] A valid delivery response asserts exact top-level, lyric and audio keys.
+- [x] HTTP completion logs contain only the permitted operational keys and have an exact assertion.
+- [x] A valid delivery response asserts exact top-level, lyric and audio keys.
 
 **Gate**: Full
 
@@ -337,6 +337,6 @@ T8
 | T6   | React + journey        | RTL/Playwright status and recovery matrix                               | Full  | ✅     |
 | T7   | Presentation + journey | RTL/Playwright keyboard, focus, responsive and screenshot checks        | Build | ✅     |
 | T8   | Operations/config/docs | Full gates, DB replay, UAT, React Doctor and link review                | Build | ⚠️     |
-| F1   | API boundary           | Exact HTTP-log and delivery DTO assertions                              | Full  | ⏳     |
+| F1   | API boundary           | Exact HTTP-log and delivery DTO assertions                              | Full  | ✅     |
 | F2   | Public journey         | RTL/Playwright for resumability and delivered assets                    | Full  | ⏳     |
 | F3   | Accessibility          | Computed contrast and all-route heading assertions                      | Build | ⏳     |

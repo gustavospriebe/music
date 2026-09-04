@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildApp } from './app.js';
+import { buildApp, httpLogContext } from './app.js';
 import type { Env } from './env.js';
 
 const env: Env = {
@@ -21,6 +21,14 @@ const env: Env = {
 };
 
 describe('HTTP foundation', () => {
+  it('limits the HTTP completion context to route, status and duration', () => {
+    expect(httpLogContext('/api/v1/orders/:publicId', 200, 12.6)).toEqual({
+      route: '/api/v1/orders/:publicId',
+      statusCode: 200,
+      latencyMs: 13,
+    });
+  });
+
   it('serves a live health probe through fastify.inject', async () => {
     const app = await buildApp(env);
     try {

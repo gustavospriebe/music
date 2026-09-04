@@ -117,6 +117,12 @@ export const spDayStartUtc = (date: string): string => {
 export const nextUtcDate = (date: string): string =>
   new Date(Date.parse(`${date}T00:00:00.000Z`) + 86_400_000).toISOString().slice(0, 10);
 
+export const httpLogContext = (route: string, statusCode: number, elapsedTime: number) => ({
+  route,
+  statusCode,
+  latencyMs: Math.round(elapsedTime),
+});
+
 export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } = {}) => {
   const app = Fastify({
     logger: {
@@ -130,12 +136,11 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
   /** URLs concretas carregam tokens de capability e UUIDs: loga só o template da rota. */
   app.addHook('onResponse', (request, reply, done) => {
     request.log.info(
-      {
-        route: request.routeOptions.url ?? '<unmatched>',
-        method: request.method,
-        statusCode: reply.statusCode,
-        latencyMs: Math.round(reply.elapsedTime),
-      },
+      httpLogContext(
+        request.routeOptions.url ?? '<unmatched>',
+        reply.statusCode,
+        reply.elapsedTime,
+      ),
       'request completed',
     );
     done();
