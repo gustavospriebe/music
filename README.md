@@ -6,7 +6,7 @@ MVP brasileiro para transformar histórias de amigos em música personalizada. A
 
 Turborepo + pnpm + TypeScript estrito. `apps/web` contém React/Vite; `apps/api`, Fastify; `apps/worker`, a fila PostgreSQL. `packages/contracts`, `domain` e `database` são compartilhados. As fronteiras de adapters/configuração estão em `packages/providers` e `packages/config`; presets compartilhados ficam em `packages/eslint-config` e `packages/typescript-config`.
 
-Mais detalhes: [ARCHITECTURE.md](ARCHITECTURE.md), [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md), [provider setup](docs/provider-setup.md) e [checklist de produção](docs/production-checklist.md).
+Mais detalhes: [arquitetura](docs/architecture.md), [plano histórico](docs/implementation-plan.md), [configuração de providers](docs/provider-setup.md) e [checklist de produção](docs/production-checklist.md).
 
 ## Rodando localmente
 
@@ -15,7 +15,7 @@ Pré-requisitos: Node Active LTS, Corepack, Docker e Docker Compose.
 ```sh
 corepack enable
 corepack pnpm install
-cp .env.example .env   # preencha as chaves de OpenRouter, Mercado Pago e Resend
+cp .env.example .env   # OpenRouter é obrigatório; Mercado Pago e Resend têm fallback fora de produção
 docker compose up -d
 pnpm db:migrate
 pnpm db:seed
@@ -24,9 +24,17 @@ pnpm dev
 
 URLs locais: web `http://localhost:5175`, API `http://localhost:3001`, OpenAPI `http://localhost:3001/documentation`. O banco publicado localmente usa `localhost:5433`. `LOCAL_STORAGE_PATH` deve ser absoluto para que API e worker compartilhem o mesmo diretório de arquivos.
 
-Os providers são reais e selecionados por variáveis de ambiente (`LYRICS_PROVIDER`, `MUSIC_PROVIDER`, `PAYMENT_PROVIDER`, `EMAIL_PROVIDER`). Modelos recomendados (validados com chamada real): `OPENROUTER_TEXT_MODEL=google/gemini-3-flash-preview` (letra, custo marginal) e `OPENROUTER_MUSIC_MODEL=google/lyria-3-pro-preview` (duas músicas completas por pedido, US$ 0,08 por faixa). Sem as credenciais de Mercado Pago/Resend fora de produção: o checkout roda em modo dev (aprovação automática via endpoint local) e o e-mail de entrega é gravado em `var/emails` com o link privado — a entrega da música continua funcionando de ponta a ponta. Em produção a API exige as chaves de OpenRouter e Mercado Pago e o worker exige a chave da Resend.
+Os adapters de rede são reais e selecionados por variáveis de ambiente (`LYRICS_PROVIDER`, `MUSIC_PROVIDER`, `PAYMENT_PROVIDER`, `EMAIL_PROVIDER`); não existe modo fake de provider. OpenRouter é necessário para gerar letra e áudio. Os modelos e custos medidos em uma chamada autorizada de 04/09/2026 estão registrados em [providers](docs/providers.md) e [evolução do MVP](docs/evolucao-mvp.md); o gate local atual usa providers controlados e não revalida a rede. Sem credenciais de Mercado Pago ou Resend fora de produção, o checkout usa confirmação local pelo pedido e o e-mail é gravado em `var/emails` com o link privado. Em produção, a API exige OpenRouter e Mercado Pago; o worker exige OpenRouter e Resend.
 
 Modelos de áudio têm filtro de conteúdo probabilístico: uma letra pode ser bloqueada (`PROHIBITED_CONTENT`) mesmo passando nas regras locais. O worker tenta várias vezes, o job fica visível no painel e o admin pode editar a letra ou regenerar.
+
+## Retomada e acesso privado
+
+- A criação guarda no navegador uma chave UUID por tentativa. A API persiste apenas o SHA-256 e devolve o mesmo `publicId` em retry, sem duplicar pedido ou evento.
+- Geração de letra usa claim atômico. Reload apenas consulta o pedido; uma nova tentativa só é liberada após falha ou claim sem atualização por cinco minutos.
+- Edição e aprovação sempre acrescentam versões. Uma letra histórica nunca é reescrita.
+- Cookies de pedido/visualização são capabilities assinadas, `HttpOnly` e vinculadas ao `publicId`. Um marcador literal forjado recebe 401.
+- O link de entrega troca o token por acesso de visualização, salva somente o `publicId` no histórico local e não concede mutações nem expõe dados do formulário.
 
 ## Banco e admin
 
@@ -42,9 +50,10 @@ pnpm test
 pnpm build
 pnpm test:e2e
 pnpm check
+npx react-doctor@latest --verbose --scope changed
 ```
 
-`pnpm check` executa formato, lint, typecheck, testes e build. O GitHub Actions usa PostgreSQL de serviço e roda essas verificações, incluindo Playwright, sem credenciais externas.
+`pnpm check` executa formato, lint, typecheck, testes e build. O GitHub Actions usa PostgreSQL de serviço e roda essas verificações, incluindo Playwright, sem credenciais externas. Antes de promover uma migration, execute `pnpm db:migrate` e `pnpm db:seed` duas vezes no banco alvo; o replay deve terminar sem duplicação ou erro.
 
 ## Providers e produção
 
@@ -54,7 +63,7 @@ Há imagens de produção multi-stage e não-root em `docker/api/Dockerfile`, `d
 
 ## Custo de IA
 
-Cada chamada ao OpenRouter grava uma linha em `ai_usage` (pedido, `kind` letra/áudio, modelo, tokens, `cost_usd` em dólar como devolvido em `usage.cost`, latência, status `ok`/`blocked`/`error`/`rejected`, `requestId` e tentativa — inclusive bloqueios do filtro e tentativas reprovadas na validação local, que também são cobradas). Somas em USD são feitas no PostgreSQL (`numeric`) e trafegam como string decimal exata até o painel. O admin vê o custo por pedido, o agregado do mês/30 dias em `GET /admin/ai-usage/summary` e o uso da key (`GET /key` documentado do OpenRouter, gratuito, best-effort) no painel. Respostas públicas e logs carregam só referências públicas (`publicId`, número da versão, variante do áudio); UUIDs internos ficam no admin autenticado.
+Cada chamada ao OpenRouter grava uma linha em `ai_usage` (pedido, `kind` letra/áudio, modelo, tokens, `cost_usd` em dólar como devolvido em `usage.cost`, latência, status `ok`/`blocked`/`error`/`rejected`, `requestId` e tentativa, inclusive bloqueios do filtro e tentativas reprovadas na validação local). Somas em USD usam `numeric` no PostgreSQL e trafegam como string decimal exata até o painel. O admin vê o custo por pedido, o agregado do mês/30 dias em `GET /admin/ai-usage/summary` e o uso da key em `GET /key`, gratuito e best-effort. Respostas públicas carregam só referências públicas. Logs HTTP usam request ID, template de rota, método, status e duração; logs do worker usam tipo, status, tentativa e duração, sem UUID de job/pedido, token, letra ou formulário.
 
 ## Limites do MVP
 

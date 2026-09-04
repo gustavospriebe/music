@@ -164,3 +164,11 @@ export const latestLyrics = <T extends { number: number }>(versions: T[]): T | u
     (latest, version) => (!latest || version.number > latest.number ? version : latest),
     undefined,
   );
+
+export const completedAudioCount = (
+  audio: readonly { variant: number; status: string }[],
+): number => {
+  const variants = new Set<number>();
+  for (const item of audio) if (item.status === 'completed') variants.add(item.variant);
+  return variants.size;
+};

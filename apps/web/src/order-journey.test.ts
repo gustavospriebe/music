@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deriveOrderJourney, latestLyrics } from './order-journey';
+import { completedAudioCount, deriveOrderJourney, latestLyrics } from './order-journey';
 
 describe('jornada fechada do pedido', () => {
   it.each([
@@ -58,5 +58,16 @@ describe('jornada fechada do pedido', () => {
     ];
     expect(latestLyrics(versions)?.content.title).toBe('Sete');
     expect(versions.map(({ number }) => number)).toEqual([2, 7, 4]);
+  });
+
+  it('conta somente variantes concluídas e não duplica a mesma variante', () => {
+    expect(
+      completedAudioCount([
+        { variant: 1, status: 'completed' },
+        { variant: 1, status: 'completed' },
+        { variant: 2, status: 'processing' },
+        { variant: 3, status: 'completed' },
+      ]),
+    ).toBe(2);
   });
 });

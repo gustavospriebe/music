@@ -19,6 +19,7 @@ import { products } from './types';
 export function Header({ hidePrimaryAction = false }: { hidePrimaryAction?: boolean }) {
   const [open, setOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
+  const closeMenu = () => setOpen(false);
   useEffect(() => {
     if (!open) return;
     const previousOverflow = document.body.style.overflow;
@@ -50,17 +51,18 @@ export function Header({ hidePrimaryAction = false }: { hidePrimaryAction?: bool
       >
         {open ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
       </button>
-      <nav
-        id="primary-navigation"
-        aria-label="Navegação principal"
-        className={open ? 'open' : ''}
-        onClick={() => setOpen(false)}
-      >
-        <NavLink to="/">Como funciona</NavLink>
-        <NavLink to="/criar">Criar</NavLink>
-        <NavLink to="/minhas-musicas">Minhas músicas</NavLink>
+      <nav id="primary-navigation" aria-label="Navegação principal" className={open ? 'open' : ''}>
+        <NavLink to="/" onClick={closeMenu}>
+          Como funciona
+        </NavLink>
+        <NavLink to="/criar" onClick={closeMenu}>
+          Criar
+        </NavLink>
+        <NavLink to="/minhas-musicas" onClick={closeMenu}>
+          Minhas músicas
+        </NavLink>
         {!hidePrimaryAction && (
-          <Link className="nav-cta" to="/criar">
+          <Link className="nav-cta" to="/criar" onClick={closeMenu}>
             Criar minha música <ArrowRight size={16} />
           </Link>
         )}

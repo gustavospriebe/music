@@ -1,6 +1,8 @@
 # Especificação completa do MVP "Música da Resenha" — Fase 2 (aderência total)
 
-Este documento é a fonte de verdade de requisitos, arquitetura e Definition of Done para a FASE 2 de desenvolvimento.
+> Documento histórico congelado em 2026-08-02. Menções a providers mock/fake descrevem a meta original e não o comportamento atual. Consulte `README.md`, `ARCHITECTURE.md` e `docs/provider-setup.md`: o modo fake foi removido; testes usam adapters controlados por injeção.
+
+Este documento foi a fonte de verdade de requisitos, arquitetura e Definition of Done para a Fase 2.
 Estrutura-o para retomar/refinar o que já existe em /home/gustavo/projects/music tornando-o totalmente aderente.
 
 ---

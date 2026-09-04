@@ -10,7 +10,12 @@ import { api, visitorId } from '../api';
 import { Footer, Header, Loading, ProductionRail } from '../components';
 import { clearDraft, readDraft, useDraft } from '../hooks/use-draft';
 import { readMyOrders, rememberMyOrder } from '../my-orders';
-import { deriveOrderJourney, isOrderStatus, latestLyrics } from '../order-journey';
+import {
+  completedAudioCount,
+  deriveOrderJourney,
+  isOrderStatus,
+  latestLyrics,
+} from '../order-journey';
 import { clearCreationKey, creationKey } from '../submission-attempt';
 import { formatMoney, type LyricsContent, type Story } from '../types';
 
@@ -458,7 +463,7 @@ function LyricEditor({
         {...form.register('fullLyrics')}
       />
       <div className="actions">
-        <button className="button secondary" disabled={operation !== null}>
+        <button type="submit" className="button secondary" disabled={operation !== null}>
           {operation === 'saving'
             ? 'Salvando versão'
             : operation === 'approving'
@@ -560,9 +565,7 @@ export function OrderStatus() {
   if (order.isError || !order.data)
     return <PageError message="Pedido não encontrado ou acesso inválido." />;
   const approved = latestLyrics(order.data.lyrics.filter((lyric) => lyric.approvedAt));
-  const completedAudio = new Set(
-    order.data.audio.filter((audio) => audio.status === 'completed').map((audio) => audio.variant),
-  ).size;
+  const completedAudio = completedAudioCount(order.data.audio);
   const journey = deriveOrderJourney(order.data.order.status, {
     hasApprovedLyrics: Boolean(approved),
     completedAudio,
@@ -727,11 +730,7 @@ export function MyOrders() {
             );
           const title = latestLyrics(query.data.lyrics);
           const approved = query.data.lyrics.some((lyric) => Boolean(lyric.approvedAt));
-          const completedAudio = new Set(
-            query.data.audio
-              .filter((audio) => audio.status === 'completed')
-              .map((audio) => audio.variant),
-          ).size;
+          const completedAudio = completedAudioCount(query.data.audio);
           return (
             <div className="price-card" key={publicId}>
               <span>{title?.content.title ?? `Pedido ${publicId}`}</span>

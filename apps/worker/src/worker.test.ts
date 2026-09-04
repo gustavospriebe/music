@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { generateMusicOnce, readWorkerConfig, sanitizeError } from './worker.js';
+import { generateMusicOnce, jobLogContext, readWorkerConfig, sanitizeError } from './worker.js';
 
 const fullEnv = {
   DATABASE_URL: 'postgresql://local/test',
@@ -34,6 +34,34 @@ describe('worker config', () => {
       readWorkerConfig({ ...fullEnv, NODE_ENV: 'production', RESEND_API_KEY: 'resend-key' })
         .resendApiKey,
     ).toBe('resend-key');
+  });
+});
+
+describe('worker logging', () => {
+  it('logs bounded execution context without internal identifiers', () => {
+    const context = jobLogContext(
+      {
+        id: 'internal-job-id',
+        orderId: 'internal-order-id',
+        type: 'generate_audio',
+        attempts: 2,
+        maxAttempts: 6,
+        payload: {},
+      },
+      'retry_scheduled',
+      47,
+      new Error('provider failed\nwith detail'),
+    );
+
+    expect(context).toEqual({
+      jobType: 'generate_audio',
+      status: 'retry_scheduled',
+      attempt: 2,
+      durationMs: 47,
+      error: 'provider failed with detail',
+    });
+    expect(JSON.stringify(context)).not.toContain('internal-job-id');
+    expect(JSON.stringify(context)).not.toContain('internal-order-id');
   });
 });
 describe('music sing parsing', () => {

@@ -93,6 +93,7 @@ test('estado de erro mantém um único conteúdo principal e um único título',
 });
 
 test('captura os estados finais nos viewports da auditoria', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto('/');
   await page.screenshot({ path: '../../docs/audits/mvp-operavel/after/01-entrada-desktop.png' });

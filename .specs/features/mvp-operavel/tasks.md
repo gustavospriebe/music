@@ -243,6 +243,7 @@ T8
 
 ### T8: Prove and document the operable MVP
 
+**Status**: Complete
 **What**: Update operator/product documentation, record the researched album-cover extension, and run the complete local UAT and quality gates.  
 **Where**: `MVP operational evidence`  
 **Depends on**: T7  
@@ -256,11 +257,11 @@ T8
 
 **Done when**:
 
-- [ ] README/docs describe actual fallbacks, signed recovery, idempotency, operational retry and no fake-provider claim.
-- [ ] Album-cover backlog specifies model/cost, consent/privacy, storage, one included render and one bounded regeneration without calling a paid provider.
-- [ ] Migration and seed succeed twice where idempotency applies; API/web/worker serve and the real-browser happy/failure/mobile UAT passes.
-- [ ] Format, lint, typecheck, all tests, build, E2E and React Doctor exit 0 with counts recorded.
-- [ ] Before/after audit evidence and ranked backlog close every P0/P1 or name a concrete blocker.
+- [x] README/docs describe actual fallbacks, signed recovery, idempotency, operational retry and no fake-provider claim.
+- [x] Album-cover backlog specifies model/cost, consent/privacy, storage, one included render and one bounded regeneration without calling a paid provider.
+- [x] Migration and seed succeed twice where idempotency applies; API/web/worker serve and the real-browser happy/failure/mobile UAT passes.
+- [x] Format, lint, typecheck, all tests, build, E2E and React Doctor exit 0 with counts recorded.
+- [x] Before/after audit evidence and ranked backlog close every P0/P1 or name a concrete blocker.
 
 **Tests**: Complete operational gate, migration/seed replay, Playwright UAT, React Doctor and documentation/link review  
 **Gate**: Build

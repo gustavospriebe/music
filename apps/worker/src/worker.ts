@@ -76,6 +76,19 @@ export const sanitizeError = (error: unknown): string =>
     .replace(/[\r\n]+/g, ' ')
     .slice(0, 500);
 
+export const jobLogContext = (
+  job: ClaimedJob,
+  status: 'completed' | 'permanently_failed' | 'retry_scheduled',
+  durationMs: number,
+  error?: unknown,
+) => ({
+  jobType: job.type,
+  status,
+  attempt: job.attempts,
+  durationMs: Math.max(0, Math.round(durationMs)),
+  ...(error === undefined ? {} : { error: sanitizeError(error) }),
+});
+
 const safeStoragePath = (basePath: string, key: string): string => {
   const root = resolve(basePath);
   const target = resolve(root, key);
@@ -608,13 +621,14 @@ export const createWorker = ({ pool, config }: { pool: Pool; config: WorkerConfi
   const processOne = async (): Promise<boolean> => {
     const job = await claimNextJob(pool, config.workerId);
     if (!job) return false;
+    const startedAt = Date.now();
     try {
       if (job.payload === null || typeof job.payload !== 'object')
         throw new Error('Invalid job payload');
       if (job.maxAttempts < job.attempts) throw new Error('Job retry limit exceeded');
       await processAudioJob(pool, job, config);
       await completeJob(pool, job.id);
-      console.info({ jobId: job.id }, 'worker job completed');
+      console.info(jobLogContext(job, 'completed', Date.now() - startedAt), 'worker job completed');
     } catch (error) {
       const message = sanitizeError(error);
       const terminal =
@@ -625,11 +639,14 @@ export const createWorker = ({ pool, config }: { pool: Pool; config: WorkerConfi
       if (terminal || job.attempts >= job.maxAttempts) {
         await failJob(pool, job.id, message);
         if (job.type === 'generate_audio') await failAudioOrder(pool, job.orderId);
-        console.error({ jobId: job.id, error: message }, 'worker job permanently failed');
+        console.error(
+          jobLogContext(job, 'permanently_failed', Date.now() - startedAt, error),
+          'worker job permanently failed',
+        );
       } else {
         await retryJob(pool, job, message);
         console.warn(
-          { jobId: job.id, attempts: job.attempts, error: message },
+          jobLogContext(job, 'retry_scheduled', Date.now() - startedAt, error),
           'worker job retry scheduled',
         );
       }

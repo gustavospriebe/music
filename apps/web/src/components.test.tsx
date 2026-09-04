@@ -24,6 +24,12 @@ describe('navegação pública', () => {
     await user.keyboard('{Escape}');
     expect(screen.getByRole('button', { name: /abrir menu/i })).toHaveFocus();
     expect(document.body.style.overflow).toBe('');
+    await user.click(menu);
+    await user.click(screen.getByRole('link', { name: /^Criar$/i }));
+    expect(screen.getByRole('button', { name: /abrir menu/i })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
     expect(screen.getByRole('link', { name: /criar minha música/i })).toHaveAttribute(
       'href',
       '/criar',
