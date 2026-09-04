@@ -28,7 +28,7 @@ export type LyricsContent = {
 export type Order = {
   publicId: string;
   productType: ProductType;
-  status: string;
+  status?: string;
   priceCents: number;
   createdAt?: string;
 };

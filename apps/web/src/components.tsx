@@ -13,7 +13,7 @@ import { useState } from 'react';
 import type { ProductType } from './types';
 import { products } from './types';
 
-export function Header() {
+export function Header({ hidePrimaryAction = false }: { hidePrimaryAction?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <header className="site-header">
@@ -27,9 +27,11 @@ export function Header() {
         <NavLink to="/">Como funciona</NavLink>
         <NavLink to="/criar">Criar</NavLink>
         <NavLink to="/minhas-musicas">Minhas músicas</NavLink>
-        <Link className="nav-cta" to="/criar">
-          Criar minha música <ArrowRight size={16} />
-        </Link>
+        {!hidePrimaryAction && (
+          <Link className="nav-cta" to="/criar">
+            Criar minha música <ArrowRight size={16} />
+          </Link>
+        )}
       </nav>
     </header>
   );
@@ -69,8 +71,29 @@ export function TrustLine() {
 }
 export function Loading({ label = 'Preparando...' }: { label?: string }) {
   return (
-    <div className="loading">
-      <Sparkles /> {label}
+    <div className="loading" role="status">
+      <Sparkles aria-hidden="true" /> {label}
     </div>
+  );
+}
+
+const productionSteps = ['História', 'Letra', 'Pagamento', 'Produção do áudio', 'Entrega'];
+export function ProductionRail({ step, complete }: { step: number; complete: boolean }) {
+  return (
+    <ol className="steps production-rail" aria-label="Produção da música">
+      {productionSteps.map((label, index) => {
+        const number = index + 1;
+        const state =
+          complete || number < step ? 'Concluído' : number === step ? 'Etapa atual' : 'Aguardando';
+        return (
+          <li key={label} data-state={state.toLowerCase().replace(' ', '-')}>
+            <b aria-current={!complete && number === step ? 'step' : undefined}>
+              {number}. {label}
+            </b>
+            <span>{state}</span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }

@@ -191,6 +191,7 @@ T8
 
 ### T6: Render a closed, resumable production journey
 
+**Status**: Complete
 **What**: Derive generation, review, production, failure, empty and delivery screens only from validated states with polling instead of duplicate mutations.  
 **Where**: `web status journey slice`  
 **Depends on**: T5  
@@ -204,11 +205,11 @@ T8
 
 **Done when**:
 
-- [ ] `lyrics_generating` loads and reloads as live polling without POSTing again.
-- [ ] Lyric failure has a real retry; save/approve errors preserve text and busy states name/disable both actions.
-- [ ] A five-step production rail maps every known status and marks delivery complete only with two variants.
-- [ ] Paid audio failure is honest and status-unknown/absent renders an inconsistency with no mutation CTA.
-- [ ] Delivery recovery records local history and empty history offers creation.
+- [x] `lyrics_generating` loads and reloads as live polling without POSTing again.
+- [x] Lyric failure has a real retry; save/approve errors preserve text and busy states name/disable both actions.
+- [x] A five-step production rail maps every known status and marks delivery complete only with two variants.
+- [x] Paid audio failure is honest and status-unknown/absent renders an inconsistency with no mutation CTA.
+- [x] Delivery recovery records local history and empty history offers creation.
 
 **Tests**: RTL and Playwright state matrix covering every known group, absent/unknown status, reload, error, retry, busy, partial audio and delivery recovery  
 **Gate**: Full

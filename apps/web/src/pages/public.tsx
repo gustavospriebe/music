@@ -7,9 +7,10 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { api, visitorId } from '../api';
-import { Footer, Header, Loading } from '../components';
+import { Footer, Header, Loading, ProductionRail } from '../components';
 import { clearDraft, readDraft, useDraft } from '../hooks/use-draft';
 import { readMyOrders, rememberMyOrder } from '../my-orders';
+import { deriveOrderJourney, isOrderStatus, latestLyrics } from '../order-journey';
 import { clearCreationKey, creationKey } from '../submission-attempt';
 import { formatMoney, type LyricsContent, type Story } from '../types';
 
@@ -331,11 +332,13 @@ export function LyricsReview() {
     queryKey: ['order', publicId],
     queryFn: () => api.getOrder(publicId),
     enabled: Boolean(publicId),
+    refetchInterval: (query) =>
+      query.state.data?.order.status === 'lyrics_generating' ? 1500 : false,
   });
   const generate = useMutation({
     mutationFn: () => api.generateLyrics(publicId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order', publicId] }),
-    onError: (e) => toast.error(e.message),
+    onError: () => queryClient.invalidateQueries({ queryKey: ['order', publicId] }),
   });
   const edit = useMutation({
     mutationFn: ({ number, content }: { number: number; content: LyricsContent }) =>
@@ -351,27 +354,71 @@ export function LyricsReview() {
   if (order.isLoading) return <Loading label="Carregando sua história…" />;
   if (order.isError || !order.data)
     return <PageError message="Não foi possível abrir sua história." />;
-  const lyric = order.data.lyrics[0];
+  const status = order.data.order.status;
+  if (!isOrderStatus(status))
+    return <PageError message="O pedido está com um estado inconsistente." />;
+  const lyric = latestLyrics(order.data.lyrics);
+  const approved = order.data.lyrics.some((version) => Boolean(version.approvedAt));
+  if (status === 'lyrics_generating')
+    return (
+      <>
+        <Header />
+        <main className="review">
+          <p className="eyebrow">ETAPA 2 DE 5 · LETRA</p>
+          <h1>Criando sua letra</h1>
+          <p role="status">
+            Criando sua letra. A criação continua mesmo se você recarregar esta página.
+          </p>
+        </main>
+        <Footer />
+      </>
+    );
+  const canGenerate = status === 'story_completed' || (status === 'failed' && !approved);
+  if (status === 'lyrics_ready' && !lyric)
+    return <PageError message="O pedido está com um estado inconsistente: a letra está ausente." />;
+  if (!canGenerate && status !== 'lyrics_ready')
+    return <PageError message="A revisão da letra não está disponível nesta etapa." />;
+  const mutationError = generate.error ?? edit.error ?? approve.error;
   return (
     <>
       <Header />
       <main className="review">
-        <p className="eyebrow">ETAPA 5 DE 6 · REVISÃO</p>
-        <h1>Sua letra, do seu jeito.</h1>
-        {!lyric ? (
-          <button
-            className="button primary"
-            onClick={() => generate.mutate()}
-            disabled={generate.isPending}
-          >
-            {generate.isPending ? 'Criando…' : 'Criar letra agora'}
-          </button>
+        <p className="eyebrow">ETAPA 2 DE 5 · LETRA</p>
+        <h1>{lyric ? lyric.content.title : 'Sua letra, do seu jeito.'}</h1>
+        {mutationError && (
+          <p className="error" role="alert">
+            {mutationError.message}
+          </p>
+        )}
+        {canGenerate ? (
+          <>
+            {status === 'failed' && <p>A letra não foi concluída. Sua história continua salva.</p>}
+            <button
+              className="button primary"
+              onClick={() => generate.mutate()}
+              disabled={generate.isPending}
+            >
+              {generate.isPending
+                ? 'Tentando gerar novamente'
+                : status === 'failed'
+                  ? 'Tentar gerar novamente'
+                  : 'Criar letra agora'}
+            </button>
+          </>
         ) : (
           <LyricEditor
-            lyric={lyric}
-            onSave={(content) => edit.mutate({ number: lyric.number, content })}
-            onApprove={(content) => approve.mutate({ number: lyric.number, content })}
-            busy={edit.isPending || approve.isPending}
+            key={lyric!.number}
+            lyric={lyric!}
+            onSave={(content) => {
+              approve.reset();
+              edit.mutate({ number: lyric!.number, content });
+            }}
+            onApprove={(content) => {
+              edit.reset();
+              approve.mutate({ number: lyric!.number, content });
+            }}
+            operation={edit.isPending ? 'saving' : approve.isPending ? 'approving' : null}
+            saved={edit.isSuccess}
           />
         )}
       </main>
@@ -383,12 +430,14 @@ function LyricEditor({
   lyric,
   onSave,
   onApprove,
-  busy,
+  operation,
+  saved,
 }: {
   lyric: { content: LyricsContent };
   onSave: (content: LyricsContent) => void;
   onApprove: (content?: LyricsContent) => void;
-  busy: boolean;
+  operation: 'saving' | 'approving' | null;
+  saved: boolean;
 }) {
   const form = useForm<{ fullLyrics: string }>({
     defaultValues: { fullLyrics: lyric.content.fullLyrics },
@@ -402,26 +451,36 @@ function LyricEditor({
       onSubmit={form.handleSubmit((v) => onSave({ ...lyric.content, fullLyrics: v.fullLyrics }))}
     >
       <p>Edite qualquer verso; cada salvamento cria uma nova versão histórica.</p>
+      {saved && <p role="status">Nova versão salva.</p>}
       <textarea
         className="lyrics-editor"
         aria-label="Letra da música"
         {...form.register('fullLyrics')}
       />
       <div className="actions">
-        <button className="button secondary" disabled={busy}>
-          Salvar nova versão
+        <button className="button secondary" disabled={operation !== null}>
+          {operation === 'saving'
+            ? 'Salvando versão'
+            : operation === 'approving'
+              ? 'Aprovação em andamento'
+              : 'Salvar nova versão'}
         </button>
         <button
           type="button"
           className="button primary"
-          disabled={busy}
+          disabled={operation !== null}
           onClick={() =>
             onApprove(
               form.getValues().fullLyrics !== lyric.content.fullLyrics ? current() : undefined,
             )
           }
         >
-          Aprovar letra <CheckCircle2 size={17} />
+          {operation === 'approving'
+            ? 'Aprovando letra'
+            : operation === 'saving'
+              ? 'Salvamento em andamento'
+              : 'Aprovar letra'}{' '}
+          <CheckCircle2 size={17} aria-hidden="true" />
         </button>
       </div>
     </form>
@@ -477,83 +536,82 @@ export function Checkout() {
   );
 }
 
-const orderStep = (status: string) =>
-  ['draft', 'story_completed', 'lyrics_generating'].includes(status)
-    ? 1
-    : status === 'lyrics_ready'
-      ? 2
-      : ['lyrics_approved', 'payment_pending'].includes(status)
-        ? 3
-        : [
-              'paid',
-              'audio_queued',
-              'audio_generating',
-              'review_required',
-              'revision_requested',
-            ].includes(status)
-          ? 4
-          : status === 'delivered'
-            ? 5
-            : 1;
-
 export function OrderStatus() {
   const { publicOrderId = '' } = useParams();
   const order = useQuery({
     queryKey: ['order', publicOrderId],
     queryFn: () => api.getOrder(publicOrderId),
-    refetchInterval: (query) =>
-      query.state.data && ['failed', 'delivered'].includes(query.state.data.order.status)
-        ? false
-        : 2000,
+    refetchInterval: (query) => {
+      const status = query.state.data?.order.status;
+      return status &&
+        [
+          'lyrics_generating',
+          'paid',
+          'audio_queued',
+          'audio_generating',
+          'review_required',
+          'revision_requested',
+        ].includes(status)
+        ? 2000
+        : false;
+    },
   });
   if (order.isLoading) return <Loading label="Atualizando pedido…" />;
   if (order.isError || !order.data)
     return <PageError message="Pedido não encontrado ou acesso inválido." />;
-  const status = order.data.order.status;
-  const step = status === 'failed' ? 4 : orderStep(status);
-  const steps = ['História', 'Letra aprovada', 'Pagamento', 'Produção do áudio', 'Entrega'];
-  const approved = order.data.lyrics.find((lyric) => lyric.approvedAt) ?? order.data.lyrics[0];
+  const approved = latestLyrics(order.data.lyrics.filter((lyric) => lyric.approvedAt));
+  const completedAudio = new Set(
+    order.data.audio.filter((audio) => audio.status === 'completed').map((audio) => audio.variant),
+  ).size;
+  const journey = deriveOrderJourney(order.data.order.status, {
+    hasApprovedLyrics: Boolean(approved),
+    completedAudio,
+  });
+  if (!journey.valid)
+    return (
+      <PageError
+        message={
+          journey.reason === 'inconsistent_delivery'
+            ? 'O pedido está com uma entrega incompleta: faltam duas versões válidas.'
+            : 'O pedido está com um estado inconsistente.'
+        }
+      />
+    );
+  const action =
+    journey.action === 'continue_story'
+      ? { label: 'Continuar história', to: '/criar' }
+      : journey.action === 'open_lyrics'
+        ? { label: 'Acompanhar letra', to: `/criar/letra?pedido=${publicOrderId}` }
+        : journey.action === 'review_lyrics'
+          ? { label: 'Revisar letra', to: `/criar/letra?pedido=${publicOrderId}` }
+          : journey.action === 'retry_lyrics'
+            ? { label: 'Tentar gerar novamente', to: `/criar/letra?pedido=${publicOrderId}` }
+            : journey.action === 'checkout'
+              ? { label: 'Ir para o pagamento', to: `/criar/checkout?pedido=${publicOrderId}` }
+              : journey.action === 'listen'
+                ? { label: 'Ouvir versões', to: `/pedido/${publicOrderId}/entrega` }
+                : null;
   return (
     <>
       <Header />
       <main className="delivery">
         <p className="eyebrow">PEDIDO PRIVADO</p>
-        <h1>
-          {status === 'delivered'
-            ? 'Sua música está pronta!'
-            : status === 'failed'
-              ? 'Tivemos um problema na produção'
-              : 'Sua música está sendo produzida'}
-        </h1>
-        <p>
-          {status === 'failed'
-            ? 'A produção não foi concluída. Estamos revisando seu pedido e vamos regerar sua música sem nenhum custo extra — acompanhe por aqui.'
-            : status === 'delivered'
-              ? 'Ouça e baixe as duas versões no player.'
-              : 'Você recebe o link de entrega assim que a produção terminar.'}
-        </p>
-        <ol className="steps">
-          {steps.map((label, index) => (
-            <li key={label}>
-              <b>
-                {index + 1}. {label}
-              </b>
-              <span>
-                {step > index + 1 ? 'Concluído' : step === index + 1 ? 'Etapa atual' : 'Aguardando'}
-              </span>
-            </li>
-          ))}
-        </ol>
+        <h1>{journey.heading}</h1>
+        <p>{journey.message}</p>
+        {action && (
+          <Link className="button primary" to={action.to}>
+            {action.label}
+          </Link>
+        )}
+        <ProductionRail step={journey.step} complete={journey.complete} />
         {approved && (
-          <details className="price-card" open={step < 5}>
-            <summary>{approved.content.title} · sua letra aprovada</summary>
+          <details className="price-card" open={!journey.complete}>
+            <summary>
+              {approved.content.title} ·{' '}
+              {approved.approvedAt ? 'sua letra aprovada' : 'sua letra em revisão'}
+            </summary>
             <pre className="lyrics-editor">{approved.content.fullLyrics}</pre>
           </details>
-        )}
-        {status === 'delivered' && (
-          <Link className="button primary" to={`/pedido/${publicOrderId}/entrega`}>
-            Ouvir versões
-          </Link>
         )}
       </main>
       <Footer />
@@ -571,16 +629,19 @@ export function OrderPlayer() {
   if (order.isLoading) return <Loading label="Carregando suas músicas…" />;
   if (order.isError || !order.data)
     return <PageError message="Pedido não encontrado ou acesso inválido." />;
-  const ready =
-    order.data.order.status === 'delivered'
-      ? order.data.audio.filter((audio) => audio.status === 'completed')
-      : [];
+  const ready = order.data.audio.filter((audio) => audio.status === 'completed');
+  const journey = deriveOrderJourney(order.data.order.status, {
+    hasApprovedLyrics: order.data.lyrics.some((lyric) => Boolean(lyric.approvedAt)),
+    completedAudio: new Set(ready.map((audio) => audio.variant)).size,
+  });
+  if (!journey.valid || journey.kind !== 'delivered')
+    return <PageError message="As duas versões ainda não estão disponíveis para entrega." />;
   return (
     <>
       <Header />
       <main className="delivery">
         <p className="eyebrow">SUAS VERSÕES</p>
-        <h1>{ready.length ? 'Ouvir e baixar' : 'As versões ainda estão em produção'}</h1>
+        <h1>Ouvir e baixar</h1>
         {ready.map((audio) => (
           <div className="price-card" key={audio.variant}>
             <span>Versão {audio.variant}</span>
@@ -602,22 +663,19 @@ export function OrderPlayer() {
     </>
   );
 }
-const myOrderStatusLabel = (status: string) =>
-  status === 'delivered'
-    ? 'Pronta'
-    : status === 'failed'
-      ? 'Problema na produção'
-      : [
-            'paid',
-            'audio_queued',
-            'audio_generating',
-            'review_required',
-            'revision_requested',
-          ].includes(status)
-        ? 'Em produção'
-        : ['lyrics_approved', 'payment_pending'].includes(status)
-          ? 'Aguardando pagamento'
-          : 'Em criação';
+const myOrderStatusLabel = (status: unknown, approved: boolean, completedAudio: number) => {
+  const journey = deriveOrderJourney(status, {
+    hasApprovedLyrics: approved,
+    completedAudio,
+  });
+  if (!journey.valid) return 'Estado inconsistente';
+  if (journey.kind === 'delivered') return 'Pronta';
+  if (journey.kind === 'production_failed') return 'Problema na produção';
+  if (journey.kind === 'production') return 'Em produção';
+  if (journey.kind === 'payment') return 'Aguardando pagamento';
+  if (journey.kind === 'closed') return 'Pedido encerrado';
+  return 'Em criação';
+};
 
 export function MyOrders() {
   const [ids] = useState<string[]>(() => readMyOrders());
@@ -632,7 +690,7 @@ export function MyOrders() {
   if (!ids.length)
     return (
       <>
-        <Header />
+        <Header hidePrimaryAction />
         <main className="delivery">
           <p className="eyebrow">MINHAS MÚSICAS</p>
           <h1>Você ainda não criou nenhuma música aqui</h1>
@@ -667,11 +725,17 @@ export function MyOrders() {
                 </Link>
               </div>
             );
-          const title = query.data.lyrics.find((lyric) => lyric.approvedAt) ?? query.data.lyrics[0];
+          const title = latestLyrics(query.data.lyrics);
+          const approved = query.data.lyrics.some((lyric) => Boolean(lyric.approvedAt));
+          const completedAudio = new Set(
+            query.data.audio
+              .filter((audio) => audio.status === 'completed')
+              .map((audio) => audio.variant),
+          ).size;
           return (
             <div className="price-card" key={publicId}>
               <span>{title?.content.title ?? `Pedido ${publicId}`}</span>
-              <p>{myOrderStatusLabel(query.data.order.status)}</p>
+              <p>{myOrderStatusLabel(query.data.order.status, approved, completedAudio)}</p>
               <Link className="button secondary" to={`/pedido/${publicId}`}>
                 Ver pedido
               </Link>
@@ -709,8 +773,40 @@ export function Delivery() {
         {delivery.isError && <PageError message="Link de entrega inválido ou expirado." />}
         {delivery.data && (
           <>
-            <h1>Sua música está pronta!</h1>
-            <p>Este link é privado. Ouça e baixe as duas versões abaixo.</p>
+            {delivery.data.audio.length === 2 ? (
+              <>
+                <h1>Sua música está pronta!</h1>
+                <p>Este link é privado. Ouça e baixe as duas versões abaixo.</p>
+                {delivery.data.audio.map((audio) => (
+                  <div className="price-card" key={audio.variant}>
+                    <span>Versão {audio.variant}</span>
+                    <audio controls src={api.deliveryDownloadUrl(deliveryToken, audio.variant)} />
+                    <a
+                      className="button secondary"
+                      href={api.deliveryDownloadUrl(deliveryToken, audio.variant)}
+                      download
+                    >
+                      Baixar versão {audio.variant}
+                    </a>
+                  </div>
+                ))}
+                {delivery.data.lyrics[0] && (
+                  <details>
+                    <summary>Ver letra aprovada</summary>
+                    <pre className="lyrics-editor">
+                      {delivery.data.lyrics[0].content.fullLyrics}
+                    </pre>
+                  </details>
+                )}
+              </>
+            ) : (
+              <>
+                <h1>As versões ainda não estão prontas</h1>
+                <p className="error" role="alert">
+                  A entrega está incompleta. Acompanhe o pedido para receber as duas versões.
+                </p>
+              </>
+            )}
             <button
               className="button secondary"
               disabled={recover.isPending}
@@ -718,25 +814,6 @@ export function Delivery() {
             >
               {recover.isPending ? 'Liberando…' : 'Acompanhar pedido neste navegador'}
             </button>
-            {delivery.data.audio.map((audio) => (
-              <div className="price-card" key={audio.variant}>
-                <span>Versão {audio.variant}</span>
-                <audio controls src={api.deliveryDownloadUrl(deliveryToken, audio.variant)} />
-                <a
-                  className="button secondary"
-                  href={api.deliveryDownloadUrl(deliveryToken, audio.variant)}
-                  download
-                >
-                  Baixar versão {audio.variant}
-                </a>
-              </div>
-            ))}
-            {delivery.data.lyrics[0] && (
-              <details>
-                <summary>Ver letra aprovada</summary>
-                <pre className="lyrics-editor">{delivery.data.lyrics[0].content.fullLyrics}</pre>
-              </details>
-            )}
           </>
         )}
       </main>

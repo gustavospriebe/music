@@ -26,6 +26,7 @@ const lyric = {
 
 test('fluxo completo local: história, letra, checkout e acompanhamento', async ({ page }) => {
   let lyricReady = false;
+  let paid = false;
   await page.route('**/api/v1/**', async (route) => {
     const url = new URL(route.request().url());
     const method = route.request().method();
@@ -43,17 +44,23 @@ test('fluxo completo local: história, letra, checkout e acompanhamento', async 
     if (method === 'GET' && url.pathname.endsWith('/orders/order-demo-123'))
       return route.fulfill({
         json: {
-          order: { publicId: 'order-demo-123', priceCents: 4990 },
+          order: {
+            publicId: 'order-demo-123',
+            status: paid ? 'paid' : lyricReady ? 'lyrics_ready' : 'story_completed',
+            priceCents: 4990,
+          },
           lyrics: lyricReady ? [lyric] : [],
           audio: [],
         },
       });
     if (method === 'POST' && url.pathname.includes('/lyrics/1/approve'))
       return route.fulfill({ json: { approved: true } });
-    if (method === 'POST' && url.pathname.endsWith('/checkout'))
+    if (method === 'POST' && url.pathname.endsWith('/checkout')) {
+      paid = true;
       return route.fulfill({
         json: { paymentId: 'payment-demo-123', checkoutUrl: '/pedido/order-demo-123' },
       });
+    }
     return route.fulfill({ status: 404, json: { error: { message: 'Rota mock não prevista' } } });
   });
 
@@ -179,7 +186,7 @@ test('pedido com falha explica e orienta sem prometer causa', async ({ page }) =
     route.fulfill({
       json: {
         order: { publicId: 'order-failed-x', status: 'failed', priceCents: 4990 },
-        lyrics: [],
+        lyrics: [{ ...lyric, kind: 'approved', approvedAt: new Date().toISOString() }],
         audio: [],
       },
     }),
@@ -188,4 +195,20 @@ test('pedido com falha explica e orienta sem prometer causa', async ({ page }) =
   await expect(page.getByRole('heading', { name: /problema na produção/i })).toBeVisible();
   await expect(page.getByText(/produção não foi concluída/i)).toBeVisible();
   await expect(page.getByText(/sem nenhum custo extra/i)).toBeVisible();
+});
+
+test('pedido aguardando letra convida a revisar', async ({ page }) => {
+  await page.route('**/api/v1/orders/order-review-x', (route) =>
+    route.fulfill({
+      json: {
+        order: { publicId: 'order-review-x', status: 'lyrics_ready', priceCents: 4990 },
+        lyrics: [],
+        audio: [],
+      },
+    }),
+  );
+  await page.goto('/pedido/order-review-x');
+  await expect(page.getByRole('heading', { name: /revise sua letra/i })).toBeVisible();
+  await page.getByRole('link', { name: /revisar letra/i }).click();
+  await expect(page).toHaveURL(/\/criar\/letra\?pedido=order-review-x/);
 });
