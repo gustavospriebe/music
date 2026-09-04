@@ -53,6 +53,12 @@ export class ApiError extends Error {
     super(message);
   }
 }
+export type PublicProduct = {
+  type: ProductType;
+  name: string;
+  priceCents: number;
+  active: boolean;
+};
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {};
   if (init?.body != null) headers['content-type'] = 'application/json';
@@ -73,12 +79,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  createOrder: (productType: ProductType, visitorId?: string) =>
+  products: () => request<PublicProduct[]>('/products'),
+  createOrder: (productType: ProductType, creationKey: string, visitorId?: string) =>
     request<{ publicId: string }>(`/orders`, {
       method: 'POST',
-      body: JSON.stringify(
-        visitorId && UUID_RE.test(visitorId) ? { productType, visitorId } : { productType },
-      ),
+      body: JSON.stringify({
+        productType,
+        creationKey,
+        ...(visitorId && UUID_RE.test(visitorId) ? { visitorId } : {}),
+      }),
     }),
   saveStory: (publicId: string, story: Story) =>
     request<{ saved: true }>(`/orders/${publicId}/story`, {
@@ -99,12 +108,11 @@ export const api = {
   generateLyrics: (publicId: string) =>
     request(`/orders/${publicId}/lyrics/generate`, { method: 'POST' }),
   checkout: (publicId: string) =>
-    request<{ paymentId: string; checkoutUrl: string; dev?: boolean }>(
-      `/orders/${publicId}/checkout`,
-      { method: 'POST' },
-    ),
-  approveDevPayment: (paymentId: string) =>
-    request<{ approved: true }>(`/dev/payments/${paymentId}/approve`, { method: 'POST' }),
+    request<{ checkoutUrl: string; dev?: boolean }>(`/orders/${publicId}/checkout`, {
+      method: 'POST',
+    }),
+  approveDevPayment: (publicId: string) =>
+    request<{ approved: true }>(`/orders/${publicId}/dev-payment/approve`, { method: 'POST' }),
   delivery: (token: string) =>
     request<{
       publicOrderId: string;

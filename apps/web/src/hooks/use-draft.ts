@@ -12,7 +12,11 @@ export function readDraft(): Draft {
 }
 
 export function clearDraft() {
-  localStorage.removeItem(key);
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // Storage bloqueado não invalida um salvamento remoto já concluído.
+  }
 }
 
 /** Local recovery is intentional until an opaque story-session token is available from the API. */

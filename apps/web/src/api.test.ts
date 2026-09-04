@@ -11,14 +11,15 @@ afterAll(() => server.close());
 
 describe('API client', () => {
   it('posts the selected product and returns the public order reference', async () => {
+    const creationKey = '11111111-1111-4111-8111-111111111111';
     server.use(
       http.post('http://localhost:3001/api/v1/orders', async ({ request }) => {
-        await expect(request.json()).resolves.toEqual({ productType: 'friend_roast' });
+        await expect(request.json()).resolves.toEqual({ productType: 'friend_roast', creationKey });
         return HttpResponse.json({ publicId: 'public-order-123' }, { status: 201 });
       }),
     );
 
-    await expect(api.createOrder('friend_roast')).resolves.toEqual({
+    await expect(api.createOrder('friend_roast', creationKey)).resolves.toEqual({
       publicId: 'public-order-123',
     });
   });
@@ -33,7 +34,9 @@ describe('API client', () => {
       ),
     );
 
-    await expect(api.createOrder('friend_roast')).rejects.toMatchObject({
+    await expect(
+      api.createOrder('friend_roast', '11111111-1111-4111-8111-111111111111'),
+    ).rejects.toMatchObject({
       name: 'Error',
       message: 'Revise os campos informados.',
       status: 400,
@@ -142,8 +145,42 @@ describe('API client', () => {
       }),
     );
 
-    await api.createOrder('friend_roast', 'anon-123');
-    expect(orderBody).toEqual({ productType: 'friend_roast' });
+    await api.createOrder('friend_roast', '11111111-1111-4111-8111-111111111111', 'anon-123');
+    expect(orderBody).toEqual({
+      productType: 'friend_roast',
+      creationKey: '11111111-1111-4111-8111-111111111111',
+    });
+  });
+
+  it('usa somente contratos públicos no catálogo e na confirmação local', async () => {
+    let approvedPath = '';
+    server.use(
+      http.get('http://localhost:3001/api/v1/products', () =>
+        HttpResponse.json([
+          { type: 'friend_roast', name: 'Música da Resenha', priceCents: 6789, active: true },
+        ]),
+      ),
+      http.post('http://localhost:3001/api/v1/orders/public-order-1/checkout', () =>
+        HttpResponse.json({ checkoutUrl: '/pedido/public-order-1', dev: true }),
+      ),
+      http.post(
+        'http://localhost:3001/api/v1/orders/public-order-1/dev-payment/approve',
+        ({ request }) => {
+          approvedPath = new URL(request.url).pathname;
+          return HttpResponse.json({ approved: true });
+        },
+      ),
+    );
+
+    await expect(api.products()).resolves.toEqual([
+      { type: 'friend_roast', name: 'Música da Resenha', priceCents: 6789, active: true },
+    ]);
+    await expect(api.checkout('public-order-1')).resolves.toEqual({
+      checkoutUrl: '/pedido/public-order-1',
+      dev: true,
+    });
+    await expect(api.approveDevPayment('public-order-1')).resolves.toEqual({ approved: true });
+    expect(approvedPath).toBe('/api/v1/orders/public-order-1/dev-payment/approve');
   });
 
   it('gera UUID válido mesmo com crypto e localStorage indisponíveis', async () => {

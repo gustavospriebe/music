@@ -166,6 +166,7 @@ T8
 
 ### T5: Preserve the submission attempt and server price
 
+**Status**: Complete  
 **What**: Make the client retain drafts and one creation attempt through partial failure while sourcing price and dev confirmation only from public contracts.  
 **Where**: `web data-entry slice`  
 **Depends on**: T4  
@@ -179,11 +180,11 @@ T8
 
 **Done when**:
 
-- [ ] Draft restore/save is exception-safe and announced in `role="status"`.
-- [ ] Invalid controls receive focus, `aria-invalid`, a stable description and the two-memory rule.
-- [ ] One UUID attempt survives create/story-save failure and clears only after the story is saved.
-- [ ] Landing and checkout show the same API price or no numeric price when catalog fails.
-- [ ] Dev checkout confirms by public order and announces “Confirmando pagamento”.
+- [x] Draft restore/save is exception-safe and announced in `role="status"`.
+- [x] Invalid controls receive focus, `aria-invalid`, a stable description and the two-memory rule.
+- [x] One UUID attempt survives create/story-save failure and clears only after the story is saved.
+- [x] Landing and checkout show the same API price or no numeric price when catalog fails.
+- [x] Dev checkout confirms by public order and announces “Confirmando pagamento”.
 
 **Tests**: RTL unit plus Playwright coverage for restore, validation, partial retry, catalog failure, exact price and pending confirmation  
 **Gate**: Full

@@ -10,6 +10,7 @@ import { api, visitorId } from '../api';
 import { Footer, Header, Loading } from '../components';
 import { clearDraft, readDraft, useDraft } from '../hooks/use-draft';
 import { readMyOrders, rememberMyOrder } from '../my-orders';
+import { clearCreationKey, creationKey } from '../submission-attempt';
 import { formatMoney, type LyricsContent, type Story } from '../types';
 
 const storySchema = z.object({
@@ -19,7 +20,7 @@ const storySchema = z.object({
   occasion: z.string().min(2, 'Conte a ocasião'),
   factsText: z
     .string()
-    .min(8, 'Conte ao menos uma história')
+    .min(8, 'Escreva pelo menos 2 lembranças, uma em cada linha')
     .refine(
       (value) =>
         value
@@ -50,6 +51,8 @@ const defaults: StoryForm = {
   voice: 'either',
 };
 export function Landing() {
+  const catalog = useQuery({ queryKey: ['products'], queryFn: api.products });
+  const product = catalog.data?.find(({ type }) => type === 'friend_roast');
   useEffect(() => {
     api.sendBeacon('landing_view');
   }, []);
@@ -106,8 +109,14 @@ export function Landing() {
               <p>Para ouvir e baixar depois da revisão.</p>
             </article>
             <article className="card">
-              <b>R$ 49,90</b>
-              <p>Preço do produto base; adicionais aparecem no checkout.</p>
+              <b>{product ? formatMoney(product.priceCents) : 'Preço indisponível'}</b>
+              <p>
+                {catalog.isLoading
+                  ? 'Consultando o valor do pacote.'
+                  : product
+                    ? 'Preço do pacote exibido no checkout.'
+                    : 'Consulte o valor ao iniciar seu pedido.'}
+              </p>
             </article>
           </div>
         </section>
@@ -141,7 +150,7 @@ export function CreateStory() {
   const saveStatus = useDraft(values);
   const submit = useMutation({
     mutationFn: async (data: StoryForm) => {
-      const created = await api.createOrder('friend_roast', visitorId());
+      const created = await api.createOrder('friend_roast', creationKey(), visitorId());
       rememberOrder(created.publicId);
       const facts = data.factsText
         .split('\n')
@@ -169,6 +178,7 @@ export function CreateStory() {
       return created.publicId;
     },
     onSuccess: (publicId) => {
+      clearCreationKey();
       clearDraft();
       api.sendBeacon('form_completed');
       toast.success('História salva. Vamos criar sua letra!');
@@ -184,9 +194,17 @@ export function CreateStory() {
   ) => (
     <label>
       {label}
-      <input {...form.register(name)} {...extra} />
+      <input
+        {...form.register(name)}
+        {...extra}
+        aria-label={label}
+        aria-invalid={form.formState.errors[name] ? 'true' : undefined}
+        aria-describedby={form.formState.errors[name] ? `${name}-error` : undefined}
+      />
       {form.formState.errors[name] && (
-        <small className="error">{form.formState.errors[name]?.message}</small>
+        <small id={`${name}-error`} className="error">
+          {form.formState.errors[name]?.message}
+        </small>
       )}
     </label>
   );
@@ -198,7 +216,7 @@ export function CreateStory() {
         <h1>Conte a resenha em seu ritmo.</h1>
         <p className="sub">
           Etapa 1 de 6 ·{' '}
-          <span aria-live="polite">
+          <span role="status">
             {saveStatus === 'saving'
               ? 'Salvando rascunho…'
               : saveStatus === 'saved'
@@ -219,9 +237,13 @@ export function CreateStory() {
             <textarea
               {...form.register('factsText')}
               placeholder="Pelo menos 2 lembranças, uma em cada linha"
+              aria-invalid={form.formState.errors.factsText ? 'true' : undefined}
+              aria-describedby={form.formState.errors.factsText ? 'factsText-error' : undefined}
             />
             {form.formState.errors.factsText && (
-              <small className="error">{form.formState.errors.factsText.message}</small>
+              <small id="factsText-error" className="error">
+                {form.formState.errors.factsText.message}
+              </small>
             )}
           </label>
           <label>
@@ -259,8 +281,21 @@ export function CreateStory() {
             </select>
           </label>
           <label className="check wide">
-            <input type="checkbox" {...form.register('termsAccepted')} /> Li e aceito os{' '}
-            <Link to="/termos">termos</Link> e a <Link to="/privacidade">privacidade</Link>.
+            <input
+              type="checkbox"
+              {...form.register('termsAccepted')}
+              aria-invalid={form.formState.errors.termsAccepted ? 'true' : undefined}
+              aria-describedby={
+                form.formState.errors.termsAccepted ? 'termsAccepted-error' : undefined
+              }
+            />{' '}
+            Li e aceito os <Link to="/termos">termos</Link> e a{' '}
+            <Link to="/privacidade">privacidade</Link>.
+            {form.formState.errors.termsAccepted && (
+              <small id="termsAccepted-error" className="error">
+                {form.formState.errors.termsAccepted.message}
+              </small>
+            )}
           </label>
           <label className="check wide">
             <input type="checkbox" {...form.register('marketingAccepted')} /> Quero receber
@@ -290,7 +325,7 @@ function rememberOrder(publicId: string) {
 }
 export function LyricsReview() {
   const navigate = useNavigate();
-  const publicId = orderIdFromSearch();
+  const [publicId] = useState(orderIdFromSearch);
   const queryClient = useQueryClient();
   const order = useQuery({
     queryKey: ['order', publicId],
@@ -395,7 +430,7 @@ function LyricEditor({
 
 export function Checkout() {
   const nav = useNavigate();
-  const publicId = orderIdFromSearch();
+  const [publicId] = useState(orderIdFromSearch);
   const order = useQuery({
     queryKey: ['order', publicId],
     queryFn: () => api.getOrder(publicId),
@@ -405,7 +440,7 @@ export function Checkout() {
     mutationFn: async () => {
       const checkout = await api.checkout(publicId);
       if (checkout.dev) {
-        await api.approveDevPayment(checkout.paymentId);
+        await api.approveDevPayment(publicId);
         nav(`/pedido/${publicId}`);
         return;
       }
@@ -432,8 +467,9 @@ export function Checkout() {
             disabled={payment.isPending}
             onClick={() => payment.mutate()}
           >
-            {payment.isPending ? 'Confirmando…' : 'Pagar com Mercado Pago'}
+            {payment.isPending ? 'Confirmando pagamento' : 'Pagar com Mercado Pago'}
           </button>
+          {payment.isPending && <span role="status">Confirmando pagamento</span>}
         </div>
       </main>
       <Footer />
