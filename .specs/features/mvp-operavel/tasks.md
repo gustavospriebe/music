@@ -114,6 +114,7 @@ T8
 
 ### T3: Enforce signed access and identifier-free payment
 
+**Status**: Complete  
 **What**: Require server-signed order/view capabilities, project public product DTOs, and confirm local payment by public order under authorization.  
 **Where**: `Fastify public boundary`  
 **Depends on**: T2  
@@ -127,11 +128,11 @@ T8
 
 **Done when**:
 
-- [ ] Literal forged order and view cookies return 401; server-issued signed cookies work.
-- [ ] `/products` returns exactly `type`, `name`, `priceCents`, `active`.
-- [ ] Checkout omits payment UUID and reuses one pending preference.
-- [ ] Dev confirmation uses `publicId`, requires full signed access and creates one audio job across retries.
-- [ ] Route tests prove no unauthorized state, payment or queue mutation.
+- [x] Literal forged order and view cookies return 401; server-issued signed cookies work.
+- [x] `/products` returns exactly `type`, `name`, `priceCents`, `active`.
+- [x] Checkout omits payment UUID and reuses one pending preference.
+- [x] Dev confirmation uses `publicId`, requires full signed access and creates one audio job across retries.
+- [x] Route tests prove no unauthorized state, payment or queue mutation.
 
 **Tests**: Fastify/PostgreSQL integration for every changed public route, happy/error/forgery/retry paths and exact payload keys  
 **Gate**: Full

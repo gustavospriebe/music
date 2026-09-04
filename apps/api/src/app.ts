@@ -5,6 +5,7 @@ import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { and, desc, eq, gt, inArray, sql } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { ZodError } from 'zod';
@@ -234,16 +235,38 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
       })
       .onConflictDoNothing();
   };
-  const hasAccess = (publicId: string, request: { cookies: Record<string, string | undefined> }) =>
-    request.cookies[`order_${publicId}`] === '1';
+  const setAccessCookie = (
+    reply: FastifyReply,
+    kind: 'order' | 'order_view',
+    publicId: string,
+  ) =>
+    reply.setCookie(`${kind}_${publicId}`, '1', {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: env.NODE_ENV === 'production',
+      path: '/',
+      signed: true,
+    });
+  const hasSignedAccess = (
+    kind: 'order' | 'order_view',
+    publicId: string,
+    request: FastifyRequest,
+  ) => {
+    const value = request.cookies[`${kind}_${publicId}`];
+    if (!value) return false;
+    const unsigned = request.unsignCookie(value);
+    return unsigned.valid && unsigned.value === '1';
+  };
+  const hasAccess = (publicId: string, request: FastifyRequest) =>
+    hasSignedAccess('order', publicId, request);
   /**
    * Sessão limitada de recovery (link de entrega compartilhável): só leitura do
    * status/letra/áudio, sem `story` (PII) e sem mutações. Mutações exigem `hasAccess`.
    */
   const hasViewAccess = (
     publicId: string,
-    request: { cookies: Record<string, string | undefined> },
-  ) => hasAccess(publicId, request) || request.cookies[`order_view_${publicId}`] === '1';
+    request: FastifyRequest,
+  ) => hasAccess(publicId, request) || hasSignedAccess('order_view', publicId, request);
   const requireAdmin = async (request: { cookies: Record<string, string | undefined> }) => {
     const token = request.cookies.admin_session;
     if (!token) throw fail('Autenticação administrativa necessária', 401);
@@ -283,7 +306,15 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
     return { status: 'ok' };
   });
   app.get('/api/v1/products', async () =>
-    db.select().from(products).where(eq(products.active, true)),
+    db
+      .select({
+        type: products.type,
+        name: products.name,
+        priceCents: products.priceCents,
+        active: products.active,
+      })
+      .from(products)
+      .where(eq(products.active, true)),
   );
   /** Beacons públicos de funil (whitelist, sem payload de história/PII); best-effort. */
   app.post(
@@ -313,14 +344,8 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
       .from(orders)
       .where(eq(orders.creationKeyHash, creationKeyHash));
     if (existing) {
-      reply.setCookie(`order_${existing.publicId}`, '1', {
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: env.NODE_ENV === 'production',
-        path: '/',
-      });
-      const { publicId, productType, status, priceCents, createdAt } = existing;
-      return reply.status(201).send({ publicId, productType, status, priceCents, createdAt });
+      setAccessCookie(reply, 'order', existing.publicId);
+      return reply.status(201).send({ publicId: existing.publicId });
     }
     const [product] = await db
       .select()
@@ -349,15 +374,9 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
           .where(eq(orders.creationKeyHash, creationKeyHash))
       )[0];
     if (!resolved) throw fail('Não foi possível criar o pedido.', 503);
-    reply.setCookie(`order_${resolved.publicId}`, '1', {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: env.NODE_ENV === 'production',
-      path: '/',
-    });
-    const { publicId, productType, status, priceCents, createdAt } = resolved;
+    setAccessCookie(reply, 'order', resolved.publicId);
     if (created) await recordEvent('order_created', resolved, input.visitorId);
-    return reply.status(201).send({ publicId, productType, status, priceCents, createdAt });
+    return reply.status(201).send({ publicId: resolved.publicId });
   });
   app.patch('/api/v1/orders/:publicId/story', async (request) => {
     const storyPublicId = (request.params as { publicId: string }).publicId;
@@ -561,11 +580,13 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
       .select()
       .from(payments)
       .where(and(eq(payments.orderId, order.id), eq(payments.status, 'pending')));
-    if (existing?.checkoutUrl) return { paymentId: existing.id, checkoutUrl: existing.checkoutUrl };
+    if (existing?.provider === 'dev')
+      return { checkoutUrl: `${env.WEB_URL}/pedido/${order.publicId}`, dev: true as const };
+    if (existing?.checkoutUrl) return { checkoutUrl: existing.checkoutUrl };
     const [product] = await db.select().from(products).where(eq(products.type, order.productType));
     if (!env.MERCADO_PAGO_ACCESS_TOKEN) {
       if (env.NODE_ENV === 'production') throw fail('Provider de pagamento não configurado.', 501);
-      const [devPayment] = await db.transaction(async (tx) => {
+      await db.transaction(async (tx) => {
         if (order.status === 'lyrics_approved') {
           assertTransition('lyrics_approved', 'payment_pending');
           await tx
@@ -573,19 +594,18 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
             .set({ status: 'payment_pending', updatedAt: new Date() })
             .where(eq(orders.id, order.id));
         }
-        return tx
+        await tx
           .insert(payments)
           .values({
             orderId: order.id,
             provider: 'dev',
             status: 'pending',
             amountCents: order.priceCents,
-          })
-          .returning();
+            checkoutUrl: `${env.WEB_URL}/pedido/${order.publicId}`,
+          });
       });
       await recordEvent('checkout_started', order);
       return {
-        paymentId: devPayment!.id,
         checkoutUrl: `${env.WEB_URL}/pedido/${order.publicId}`,
         dev: true,
       };
@@ -596,7 +616,7 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
       externalReference: order.publicId,
       backUrl: `${env.WEB_URL}/pedido/${order.publicId}`,
     });
-    const [payment] = await db.transaction(async (tx) => {
+    await db.transaction(async (tx) => {
       if (order.status === 'lyrics_approved') {
         assertTransition('lyrics_approved', 'payment_pending');
         await tx
@@ -604,7 +624,7 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
           .set({ status: 'payment_pending', updatedAt: new Date() })
           .where(eq(orders.id, order.id));
       }
-      return tx
+      await tx
         .insert(payments)
         .values({
           orderId: order.id,
@@ -612,11 +632,10 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
           status: 'pending',
           amountCents: order.priceCents,
           checkoutUrl: preference.initPoint,
-        })
-        .returning();
+        });
     });
     await recordEvent('checkout_started', order);
-    return { paymentId: payment!.id, checkoutUrl: preference.initPoint };
+    return { checkoutUrl: preference.initPoint };
   });
   /** O webhook apenas notifica: valida assinatura, busca o pagamento e confere valor/referência. */
   app.post('/api/v1/webhooks/mercado-pago', async (request, reply) => {
@@ -724,39 +743,48 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
     }
   });
   /** Somente fora de produção: confirma um pagamento criado em modo dev (sem credenciais MP). */
-  app.post('/api/v1/dev/payments/:paymentId/approve', async (request) => {
+  app.post('/api/v1/orders/:publicId/dev-payment/approve', async (request) => {
     if (env.NODE_ENV === 'production') throw fail('Indisponível', 404);
-    const paymentId = (request.params as { paymentId: string }).paymentId;
-    const [payment] = await db.select().from(payments).where(eq(payments.id, paymentId));
+    const publicId = (request.params as { publicId: string }).publicId;
+    if (!hasAccess(publicId, request)) throw fail('Acesso privado necessário', 401);
+    const order = await orderFor(publicId);
+    const [payment] = await db
+      .select()
+      .from(payments)
+      .where(and(eq(payments.orderId, order.id), eq(payments.provider, 'dev')));
     if (!payment || payment.provider !== 'dev') throw fail('Pagamento não encontrado', 404);
     let devPaid: { publicId: string; productType: typeof orders.$inferSelect.productType } | null =
       null;
     await db.transaction(async (tx) => {
-      const [current] = await tx.select().from(payments).where(eq(payments.id, paymentId));
-      if (current?.status !== 'pending') return;
-      await tx
+      const [approved] = await tx
         .update(payments)
-        .set({ status: 'approved', externalPaymentId: `dev_${paymentId}`, updatedAt: new Date() })
-        .where(eq(payments.id, paymentId));
-      const [order] = await tx.select().from(orders).where(eq(orders.id, payment.orderId));
-      if (order?.status === 'payment_pending') {
+        .set({
+          status: 'approved',
+          externalPaymentId: `dev_${payment.id}`,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(payments.id, payment.id), eq(payments.status, 'pending')))
+        .returning({ id: payments.id });
+      if (!approved) return;
+      const [currentOrder] = await tx.select().from(orders).where(eq(orders.id, payment.orderId));
+      if (currentOrder?.status === 'payment_pending') {
         assertTransition('payment_pending', 'paid');
         assertTransition('paid', 'audio_queued');
         await tx
           .update(orders)
           .set({ status: 'audio_queued', updatedAt: new Date() })
-          .where(eq(orders.id, order.id));
+          .where(eq(orders.id, currentOrder.id));
         await tx
           .insert(generationJobs)
           .values({
             type: 'generate_audio',
-            orderId: order.id,
+            orderId: currentOrder.id,
             payload: {},
-            idempotencyKey: `audio:${order.id}`,
+            idempotencyKey: `audio:${currentOrder.id}`,
             maxAttempts: 6,
           })
           .onConflictDoNothing();
-        devPaid = { publicId: order.publicId, productType: order.productType };
+        devPaid = { publicId: currentOrder.publicId, productType: currentOrder.productType };
       }
     });
     if (devPaid) await recordEvent('paid', devPaid);
@@ -771,12 +799,7 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
       !verifyToken(token, order.accessTokenHash, env.CUSTOMER_ACCESS_TOKEN_PEPPER)
     )
       throw fail('Link de acesso inválido', 401);
-    reply.setCookie(`order_${order.publicId}`, '1', {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: env.NODE_ENV === 'production',
-      path: '/',
-    });
+    setAccessCookie(reply, 'order', order.publicId);
     return { ok: true };
   });
   app.get('/api/v1/orders/:publicId', async (request) => {
@@ -959,12 +982,7 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
         throw fail('Link de entrega inválido ou expirado.', 404);
       const [order] = await db.select().from(orders).where(eq(orders.id, delivery.orderId));
       if (!order || order.status !== 'delivered') throw fail('Entrega indisponível.', 404);
-      reply.setCookie(`order_view_${order.publicId}`, '1', {
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: env.NODE_ENV === 'production',
-        path: '/',
-      });
+      setAccessCookie(reply, 'order_view', order.publicId);
       return { publicId: order.publicId };
     },
   );

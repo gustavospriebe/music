@@ -216,9 +216,9 @@ A aplicação possui as peças do fluxo de música personalizada, mas ainda acei
 | LYRIC-03 | Revisar letra | T6 | Pending |
 | LYRIC-04 | Revisar letra | T6 | Pending |
 | PAY-01 | Pagamento | T1, T5 | In Progress (T1 done) |
-| PAY-02 | Pagamento | T3 | Pending |
-| PAY-03 | Pagamento | T3, T5 | Pending |
-| PAY-04 | Pagamento | T3 | Pending |
+| PAY-02 | Pagamento | T3 | Done |
+| PAY-03 | Pagamento | T3, T5 | In Progress (T3 done) |
+| PAY-04 | Pagamento | T3 | Done |
 | PAY-05 | Pagamento | T5 | Pending |
 | ASYNC-01 | Produção e entrega | T6 | Pending |
 | ASYNC-02 | Produção e entrega | T6 | Pending |
@@ -234,13 +234,13 @@ A aplicação possui as peças do fluxo de música personalizada, mas ainda acei
 | A11Y-05 | Navegação acessível | T7 | Pending |
 | A11Y-06 | Navegação acessível | T7 | Pending |
 | A11Y-07 | Navegação acessível | T7 | Pending |
-| SAFE-01 | Borda pública | T1, T3 | In Progress (T1 done) |
-| SAFE-02 | Borda pública | T1, T3 | In Progress (T1 done) |
-| SAFE-03 | Borda pública | T1, T2, T3 | In Progress (T1-T2 done) |
+| SAFE-01 | Borda pública | T1, T3 | Done |
+| SAFE-02 | Borda pública | T1, T3 | Done |
+| SAFE-03 | Borda pública | T1, T2, T3 | Done |
 | SAFE-04 | Borda pública | T8 | Pending |
 | SAFE-05 | Borda pública | T4 | Pending |
 | SAFE-06 | Borda pública | T8 | Pending |
-| SAFE-07 | Borda pública | T3 | Pending |
+| SAFE-07 | Borda pública | T3 | Done |
 | TEST-01 | Prova de comportamento | T7, T8 | Pending |
 | TEST-02 | Prova de comportamento | T8 | Pending |
 | TEST-03 | Prova de comportamento | T7, T8 | Pending |

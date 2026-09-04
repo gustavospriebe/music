@@ -206,13 +206,49 @@ describe('fluxo completo de pedido', () => {
       headers: { cookie: session.cookie },
     });
     expect(checkout.statusCode).toBe(200);
-    expect(checkout.json()).toMatchObject({ dev: true });
-    const paymentId = (checkout.json() as { paymentId: string }).paymentId;
+    expect(checkout.json()).toEqual({
+      checkoutUrl: `${env.WEB_URL}/pedido/${session.publicId}`,
+      dev: true,
+    });
+    const checkoutAgain = await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/checkout`,
+      headers: { cookie: session.cookie },
+    });
+    expect(checkoutAgain.json()).toEqual(checkout.json());
+    const { rows: pendingRows } = await pool.query(
+      'select count(*)::int as count from payments p join orders o on o.id=p.order_id where o.public_id=$1',
+      [session.publicId],
+    );
+    expect(pendingRows[0]?.count).toBe(1);
+    const unauthorized = await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/dev-payment/approve`,
+    });
+    expect(unauthorized.statusCode).toBe(401);
+    const { rows: unchangedRows } = await pool.query(
+      `select o.status as order_status, p.status as payment_status,
+              (select count(*)::int from generation_jobs j where j.order_id=o.id) as jobs
+       from orders o join payments p on p.order_id=o.id where o.public_id=$1`,
+      [session.publicId],
+    );
+    expect(unchangedRows[0]).toMatchObject({
+      order_status: 'payment_pending',
+      payment_status: 'pending',
+      jobs: 0,
+    });
     const paid = await app.inject({
       method: 'POST',
-      url: `/api/v1/dev/payments/${paymentId}/approve`,
+      url: `/api/v1/orders/${session.publicId}/dev-payment/approve`,
+      headers: { cookie: session.cookie },
     });
     expect(paid.statusCode).toBe(200);
+    const paidAgain = await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/dev-payment/approve`,
+      headers: { cookie: session.cookie },
+    });
+    expect(paidAgain.statusCode).toBe(200);
     const detail = await app.inject({
       method: 'GET',
       url: `/api/v1/orders/${session.publicId}`,
@@ -279,13 +315,16 @@ describe('fluxo completo de pedido', () => {
       url: `/api/v1/orders/${session.publicId}/lyrics/${versionNumber}/approve`,
       headers: { cookie: session.cookie },
     });
-    const checkout = await app.inject({
+    await app.inject({
       method: 'POST',
       url: `/api/v1/orders/${session.publicId}/checkout`,
       headers: { cookie: session.cookie },
     });
-    const paymentId = (checkout.json() as { paymentId: string }).paymentId;
-    await app.inject({ method: 'POST', url: `/api/v1/dev/payments/${paymentId}/approve` });
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/dev-payment/approve`,
+      headers: { cookie: session.cookie },
+    });
     // Fixture: worker terminou os áudios sob revisão manual (par 1+2 com asset).
     const { rows: orderRows } = await pool.query('select id from orders where public_id=$1', [
       session.publicId,
@@ -367,13 +406,16 @@ describe('fluxo completo de pedido', () => {
       url: `/api/v1/orders/${session.publicId}/lyrics/${versionNumber}/approve`,
       headers: { cookie: session.cookie },
     });
-    const checkout = await app.inject({
+    await app.inject({
       method: 'POST',
       url: `/api/v1/orders/${session.publicId}/checkout`,
       headers: { cookie: session.cookie },
     });
-    const paymentId = (checkout.json() as { paymentId: string }).paymentId;
-    await app.inject({ method: 'POST', url: `/api/v1/dev/payments/${paymentId}/approve` });
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/dev-payment/approve`,
+      headers: { cookie: session.cookie },
+    });
     const { rows: orderRows } = await pool.query('select id from orders where public_id=$1', [
       session.publicId,
     ]);
@@ -502,6 +544,20 @@ describe('fluxo completo de pedido', () => {
     const session = await createOrderAndStory(app);
     const peek = await app.inject({ method: 'GET', url: `/api/v1/orders/${session.publicId}` });
     expect(peek.statusCode).toBe(401);
+    const forgedFull = await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/orders/${session.publicId}/story`,
+      payload: story,
+      headers: { cookie: `order_${session.publicId}=1` },
+    });
+    expect(forgedFull.statusCode).toBe(401);
+    const forgedView = await app.inject({
+      method: 'GET',
+      url: `/api/v1/orders/${session.publicId}`,
+      headers: { cookie: `order_view_${session.publicId}=1` },
+    });
+    expect(forgedView.statusCode).toBe(401);
+    expect(session.cookie).not.toBe(`order_${session.publicId}=1`);
   });
 
   it('respostas públicas não expõem ids internos, hashes ou tokens', async () => {
@@ -513,9 +569,11 @@ describe('fluxo completo de pedido', () => {
     });
     expect(created.statusCode).toBe(201);
     const createdBody = created.json() as Record<string, unknown>;
-    expect(Object.keys(createdBody).sort()).toEqual(
-      ['createdAt', 'priceCents', 'productType', 'publicId', 'status'].sort(),
-    );
+    expect(Object.keys(createdBody)).toEqual(['publicId']);
+    const catalog = await app.inject({ method: 'GET', url: '/api/v1/products' });
+    expect(catalog.statusCode).toBe(200);
+    for (const product of catalog.json() as Record<string, unknown>[])
+      expect(Object.keys(product).sort()).toEqual(['active', 'name', 'priceCents', 'type']);
     const session = await createOrderAndStory(app);
     await app.inject({
       method: 'POST',
@@ -657,13 +715,16 @@ describe('fluxo completo de pedido', () => {
       url: `/api/v1/orders/${session.publicId}/lyrics/${versionNumber}/approve`,
       headers: { cookie: session.cookie },
     });
-    const checkout = await app.inject({
+    await app.inject({
       method: 'POST',
       url: `/api/v1/orders/${session.publicId}/checkout`,
       headers: { cookie: session.cookie },
     });
-    const paymentId = (checkout.json() as { paymentId: string }).paymentId;
-    await app.inject({ method: 'POST', url: `/api/v1/dev/payments/${paymentId}/approve` });
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/dev-payment/approve`,
+      headers: { cookie: session.cookie },
+    });
     const { rows } = await pool.query(
       'select event from analytics_events where order_public_id=$1 order by created_at',
       [session.publicId],
@@ -772,13 +833,16 @@ describe('fluxo completo de pedido', () => {
     ]);
     const orderId = orderRows[0]?.id as string;
     expect(orderId).toBeTruthy();
-    const checkout = await app.inject({
+    await app.inject({
       method: 'POST',
       url: `/api/v1/orders/${session.publicId}/checkout`,
       headers: { cookie: session.cookie },
     });
-    const paymentId = (checkout.json() as { paymentId: string }).paymentId;
-    await app.inject({ method: 'POST', url: `/api/v1/dev/payments/${paymentId}/approve` });
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/dev-payment/approve`,
+      headers: { cookie: session.cookie },
+    });
 
     const login = await app.inject({
       method: 'POST',
