@@ -250,8 +250,8 @@ A aplicação possui as peças do fluxo de música personalizada, mas ainda acei
 
 ## Success Criteria
 
-- [ ] Os 45 requisitos possuem evidência direta em `validation.md`.
+- [x] Os 45 requisitos possuem evidência direta em `validation.md`.
 - [x] Nenhum P0 ou P1 da auditoria inicial permanece aberto.
 - [x] O fluxo crítico termina com duas variantes acessíveis usando providers controlados e PostgreSQL real.
 - [x] Screenshots finais desktop/mobile mostram entrada no topo e estados legíveis, acionáveis e responsivos.
-- [ ] Todos os gates finais saem com código 0 e o Verifier independente retorna PASS.
+- [x] Todos os gates finais saem com código 0 e o Verifier independente retorna PASS.

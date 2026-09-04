@@ -243,7 +243,7 @@ T8
 
 ### T8: Prove and document the operable MVP
 
-**Status**: Ready for Reverification
+**Status**: Complete
 **What**: Update operator/product documentation, record the researched album-cover extension, and run the complete local UAT and quality gates.  
 **Where**: `MVP operational evidence`  
 **Depends on**: T7  
@@ -349,7 +349,7 @@ T8
 | T5   | React + journey        | RTL/Playwright for draft, retry, validation, price and checkout         | Full  | ✅     |
 | T6   | React + journey        | RTL/Playwright status and recovery matrix                               | Full  | ✅     |
 | T7   | Presentation + journey | RTL/Playwright keyboard, focus, responsive and screenshot checks        | Build | ✅     |
-| T8   | Operations/config/docs | Full gates, DB replay, UAT, React Doctor and link review                | Build | ⚠️     |
+| T8   | Operations/config/docs | Full gates, DB replay, UAT, React Doctor and link review                | Build | ✅     |
 | F1   | API boundary           | Exact HTTP-log and delivery DTO assertions                              | Full  | ✅     |
 | F2   | Public journey         | RTL/Playwright for resumability and delivered assets                    | Full  | ✅     |
 | F3   | Accessibility          | Computed contrast and all-route heading assertions                      | Build | ✅     |
