@@ -198,53 +198,53 @@ A aplicação possui as peças do fluxo de música personalizada, mas ainda acei
 
 ## Requirement Traceability
 
-| Requirement ID | Story                  | Phase          | Status    |
-| -------------- | ---------------------- | -------------- | --------- |
-| FLOW-01        | Criar história         | T1, T2, T5     | Done      |
-| FLOW-02        | Criar história         | T5, F2         | Done      |
-| FLOW-03        | Criar história         | T5             | Done      |
-| FLOW-04        | Criar história         | T5             | Done      |
-| FLOW-05        | Criar história         | T2, T5         | Done      |
-| GEN-01         | Gerar letra            | T4             | Done      |
-| GEN-02         | Gerar letra            | T6             | Done      |
-| GEN-03         | Gerar letra            | T6             | Done      |
-| GEN-04         | Gerar letra            | T4             | Done      |
-| GEN-05         | Gerar letra            | T6             | Done      |
-| GEN-06         | Gerar letra            | T4, T6         | Done      |
-| LYRIC-01       | Revisar letra          | T4, F2         | Done      |
-| LYRIC-02       | Revisar letra          | T4             | Done      |
-| LYRIC-03       | Revisar letra          | T6             | Done      |
-| LYRIC-04       | Revisar letra          | T6             | Done      |
-| PAY-01         | Pagamento              | T1, T5         | Done      |
-| PAY-02         | Pagamento              | T3             | Done      |
-| PAY-03         | Pagamento              | T3, T5         | Done      |
-| PAY-04         | Pagamento              | T3             | Done      |
-| PAY-05         | Pagamento              | T5             | Done      |
-| ASYNC-01       | Produção e entrega     | T6, F2         | Done      |
-| ASYNC-02       | Produção e entrega     | T6, F2         | Done      |
-| ASYNC-03       | Produção e entrega     | T6             | Done      |
-| ASYNC-04       | Produção e entrega     | T6, F2         | Done      |
-| ASYNC-05       | Produção e entrega     | T1, T6         | Done      |
-| ASYNC-06       | Produção e entrega     | T1, T6         | Done      |
-| ASYNC-07       | Produção e entrega     | T6             | Done      |
-| A11Y-01        | Navegação acessível    | T7             | Done      |
-| A11Y-02        | Navegação acessível    | T7, F3         | Needs Fix |
-| A11Y-03        | Navegação acessível    | T7             | Done      |
-| A11Y-04        | Navegação acessível    | T7             | Done      |
-| A11Y-05        | Navegação acessível    | T7, F3         | Needs Fix |
-| A11Y-06        | Navegação acessível    | T7             | Done      |
-| A11Y-07        | Navegação acessível    | T7             | Done      |
-| SAFE-01        | Borda pública          | T1, T3         | Done      |
-| SAFE-02        | Borda pública          | T1, T3         | Done      |
-| SAFE-03        | Borda pública          | T1, T2, T3, F1 | Done      |
-| SAFE-04        | Borda pública          | T8, F1         | Done      |
-| SAFE-05        | Borda pública          | T4             | Done      |
-| SAFE-06        | Borda pública          | T8             | Done      |
-| SAFE-07        | Borda pública          | T3             | Done      |
-| TEST-01        | Prova de comportamento | T7, T8         | Done      |
-| TEST-02        | Prova de comportamento | T8             | Done      |
-| TEST-03        | Prova de comportamento | T7, T8         | Done      |
-| TEST-04        | Prova de comportamento | T8             | Done      |
+| Requirement ID | Story                  | Phase          | Status |
+| -------------- | ---------------------- | -------------- | ------ |
+| FLOW-01        | Criar história         | T1, T2, T5     | Done   |
+| FLOW-02        | Criar história         | T5, F2         | Done   |
+| FLOW-03        | Criar história         | T5             | Done   |
+| FLOW-04        | Criar história         | T5             | Done   |
+| FLOW-05        | Criar história         | T2, T5         | Done   |
+| GEN-01         | Gerar letra            | T4             | Done   |
+| GEN-02         | Gerar letra            | T6             | Done   |
+| GEN-03         | Gerar letra            | T6             | Done   |
+| GEN-04         | Gerar letra            | T4             | Done   |
+| GEN-05         | Gerar letra            | T6             | Done   |
+| GEN-06         | Gerar letra            | T4, T6         | Done   |
+| LYRIC-01       | Revisar letra          | T4, F2         | Done   |
+| LYRIC-02       | Revisar letra          | T4             | Done   |
+| LYRIC-03       | Revisar letra          | T6             | Done   |
+| LYRIC-04       | Revisar letra          | T6             | Done   |
+| PAY-01         | Pagamento              | T1, T5         | Done   |
+| PAY-02         | Pagamento              | T3             | Done   |
+| PAY-03         | Pagamento              | T3, T5         | Done   |
+| PAY-04         | Pagamento              | T3             | Done   |
+| PAY-05         | Pagamento              | T5             | Done   |
+| ASYNC-01       | Produção e entrega     | T6, F2         | Done   |
+| ASYNC-02       | Produção e entrega     | T6, F2         | Done   |
+| ASYNC-03       | Produção e entrega     | T6             | Done   |
+| ASYNC-04       | Produção e entrega     | T6, F2         | Done   |
+| ASYNC-05       | Produção e entrega     | T1, T6         | Done   |
+| ASYNC-06       | Produção e entrega     | T1, T6         | Done   |
+| ASYNC-07       | Produção e entrega     | T6             | Done   |
+| A11Y-01        | Navegação acessível    | T7             | Done   |
+| A11Y-02        | Navegação acessível    | T7, F3         | Done   |
+| A11Y-03        | Navegação acessível    | T7             | Done   |
+| A11Y-04        | Navegação acessível    | T7             | Done   |
+| A11Y-05        | Navegação acessível    | T7, F3         | Done   |
+| A11Y-06        | Navegação acessível    | T7             | Done   |
+| A11Y-07        | Navegação acessível    | T7             | Done   |
+| SAFE-01        | Borda pública          | T1, T3         | Done   |
+| SAFE-02        | Borda pública          | T1, T3         | Done   |
+| SAFE-03        | Borda pública          | T1, T2, T3, F1 | Done   |
+| SAFE-04        | Borda pública          | T8, F1         | Done   |
+| SAFE-05        | Borda pública          | T4             | Done   |
+| SAFE-06        | Borda pública          | T8             | Done   |
+| SAFE-07        | Borda pública          | T3             | Done   |
+| TEST-01        | Prova de comportamento | T7, T8         | Done   |
+| TEST-02        | Prova de comportamento | T8             | Done   |
+| TEST-03        | Prova de comportamento | T7, T8         | Done   |
+| TEST-04        | Prova de comportamento | T8             | Done   |
 
 **Coverage:** 45 total, 45 mapped to tasks, 0 pending design.
 

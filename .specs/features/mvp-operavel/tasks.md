@@ -243,7 +243,7 @@ T8
 
 ### T8: Prove and document the operable MVP
 
-**Status**: Needs Fix (Verifier round 1)
+**Status**: Ready for Reverification
 **What**: Update operator/product documentation, record the researched album-cover extension, and run the complete local UAT and quality gates.  
 **Where**: `MVP operational evidence`  
 **Depends on**: T7  
@@ -301,15 +301,15 @@ T8
 
 ### F3: Measure focus and heading accessibility
 
-**Status**: Pending
+**Status**: Complete
 **What**: Add deterministic browser assertions for focus contrast and heading typography across every public route.
 **Where**: `apps/web/e2e/mvp-operable-t7.spec.ts`
 **Depends on**: F2
 **Requirement**: A11Y-02, A11Y-05
 **Done when**:
 
-- [ ] Keyboard focus outline has a computed contrast ratio of at least 3:1.
-- [ ] Every public route fixture renders one `h1`, line-height at least 1.05 and non-collapsed word spacing/tracking.
+- [x] Keyboard focus outline has a computed contrast ratio of at least 3:1.
+- [x] Every public route fixture renders one `h1`, line-height at least 1.05 and non-collapsed word spacing/tracking.
 
 **Gate**: Build
 
@@ -339,4 +339,4 @@ T8
 | T8   | Operations/config/docs | Full gates, DB replay, UAT, React Doctor and link review                | Build | ⚠️     |
 | F1   | API boundary           | Exact HTTP-log and delivery DTO assertions                              | Full  | ✅     |
 | F2   | Public journey         | RTL/Playwright for resumability and delivered assets                    | Full  | ✅     |
-| F3   | Accessibility          | Computed contrast and all-route heading assertions                      | Build | ⏳     |
+| F3   | Accessibility          | Computed contrast and all-route heading assertions                      | Build | ✅     |
