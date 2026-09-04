@@ -205,14 +205,14 @@ A aplicação possui as peças do fluxo de música personalizada, mas ainda acei
 | FLOW-03        | Criar história         | T5         | Pending                  |
 | FLOW-04        | Criar história         | T5         | Pending                  |
 | FLOW-05        | Criar história         | T2, T5     | In Progress (T2 done)    |
-| GEN-01         | Gerar letra            | T4         | Pending                  |
+| GEN-01         | Gerar letra            | T4         | Done                     |
 | GEN-02         | Gerar letra            | T6         | Pending                  |
 | GEN-03         | Gerar letra            | T6         | Pending                  |
-| GEN-04         | Gerar letra            | T4         | Pending                  |
+| GEN-04         | Gerar letra            | T4         | Done                     |
 | GEN-05         | Gerar letra            | T6         | Pending                  |
-| GEN-06         | Gerar letra            | T4, T6     | Pending                  |
-| LYRIC-01       | Revisar letra          | T4         | Pending                  |
-| LYRIC-02       | Revisar letra          | T4         | Pending                  |
+| GEN-06         | Gerar letra            | T4, T6     | In Progress (T4 done)    |
+| LYRIC-01       | Revisar letra          | T4         | Done                     |
+| LYRIC-02       | Revisar letra          | T4         | Done                     |
 | LYRIC-03       | Revisar letra          | T6         | Pending                  |
 | LYRIC-04       | Revisar letra          | T6         | Pending                  |
 | PAY-01         | Pagamento              | T1, T5     | In Progress (T1 done)    |
@@ -238,7 +238,7 @@ A aplicação possui as peças do fluxo de música personalizada, mas ainda acei
 | SAFE-02        | Borda pública          | T1, T3     | Done                     |
 | SAFE-03        | Borda pública          | T1, T2, T3 | Done                     |
 | SAFE-04        | Borda pública          | T8         | Pending                  |
-| SAFE-05        | Borda pública          | T4         | Pending                  |
+| SAFE-05        | Borda pública          | T4         | Done                     |
 | SAFE-06        | Borda pública          | T8         | Pending                  |
 | SAFE-07        | Borda pública          | T3         | Done                     |
 | TEST-01        | Prova de comportamento | T7, T8     | Pending                  |

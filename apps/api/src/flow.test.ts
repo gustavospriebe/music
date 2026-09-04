@@ -98,11 +98,37 @@ const paraphrasingLyrics = (calls: { count: number }): LyricsProvider => ({
     };
   },
 });
+const providerPrivateDetail = `provider-private-detail\n${'x'.repeat(600)}`;
 const throwingLyrics = (): LyricsProvider => ({
   generate: async () => {
-    throw new Error('provider fora do ar');
+    throw new Error(providerPrivateDetail);
   },
 });
+const controlledLyrics = () => {
+  let releaseFirst!: () => void;
+  let markStarted!: () => void;
+  const firstReleased = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  const started = new Promise<void>((resolve) => {
+    markStarted = resolve;
+  });
+  const calls = { count: 0 };
+  const provider: LyricsProvider = {
+    generate: async (input) => {
+      calls.count += 1;
+      if (calls.count === 1) {
+        markStarted();
+        await firstReleased;
+      }
+      return {
+        lyrics: lyricsWith([input.subjectName, ...input.facts].join('\n')),
+        usage: testUsage(),
+      };
+    },
+  };
+  return { calls, provider, releaseFirst, started };
+};
 
 const { db, pool } = createDb(env.DATABASE_URL);
 const apps: FastifyInstance[] = [];
@@ -294,11 +320,71 @@ describe('fluxo completo de pedido', () => {
       }[];
     };
     expect(body.order.status).toBe('lyrics_approved');
+    expect(body.lyrics).toHaveLength(2);
+    const original = body.lyrics.find((lyric) => lyric.number === versionNumber);
     const approvedLyric = body.lyrics.find((lyric) => lyric.approvedAt);
+    expect(original).toMatchObject({
+      number: versionNumber,
+      kind: 'generated',
+      approvedAt: null,
+    });
     expect(approvedLyric?.content.fullLyrics).toBe(
       'Versão editada no último segundo antes de aprovar',
     );
-    expect(approvedLyric?.kind).toBe('edited');
+    expect(approvedLyric).toMatchObject({
+      number: versionNumber + 1,
+      kind: 'approved',
+    });
+    expect(body.lyrics.map((lyric) => lyric.number)).toEqual([versionNumber + 1, versionNumber]);
+  });
+
+  it('salvar e aprovar sem edição preservam todas as versões como histórico imutável', async () => {
+    const app = await appWith(compliantLyrics());
+    const session = await createOrderAndStory(app);
+    const generated = await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/lyrics/generate`,
+      headers: { cookie: session.cookie },
+    });
+    const generatedNumber = (generated.json() as { number: number }).number;
+    const savedContent = lyricsWith('Versão salva antes da aprovação');
+    const saved = await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/orders/${session.publicId}/lyrics/${generatedNumber}`,
+      headers: { cookie: session.cookie },
+      payload: savedContent,
+    });
+    expect(saved.json()).toEqual({ number: generatedNumber + 1, kind: 'edited' });
+    const approved = await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/lyrics/${generatedNumber + 1}/approve`,
+      headers: { cookie: session.cookie },
+    });
+    expect(approved.statusCode).toBe(200);
+
+    const detail = await app.inject({
+      method: 'GET',
+      url: `/api/v1/orders/${session.publicId}`,
+      headers: { cookie: session.cookie },
+    });
+    const versions = (
+      detail.json() as {
+        lyrics: {
+          number: number;
+          kind: string;
+          approvedAt: string | null;
+          content: GeneratedLyrics;
+        }[];
+      }
+    ).lyrics;
+    expect(versions.map(({ number, kind, approvedAt }) => ({ number, kind, approvedAt }))).toEqual([
+      { number: generatedNumber + 2, kind: 'approved', approvedAt: expect.any(String) },
+      { number: generatedNumber + 1, kind: 'edited', approvedAt: null },
+      { number: generatedNumber, kind: 'generated', approvedAt: null },
+    ]);
+    expect(versions[0]?.content).toEqual(savedContent);
+    expect(versions[1]?.content).toEqual(savedContent);
+    expect(versions[2]?.content.fullLyrics).toContain(story.subjectName);
   });
 
   it('link de entrega válido vira sessão de leitura: recovery sem cadastro', async () => {
@@ -457,6 +543,15 @@ describe('fluxo completo de pedido', () => {
       headers: { cookie: session.cookie },
     });
     expect(failed.statusCode).toBe(500);
+    expect(failed.body).not.toContain('provider-private-detail');
+    const { rows: usageRows } = await pool.query(
+      `select ai_usage.error from ai_usage
+       join orders on orders.id=ai_usage.order_id
+       where orders.public_id=$1 and ai_usage.status='error'`,
+      [session.publicId],
+    );
+    expect(usageRows[0]?.error).not.toContain('\n');
+    expect(String(usageRows[0]?.error)).toHaveLength(500);
     const retryApp = await appWith(compliantLyrics());
     const retry = await retryApp.inject({
       method: 'POST',
@@ -470,6 +565,28 @@ describe('fluxo completo de pedido', () => {
       headers: { cookie: session.cookie },
     });
     expect((current.json() as { order: { status: string } }).order.status).toBe('lyrics_ready');
+  });
+
+  it('duas gerações concorrentes executam uma chamada e a reivindicação perdedora recebe 409', async () => {
+    const control = controlledLyrics();
+    const app = await appWith(control.provider);
+    const session = await createOrderAndStory(app);
+    const firstPromise = app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/lyrics/generate`,
+      headers: { cookie: session.cookie },
+    });
+    await control.started;
+    const concurrent = await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/lyrics/generate`,
+      headers: { cookie: session.cookie },
+    });
+    control.releaseFirst();
+    const first = await firstPromise;
+    expect(first.statusCode).toBe(200);
+    expect(concurrent.statusCode).toBe(409);
+    expect(control.calls.count).toBe(1);
   });
 
   it('letra que parafraseia fatos tenta 3x com feedback e falha de forma recuperável', async () => {
@@ -498,7 +615,7 @@ describe('fluxo completo de pedido', () => {
     expect(retry.statusCode).toBe(200);
   });
 
-  it('draft orienta a preencher o formulário; crash em lyrics_generating se recupera', async () => {
+  it('draft orienta; reivindicação fresca bloqueia e uma expirada se recupera uma vez', async () => {
     const app = await appWith(compliantLyrics());
     const created = await app.inject({
       method: 'POST',
@@ -516,15 +633,36 @@ describe('fluxo completo de pedido', () => {
     expect(String(blocked.json().error.message)).toContain('Preencha o formulário');
 
     const session = await createOrderAndStory(app);
-    await pool.query(`update orders set status='lyrics_generating' where public_id=$1`, [
-      session.publicId,
-    ]);
+    await pool.query(
+      `update orders set status='lyrics_generating', updated_at=now() where public_id=$1`,
+      [session.publicId],
+    );
+    const fresh = await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${session.publicId}/lyrics/generate`,
+      headers: { cookie: session.cookie },
+    });
+    expect(fresh.statusCode).toBe(409);
+    await pool.query(
+      `update orders set updated_at=now() - interval '6 minutes' where public_id=$1`,
+      [session.publicId],
+    );
     const recovered = await app.inject({
       method: 'POST',
       url: `/api/v1/orders/${session.publicId}/lyrics/generate`,
       headers: { cookie: session.cookie },
     });
     expect(recovered.statusCode).toBe(200);
+    expect(
+      (
+        await pool.query(
+          `select count(*)::int as count from lyric_versions
+           join orders on orders.id=lyric_versions.order_id
+           where orders.public_id=$1`,
+          [session.publicId],
+        )
+      ).rows[0]?.count,
+    ).toBe(1);
   });
 
   it('checkout exige letra aprovada', async () => {

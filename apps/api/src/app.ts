@@ -6,7 +6,7 @@ import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { and, desc, eq, gt, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, lte, sql } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { ZodError } from 'zod';
 import {
@@ -235,11 +235,7 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
       })
       .onConflictDoNothing();
   };
-  const setAccessCookie = (
-    reply: FastifyReply,
-    kind: 'order' | 'order_view',
-    publicId: string,
-  ) =>
+  const setAccessCookie = (reply: FastifyReply, kind: 'order' | 'order_view', publicId: string) =>
     reply.setCookie(`${kind}_${publicId}`, '1', {
       httpOnly: true,
       sameSite: 'lax',
@@ -263,10 +259,8 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
    * Sessão limitada de recovery (link de entrega compartilhável): só leitura do
    * status/letra/áudio, sem `story` (PII) e sem mutações. Mutações exigem `hasAccess`.
    */
-  const hasViewAccess = (
-    publicId: string,
-    request: FastifyRequest,
-  ) => hasAccess(publicId, request) || hasSignedAccess('order_view', publicId, request);
+  const hasViewAccess = (publicId: string, request: FastifyRequest) =>
+    hasAccess(publicId, request) || hasSignedAccess('order_view', publicId, request);
   const requireAdmin = async (request: { cookies: Record<string, string | undefined> }) => {
     const token = request.cookies.admin_session;
     if (!token) throw fail('Autenticação administrativa necessária', 401);
@@ -367,12 +361,7 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
     const created = Boolean(order);
     const resolved =
       order ??
-      (
-        await db
-          .select()
-          .from(orders)
-          .where(eq(orders.creationKeyHash, creationKeyHash))
-      )[0];
+      (await db.select().from(orders).where(eq(orders.creationKeyHash, creationKeyHash)))[0];
     if (!resolved) throw fail('Não foi possível criar o pedido.', 503);
     setAccessCookie(reply, 'order', resolved.publicId);
     if (created) await recordEvent('order_created', resolved, input.visitorId);
@@ -432,14 +421,22 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
         .where(and(eq(lyricsVersions.orderId, order.id), eq(lyricsVersions.kind, 'generated')));
       if (generated && generated.count >= 4)
         throw fail('O limite de três novas gerações foi atingido.');
-      // 'lyrics_generating' aqui significa recuperação de uma tentativa interrompida.
-      if (order.status !== 'lyrics_generating') {
-        assertTransition(order.status, 'lyrics_generating');
-        await db
-          .update(orders)
-          .set({ status: 'lyrics_generating', updatedAt: new Date() })
-          .where(eq(orders.id, order.id));
-      }
+      const claimStartedAt = new Date();
+      const staleBefore = new Date(claimStartedAt.getTime() - 5 * 60 * 1_000);
+      if (order.status !== 'lyrics_generating') assertTransition(order.status, 'lyrics_generating');
+      const [claim] = await db
+        .update(orders)
+        .set({ status: 'lyrics_generating', updatedAt: claimStartedAt })
+        .where(
+          and(
+            eq(orders.id, order.id),
+            eq(orders.status, order.status),
+            ...(order.status === 'lyrics_generating' ? [lte(orders.updatedAt, staleBefore)] : []),
+          ),
+        )
+        .returning({ updatedAt: orders.updatedAt });
+      if (!claim)
+        throw fail('A letra já está sendo criada. Aguarde a conclusão desta tentativa.', 409);
       try {
         let feedback: string | undefined;
         let content: GeneratedLyrics | undefined;
@@ -483,19 +480,30 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
           content = undefined;
         }
         if (!content) throw fail(`${errors.join(' ')} Tente novamente.`);
-        const [countRow = { count: 0 }] = await db
-          .select({ count: sql<number>`count(*)::int` })
-          .from(lyricsVersions)
-          .where(eq(lyricsVersions.orderId, order.id));
-        const [version] = await db
-          .insert(lyricsVersions)
-          .values({ orderId: order.id, number: countRow.count + 1, kind: 'generated', content })
-          .returning({ number: lyricsVersions.number, kind: lyricsVersions.kind });
-        assertTransition('lyrics_generating', 'lyrics_ready');
-        await db
-          .update(orders)
-          .set({ status: 'lyrics_ready', updatedAt: new Date() })
-          .where(eq(orders.id, order.id));
+        const version = await db.transaction(async (tx) => {
+          assertTransition('lyrics_generating', 'lyrics_ready');
+          const [transitioned] = await tx
+            .update(orders)
+            .set({ status: 'lyrics_ready', updatedAt: new Date() })
+            .where(
+              and(
+                eq(orders.id, order.id),
+                eq(orders.status, 'lyrics_generating'),
+                eq(orders.updatedAt, claim.updatedAt),
+              ),
+            )
+            .returning({ id: orders.id });
+          if (!transitioned) throw fail('Esta tentativa de geração expirou.', 409);
+          const [countRow = { count: 0 }] = await tx
+            .select({ count: sql<number>`count(*)::int` })
+            .from(lyricsVersions)
+            .where(eq(lyricsVersions.orderId, order.id));
+          const [inserted] = await tx
+            .insert(lyricsVersions)
+            .values({ orderId: order.id, number: countRow.count + 1, kind: 'generated', content })
+            .returning({ number: lyricsVersions.number, kind: lyricsVersions.kind });
+          return inserted;
+        });
         await recordEvent('lyrics_generated', order);
         return version;
       } catch (error) {
@@ -503,8 +511,15 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
         await db
           .update(orders)
           .set({ status: 'failed', updatedAt: new Date() })
-          .where(eq(orders.id, order.id));
-        throw error;
+          .where(
+            and(
+              eq(orders.id, order.id),
+              eq(orders.status, 'lyrics_generating'),
+              eq(orders.updatedAt, claim.updatedAt),
+            ),
+          );
+        if ((error as { statusCode?: number }).statusCode) throw error;
+        throw fail('Não foi possível gerar a letra agora. Tente novamente.', 500);
       }
     },
   );
@@ -539,28 +554,23 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
     const versionNumber = Number((request.params as { versionNumber: string }).versionNumber);
     if (!Number.isInteger(versionNumber) || versionNumber < 1) throw fail('Versão inválida.', 404);
     const [version] = await db
-      .select({ id: lyricsVersions.id })
+      .select({ content: lyricsVersions.content })
       .from(lyricsVersions)
       .where(and(eq(lyricsVersions.orderId, order.id), eq(lyricsVersions.number, versionNumber)));
     if (!version) throw fail('Versão não encontrada.', 404);
     const { content } = approveLyricsSchema.parse(request.body ?? {});
     await db.transaction(async (tx) => {
-      let approvedId = version.id;
-      if (content) {
-        const [countRow = { count: 0 }] = await tx
-          .select({ count: sql<number>`count(*)::int` })
-          .from(lyricsVersions)
-          .where(eq(lyricsVersions.orderId, order.id));
-        const [edited] = await tx
-          .insert(lyricsVersions)
-          .values({ orderId: order.id, number: countRow.count + 1, kind: 'edited', content })
-          .returning({ id: lyricsVersions.id });
-        approvedId = edited!.id;
-      }
-      await tx
-        .update(lyricsVersions)
-        .set({ approvedAt: new Date() })
-        .where(eq(lyricsVersions.id, approvedId));
+      const [countRow = { count: 0 }] = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(lyricsVersions)
+        .where(eq(lyricsVersions.orderId, order.id));
+      await tx.insert(lyricsVersions).values({
+        orderId: order.id,
+        number: countRow.count + 1,
+        kind: 'approved',
+        content: content ?? version.content,
+        approvedAt: new Date(),
+      });
       assertTransition(order.status, 'lyrics_approved');
       await tx
         .update(orders)
@@ -594,15 +604,13 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
             .set({ status: 'payment_pending', updatedAt: new Date() })
             .where(eq(orders.id, order.id));
         }
-        await tx
-          .insert(payments)
-          .values({
-            orderId: order.id,
-            provider: 'dev',
-            status: 'pending',
-            amountCents: order.priceCents,
-            checkoutUrl: `${env.WEB_URL}/pedido/${order.publicId}`,
-          });
+        await tx.insert(payments).values({
+          orderId: order.id,
+          provider: 'dev',
+          status: 'pending',
+          amountCents: order.priceCents,
+          checkoutUrl: `${env.WEB_URL}/pedido/${order.publicId}`,
+        });
       });
       await recordEvent('checkout_started', order);
       return {
@@ -624,15 +632,13 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
           .set({ status: 'payment_pending', updatedAt: new Date() })
           .where(eq(orders.id, order.id));
       }
-      await tx
-        .insert(payments)
-        .values({
-          orderId: order.id,
-          provider: 'mercado-pago',
-          status: 'pending',
-          amountCents: order.priceCents,
-          checkoutUrl: preference.initPoint,
-        });
+      await tx.insert(payments).values({
+        orderId: order.id,
+        provider: 'mercado-pago',
+        status: 'pending',
+        amountCents: order.priceCents,
+        checkoutUrl: preference.initPoint,
+      });
     });
     await recordEvent('checkout_started', order);
     return { checkoutUrl: preference.initPoint };

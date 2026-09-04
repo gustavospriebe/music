@@ -139,6 +139,7 @@ T8
 
 ### T4: Claim lyrics once and append approval history
 
+**Status**: Complete  
 **What**: Give lyric generation one atomic, expiring claim and make edits/approval append versions without mutating historical rows.  
 **Where**: `lyrics lifecycle slice`  
 **Depends on**: T3  
@@ -152,11 +153,11 @@ T8
 
 **Done when**:
 
-- [ ] Concurrent generation executes one provider call and the loser receives 409.
-- [ ] A fresh `lyrics_generating` claim cannot restart; one older than five minutes can be reclaimed once.
-- [ ] Provider errors are sanitized/capped and the order reaches the explicit retryable failure state through `assertTransition`.
-- [ ] Save appends the next version and approval always appends an approved copy of the exact visible content.
-- [ ] Integration assertions compare every old/new version, number, kind and approval marker.
+- [x] Concurrent generation executes one provider call and the loser receives 409.
+- [x] A fresh `lyrics_generating` claim cannot restart; one older than five minutes can be reclaimed once.
+- [x] Provider errors are sanitized/capped and the order reaches the explicit retryable failure state through `assertTransition`.
+- [x] Save appends the next version and approval always appends an approved copy of the exact visible content.
+- [x] Integration assertions compare every old/new version, number, kind and approval marker.
 
 **Tests**: Fastify/PostgreSQL integration for concurrency, stale claim, provider failure, edited and unchanged approval, ordering and immutability  
 **Gate**: Build
