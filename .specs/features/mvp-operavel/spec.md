@@ -200,7 +200,7 @@ A aplicação possui as peças do fluxo de música personalizada, mas ainda acei
 
 | Requirement ID | Story | Phase | Status |
 | --- | --- | --- | --- |
-| FLOW-01 | Criar história | T1, T2, T5 | Pending |
+| FLOW-01 | Criar história | T1, T2, T5 | In Progress (T1 done) |
 | FLOW-02 | Criar história | T5 | Pending |
 | FLOW-03 | Criar história | T5 | Pending |
 | FLOW-04 | Criar história | T5 | Pending |
@@ -215,7 +215,7 @@ A aplicação possui as peças do fluxo de música personalizada, mas ainda acei
 | LYRIC-02 | Revisar letra | T4 | Pending |
 | LYRIC-03 | Revisar letra | T6 | Pending |
 | LYRIC-04 | Revisar letra | T6 | Pending |
-| PAY-01 | Pagamento | T1, T5 | Pending |
+| PAY-01 | Pagamento | T1, T5 | In Progress (T1 done) |
 | PAY-02 | Pagamento | T3 | Pending |
 | PAY-03 | Pagamento | T3, T5 | Pending |
 | PAY-04 | Pagamento | T3 | Pending |
@@ -224,8 +224,8 @@ A aplicação possui as peças do fluxo de música personalizada, mas ainda acei
 | ASYNC-02 | Produção e entrega | T6 | Pending |
 | ASYNC-03 | Produção e entrega | T6 | Pending |
 | ASYNC-04 | Produção e entrega | T6 | Pending |
-| ASYNC-05 | Produção e entrega | T1, T6 | Pending |
-| ASYNC-06 | Produção e entrega | T1, T6 | Pending |
+| ASYNC-05 | Produção e entrega | T1, T6 | In Progress (T1 done) |
+| ASYNC-06 | Produção e entrega | T1, T6 | In Progress (T1 done) |
 | ASYNC-07 | Produção e entrega | T6 | Pending |
 | A11Y-01 | Navegação acessível | T7 | Pending |
 | A11Y-02 | Navegação acessível | T7 | Pending |
@@ -234,9 +234,9 @@ A aplicação possui as peças do fluxo de música personalizada, mas ainda acei
 | A11Y-05 | Navegação acessível | T7 | Pending |
 | A11Y-06 | Navegação acessível | T7 | Pending |
 | A11Y-07 | Navegação acessível | T7 | Pending |
-| SAFE-01 | Borda pública | T1, T3 | Pending |
-| SAFE-02 | Borda pública | T1, T3 | Pending |
-| SAFE-03 | Borda pública | T1, T2, T3 | Pending |
+| SAFE-01 | Borda pública | T1, T3 | In Progress (T1 done) |
+| SAFE-02 | Borda pública | T1, T3 | In Progress (T1 done) |
+| SAFE-03 | Borda pública | T1, T2, T3 | In Progress (T1 done) |
 | SAFE-04 | Borda pública | T8 | Pending |
 | SAFE-05 | Borda pública | T4 | Pending |
 | SAFE-06 | Borda pública | T8 | Pending |

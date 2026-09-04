@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
@@ -129,7 +130,7 @@ const createOrderAndStory = async (app: FastifyInstance): Promise<Session> => {
   const created = await app.inject({
     method: 'POST',
     url: '/api/v1/orders',
-    payload: { productType: 'friend_roast' },
+    payload: { productType: 'friend_roast', creationKey: randomUUID() },
   });
   const body = created.json() as { publicId: string };
   const cookie = String(created.headers['set-cookie']).split(';')[0] ?? '';
@@ -421,7 +422,7 @@ describe('fluxo completo de pedido', () => {
     const created = await app.inject({
       method: 'POST',
       url: '/api/v1/orders',
-      payload: { productType: 'friend_roast' },
+      payload: { productType: 'friend_roast', creationKey: randomUUID() },
     });
     const publicId = (created.json() as { publicId: string }).publicId;
     const freshCookie = String(created.headers['set-cookie']).split(';')[0] ?? '';
@@ -469,7 +470,7 @@ describe('fluxo completo de pedido', () => {
     const created = await app.inject({
       method: 'POST',
       url: '/api/v1/orders',
-      payload: { productType: 'friend_roast' },
+      payload: { productType: 'friend_roast', creationKey: randomUUID() },
     });
     expect(created.statusCode).toBe(201);
     const createdBody = created.json() as Record<string, unknown>;
@@ -597,7 +598,7 @@ describe('fluxo completo de pedido', () => {
     const created = await app.inject({
       method: 'POST',
       url: '/api/v1/orders',
-      payload: { productType: 'friend_roast' },
+      payload: { productType: 'friend_roast', creationKey: randomUUID() },
     });
     expect(created.statusCode).toBe(201);
     const session = await createOrderAndStory(app);

@@ -38,7 +38,10 @@ describe('HTTP foundation', () => {
       const response = await app.inject({
         method: 'POST',
         url: '/api/v1/orders',
-        payload: { productType: 'not-a-product' },
+        payload: {
+          productType: 'not-a-product',
+          creationKey: '51cc3b09-2902-42cf-9071-70f078d36cd7',
+        },
       });
       expect(response.statusCode).toBe(400);
       expect(response.json()).toMatchObject({

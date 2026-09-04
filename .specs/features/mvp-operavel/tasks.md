@@ -66,6 +66,7 @@ T8
 
 ### T1: Close the public contract surface
 
+**Status**: Complete  
 **What**: Define exact creation, catalog, checkout and order-status contracts so internal identifiers and unknown states cannot pass as valid public data.  
 **Where**: `public contract consumers`  
 **Depends on**: None  
@@ -79,10 +80,10 @@ T8
 
 **Done when**:
 
-- [ ] Creation requires a UUID attempt key while preserving the existing product vocabulary.
-- [ ] Product and checkout response schemas enumerate only the allowed public keys.
-- [ ] Order status is a closed union and malformed or absent values fail parsing.
-- [ ] Unit tests assert exact parsed keys and rejection of leaked/unknown fields or states.
+- [x] Creation requires a UUID attempt key while preserving the existing product vocabulary.
+- [x] Product and checkout response schemas enumerate only the allowed public keys.
+- [x] Order status is a closed union and malformed or absent values fail parsing.
+- [x] Unit tests assert exact parsed keys and rejection of leaked/unknown fields or states.
 
 **Tests**: unit, co-located in the contracts package and mapped to every listed criterion  
 **Gate**: Quick

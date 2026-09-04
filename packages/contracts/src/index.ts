@@ -118,9 +118,36 @@ export const publicIdSchema = z.string().regex(/^[A-Za-z0-9_-]{8,32}$/);
 export const uuidSchema = z.string().uuid();
 export const createOrderSchema = z.object({
   productType: productTypeSchema,
+  /** Random UUID scoped to one submission attempt; persisted only as a hash. */
+  creationKey: uuidSchema,
   /** Random per-browser UUID (no PII); links pre-order beacons to the order. */
   visitorId: uuidSchema.optional(),
 });
+export const createOrderResponseSchema = z.object({ publicId: publicIdSchema }).strict();
+export const publicProductSchema = z
+  .object({
+    type: productTypeSchema,
+    name: conciseText(1, 120),
+    priceCents: z.number().int().nonnegative(),
+    active: z.boolean(),
+  })
+  .strict();
+export type PublicProduct = z.infer<typeof publicProductSchema>;
+export const publicOrderSchema = z
+  .object({
+    publicId: publicIdSchema,
+    productType: productTypeSchema,
+    status: orderStatusSchema,
+    priceCents: z.number().int().nonnegative(),
+    createdAt: z.string().datetime(),
+  })
+  .strict();
+export const checkoutResponseSchema = z
+  .object({
+    checkoutUrl: z.string().trim().min(1),
+    dev: z.literal(true).optional(),
+  })
+  .strict();
 export const beaconEventSchema = z.object({
   event: z.enum(['landing_view', 'form_started', 'form_completed']),
   visitorId: uuidSchema,
