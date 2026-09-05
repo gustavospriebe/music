@@ -8,6 +8,19 @@ const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 export default defineConfig({
   envDir: repoRoot,
   plugins: [react(), tailwindcss()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined;
+          if (/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//.test(id))
+            return 'react-vendor';
+          if (id.includes('node_modules/@tanstack/')) return 'query-vendor';
+          return undefined;
+        },
+      },
+    },
+  },
   server: {
     port: 5175,
     host: true,

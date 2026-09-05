@@ -4,20 +4,18 @@ import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { Loading, RouteFocus } from './components';
-import {
-  Checkout,
-  CreateStory,
-  Delivery,
-  Landing,
-  Legal,
-  LyricsReview,
-  MyOrders,
-  NotFound,
-  OrderPlayer,
-  OrderStatus,
-} from './pages/public';
+import { Landing } from './pages/landing';
 import './styles.css';
 
+const Checkout = lazy(async () => ({ default: (await import('./pages/public')).Checkout }));
+const CreateStory = lazy(async () => ({ default: (await import('./pages/public')).CreateStory }));
+const Delivery = lazy(async () => ({ default: (await import('./pages/public')).Delivery }));
+const Legal = lazy(async () => ({ default: (await import('./pages/public')).Legal }));
+const LyricsReview = lazy(async () => ({ default: (await import('./pages/public')).LyricsReview }));
+const MyOrders = lazy(async () => ({ default: (await import('./pages/public')).MyOrders }));
+const NotFound = lazy(async () => ({ default: (await import('./pages/public')).NotFound }));
+const OrderPlayer = lazy(async () => ({ default: (await import('./pages/public')).OrderPlayer }));
+const OrderStatus = lazy(async () => ({ default: (await import('./pages/public')).OrderStatus }));
 const AdminLogin = lazy(async () => ({ default: (await import('./admin/routes')).AdminLogin }));
 const AdminDashboard = lazy(async () => ({
   default: (await import('./admin/routes')).AdminDashboard,
@@ -32,61 +30,63 @@ const Admin = ({ children }: { children: React.ReactNode }) => (
 );
 function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Landing />} />
-      <Route path="/criar" element={<CreateStory />} />
-      <Route path="/criar/historia" element={<CreateStory />} />
-      <Route path="/criar/letra" element={<LyricsReview />} />
-      <Route path="/criar/checkout" element={<Checkout />} />
-      <Route path="/minhas-musicas" element={<MyOrders />} />
-      <Route path="/pedido/:publicOrderId" element={<OrderStatus />} />
-      <Route path="/pedido/:publicOrderId/entrega" element={<OrderPlayer />} />
-      <Route path="/entrega/:deliveryToken" element={<Delivery />} />
-      <Route path="/privacidade" element={<Legal kind="privacidade" />} />
-      <Route path="/termos" element={<Legal kind="termos" />} />
-      <Route
-        path="/admin/login"
-        element={
-          <Admin>
-            <AdminLogin />
-          </Admin>
-        }
-      />
-      <Route
-        path="/admin"
-        element={
-          <Admin>
-            <AdminDashboard />
-          </Admin>
-        }
-      />
-      <Route
-        path="/admin/pedidos"
-        element={
-          <Admin>
-            <AdminOrders />
-          </Admin>
-        }
-      />
-      <Route
-        path="/admin/pedidos/:orderId"
-        element={
-          <Admin>
-            <AdminOrderDetail />
-          </Admin>
-        }
-      />
-      <Route path="/resenha" element={<Navigate to="/" replace />} />
-      <Route path="/hino-da-pelada" element={<Navigate to="/" replace />} />
-      <Route path="/homenagem" element={<Navigate to="/" replace />} />
-      <Route path="/criar/:type" element={<Navigate to="/criar" replace />} />
-      <Route path="/pedido/:publicId/letra" element={<Navigate to="/criar/letra" replace />} />
-      <Route
-        path="/pedido/:publicId/checkout"
-        element={<Navigate to="/criar/checkout" replace />}
-      />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+    <Suspense fallback={<Loading label="Abrindo página…" />}>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/criar" element={<CreateStory />} />
+        <Route path="/criar/historia" element={<CreateStory />} />
+        <Route path="/criar/letra" element={<LyricsReview />} />
+        <Route path="/criar/checkout" element={<Checkout />} />
+        <Route path="/minhas-musicas" element={<MyOrders />} />
+        <Route path="/pedido/:publicOrderId" element={<OrderStatus />} />
+        <Route path="/pedido/:publicOrderId/entrega" element={<OrderPlayer />} />
+        <Route path="/entrega/:deliveryToken" element={<Delivery />} />
+        <Route path="/privacidade" element={<Legal kind="privacidade" />} />
+        <Route path="/termos" element={<Legal kind="termos" />} />
+        <Route
+          path="/admin/login"
+          element={
+            <Admin>
+              <AdminLogin />
+            </Admin>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <Admin>
+              <AdminDashboard />
+            </Admin>
+          }
+        />
+        <Route
+          path="/admin/pedidos"
+          element={
+            <Admin>
+              <AdminOrders />
+            </Admin>
+          }
+        />
+        <Route
+          path="/admin/pedidos/:orderId"
+          element={
+            <Admin>
+              <AdminOrderDetail />
+            </Admin>
+          }
+        />
+        <Route path="/resenha" element={<Navigate to="/" replace />} />
+        <Route path="/hino-da-pelada" element={<Navigate to="/" replace />} />
+        <Route path="/homenagem" element={<Navigate to="/" replace />} />
+        <Route path="/criar/:type" element={<Navigate to="/criar" replace />} />
+        <Route path="/pedido/:publicId/letra" element={<Navigate to="/criar/letra" replace />} />
+        <Route
+          path="/pedido/:publicId/checkout"
+          element={<Navigate to="/criar/checkout" replace />}
+        />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Suspense>
   );
 }
 createRoot(document.getElementById('root')!).render(

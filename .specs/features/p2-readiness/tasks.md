@@ -11,25 +11,25 @@ Implement these tasks with the `tlc-spec-driven` skill: **activate it by name an
 
 > Generated from `AGENTS.md`, `README.md`, `.github/workflows/ci.yml`, `package.json`, the feature spec and existing Vitest/Fastify/Playwright samples.
 
-| Code Layer | Required Test Type | Coverage Expectation | Location Pattern | Run Command |
-| --- | --- | --- | --- | --- |
-| Contracts and image validation | unit | Every accepted/rejected shape, size, status and exact public DTO | `packages/contracts/src/*.test.ts`, `apps/api/src/*.test.ts` | `corepack pnpm test` |
-| PostgreSQL persistence | integration | Attempt limit, concurrency, job idempotency, history and cleanup on real PostgreSQL | `apps/{api,worker}/src/*flow.test.ts` | `corepack pnpm test` |
-| Fastify routes and config | integration | Happy, authorization, state, validation, exact DTO/download and production fail-fast paths | `apps/api/src/*.test.ts` | `corepack pnpm test` |
-| Worker/provider | unit + integration | Exact official request/response, retry, terminal failure, storage and ledger branches | `apps/worker/src/*.test.ts` | `corepack pnpm test` |
-| React public journey | RTL + Playwright | Loading/error/success, upload/consent, owner/view-only, one regeneration and accessible feedback | `apps/web/src/*.test.tsx`, `apps/web/e2e/*.spec.ts` | `corepack pnpm test && corepack pnpm test:e2e` |
-| Build/performance | deterministic build | Entry below 500.000 bytes and operational routes as dynamic chunks | `apps/web/dist`, feature validator | `corepack pnpm build` |
-| Operations/legal docs | config + document validation | Commands/links/status labels present; no external validation claim | `.specs/features/p2-readiness/validate.py`, config tests | `python3 .specs/features/p2-readiness/validate.py` |
+| Code Layer                     | Required Test Type           | Coverage Expectation                                                                             | Location Pattern                                             | Run Command                                        |
+| ------------------------------ | ---------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ | -------------------------------------------------- |
+| Contracts and image validation | unit                         | Every accepted/rejected shape, size, status and exact public DTO                                 | `packages/contracts/src/*.test.ts`, `apps/api/src/*.test.ts` | `corepack pnpm test`                               |
+| PostgreSQL persistence         | integration                  | Attempt limit, concurrency, job idempotency, history and cleanup on real PostgreSQL              | `apps/{api,worker}/src/*flow.test.ts`                        | `corepack pnpm test`                               |
+| Fastify routes and config      | integration                  | Happy, authorization, state, validation, exact DTO/download and production fail-fast paths       | `apps/api/src/*.test.ts`                                     | `corepack pnpm test`                               |
+| Worker/provider                | unit + integration           | Exact official request/response, retry, terminal failure, storage and ledger branches            | `apps/worker/src/*.test.ts`                                  | `corepack pnpm test`                               |
+| React public journey           | RTL + Playwright             | Loading/error/success, upload/consent, owner/view-only, one regeneration and accessible feedback | `apps/web/src/*.test.tsx`, `apps/web/e2e/*.spec.ts`          | `corepack pnpm test && corepack pnpm test:e2e`     |
+| Build/performance              | deterministic build          | Entry below 500.000 bytes and operational routes as dynamic chunks                               | `apps/web/dist`, feature validator                           | `corepack pnpm build`                              |
+| Operations/legal docs          | config + document validation | Commands/links/status labels present; no external validation claim                               | `.specs/features/p2-readiness/validate.py`, config tests     | `python3 .specs/features/p2-readiness/validate.py` |
 
 ## Gate Check Commands
 
 > Generated from the repository. Use the Corepack shim when global Corepack cannot download in the sandbox.
 
-| Gate Level | When to Use | Command |
-| --- | --- | --- |
-| Quick | Unit-only task | `corepack pnpm test` |
-| Full | API, PostgreSQL, worker or UI integration | `corepack pnpm test && corepack pnpm test:e2e` |
-| Build | Phase boundary/final | `corepack pnpm check && corepack pnpm test:e2e` |
+| Gate Level | When to Use                               | Command                                         |
+| ---------- | ----------------------------------------- | ----------------------------------------------- |
+| Quick      | Unit-only task                            | `corepack pnpm test`                            |
+| Full       | API, PostgreSQL, worker or UI integration | `corepack pnpm test && corepack pnpm test:e2e`  |
+| Build      | Phase boundary/final                      | `corepack pnpm check && corepack pnpm test:e2e` |
 
 ## Execution Plan
 
@@ -64,7 +64,7 @@ T6 → T7
 
 ### T1: Freeze the P2 contract and validators
 
-**Status**: Complete  
+**Status**: Complete
 **What**: Record product, privacy, performance, maintenance and external-validation boundaries with deterministic structural validation.  
 **Where**: `P2 specification slice`  
 **Depends on**: None  
@@ -87,7 +87,7 @@ T6 → T7
 
 ### T2: Adopt the Fastify 6 logging API
 
-**Status**: Complete  
+**Status**: Complete
 **What**: Replace the deprecated top-level logging option while preserving one sanitized completion event.  
 **Where**: `Fastify bootstrap`  
 **Depends on**: T1  
@@ -110,7 +110,7 @@ T6 → T7
 
 ### T3: Split the public entry by route
 
-**Status**: Pending  
+**Status**: Complete  
 **What**: Keep the landing in the entry and load every operational public page through dynamic imports.  
 **Where**: `public web routing slice`  
 **Depends on**: T2  
@@ -124,9 +124,9 @@ T6 → T7
 
 **Done when**:
 
-- [ ] Build assertion fails above 500.000 bytes.
-- [ ] Landing no longer imports React Hook Form/Zod page code.
-- [ ] Operational routes are dynamic and retain accessible loading/focus behavior.
+- [x] Build assertion fails above 500.000 bytes.
+- [x] Landing no longer imports React Hook Form/Zod page code.
+- [x] Operational routes are dynamic and retain accessible loading/focus behavior.
 
 **Tests**: Build measurement plus focused Playwright routing  
 **Gate**: Build
@@ -254,24 +254,24 @@ T6 → T7
 ## Diagram-Definition Cross-Check
 
 | Diagram edge | Matching dependency | Result |
-| --- | --- | --- |
-| T1 → T2 | T2 depends on T1 | ✅ |
-| T2 → T3 | T3 depends on T2 | ✅ |
-| T3 → T4 | T4 depends on T3 | ✅ |
-| T4 → T5 | T5 depends on T4 | ✅ |
-| T5 → T6 | T6 depends on T5 | ✅ |
-| T6 → T7 | T7 depends on T6 | ✅ |
-| T7 → T8 | T8 depends on T7 | ✅ |
+| ------------ | ------------------- | ------ |
+| T1 → T2      | T2 depends on T1    | ✅     |
+| T2 → T3      | T3 depends on T2    | ✅     |
+| T3 → T4      | T4 depends on T3    | ✅     |
+| T4 → T5      | T5 depends on T4    | ✅     |
+| T5 → T6      | T6 depends on T5    | ✅     |
+| T6 → T7      | T7 depends on T6    | ✅     |
+| T7 → T8      | T8 depends on T7    | ✅     |
 
 ## Test Co-location Validation
 
-| Task | Layer | Tests included with task | Gate | Result |
-| --- | --- | --- | --- | --- |
-| T1 | Specification | Structural validators | Quick | ✅ |
-| T2 | Fastify bootstrap | Logging unit/integration assertions | Quick | ✅ |
-| T3 | Web routing/build | Build measurement + focused Playwright | Build | ✅ |
-| T4 | Contracts/database/API | Unit + PostgreSQL/Fastify routes | Full | ✅ |
-| T5 | Worker/provider | Unit + PostgreSQL processing | Full | ✅ |
-| T6 | React journey | RTL + Playwright state/access matrix | Full | ✅ |
-| T7 | Provider/config/docs | Unit + deterministic docs checks | Build | ✅ |
-| T8 | Whole system | Full gates + independent discrimination | Build | ✅ |
+| Task | Layer                  | Tests included with task                | Gate  | Result |
+| ---- | ---------------------- | --------------------------------------- | ----- | ------ |
+| T1   | Specification          | Structural validators                   | Quick | ✅     |
+| T2   | Fastify bootstrap      | Logging unit/integration assertions     | Quick | ✅     |
+| T3   | Web routing/build      | Build measurement + focused Playwright  | Build | ✅     |
+| T4   | Contracts/database/API | Unit + PostgreSQL/Fastify routes        | Full  | ✅     |
+| T5   | Worker/provider        | Unit + PostgreSQL processing            | Full  | ✅     |
+| T6   | React journey          | RTL + Playwright state/access matrix    | Full  | ✅     |
+| T7   | Provider/config/docs   | Unit + deterministic docs checks        | Build | ✅     |
+| T8   | Whole system           | Full gates + independent discrimination | Build | ✅     |
