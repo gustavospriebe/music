@@ -229,7 +229,7 @@ T6 → T7
 
 ### T8: Run complete and independent validation
 
-**Status**: Pending  
+**Status**: Complete
 **What**: Prove all local behavior, migrations, performance and regression resistance, then record honest external blockers.  
 **Where**: `P2 validation evidence`  
 **Depends on**: T7  
@@ -243,10 +243,10 @@ T6 → T7
 
 **Done when**:
 
-- [ ] Format, lint, typecheck, tests, build, migrations and E2E pass.
-- [ ] Bundle sizes, test counts and Doctor output are recorded.
-- [ ] Independent verifier maps all 19 requirements and scratch mutation fails the relevant test.
-- [ ] Validation labels external prerequisites separately from local PASS.
+- [x] Format, lint, typecheck, tests, build, migrations and E2E pass.
+- [x] Bundle sizes, test counts and Doctor output are recorded in `verification.md`.
+- [x] Independent verifier maps all 19 requirements and scratch mutation fails the relevant test.
+- [x] Validation labels external prerequisites separately from local PASS.
 
 **Tests**: Complete gate and independent evidence review  
 **Gate**: Build

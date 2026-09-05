@@ -6,11 +6,11 @@ O MVP funciona, mas ainda entrega JavaScript público pesado, não oferece uma c
 
 ## Goals
 
-- [ ] Manter o chunk de entrada abaixo de 500.000 bytes com rotas operacionais lazy.
-- [ ] Oferecer uma capa quadrada opcional após pagamento, com uma geração e uma regeneração.
-- [ ] Tratar foto de referência como arquivo privado, consentido, sanitizado e transitório.
-- [ ] Deixar providers, storage e restore prontos para ativação, sem alegar homologação externa.
-- [ ] Remover a depreciação do Fastify 6 e os avisos React sob controle desta mudança.
+- [x] Manter o chunk de entrada abaixo de 500.000 bytes com rotas operacionais lazy.
+- [x] Oferecer uma capa quadrada opcional após pagamento, com uma geração e uma regeneração.
+- [x] Tratar foto de referência como arquivo privado, consentido, sanitizado e transitório.
+- [x] Deixar providers, storage e restore prontos para ativação, sem alegar homologação externa.
+- [x] Remover a depreciação do Fastify 6 e os avisos React sob controle desta mudança.
 
 ## Out of Scope
 
@@ -142,32 +142,32 @@ O MVP funciona, mas ainda entrega JavaScript público pesado, não oferece uma c
 
 | Requirement ID | Story        | Phase  | Status   |
 | -------------- | ------------ | ------ | -------- |
-| COVER-01       | Capa privada | T4     | In Tasks |
-| COVER-02       | Capa privada | T4     | In Tasks |
-| COVER-03       | Capa privada | T4     | In Tasks |
-| COVER-04       | Capa privada | T5     | In Tasks |
-| COVER-05       | Capa privada | T4     | In Tasks |
-| COVER-06       | Capa privada | T5     | In Tasks |
-| COVER-07       | Capa privada | T4, T5 | In Tasks |
-| COVER-08       | Capa privada | T5     | In Tasks |
-| COVER-09       | Capa privada | T4     | In Tasks |
-| COVER-10       | Capa privada | T6     | In Tasks |
-| PERF-01        | Performance  | T3     | In Tasks |
-| PERF-02        | Performance  | T3     | In Tasks |
-| MAINT-01       | Manutenção   | T2     | In Tasks |
-| MAINT-02       | Manutenção   | T6     | In Tasks |
-| OPS-01         | Operação     | T7     | In Tasks |
-| OPS-02         | Operação     | T7     | In Tasks |
-| OPS-03         | Operação     | T7     | In Tasks |
-| TEST-01        | Validação    | T8     | In Tasks |
-| TEST-02        | Validação    | T8     | In Tasks |
+| COVER-01       | Capa privada | T4     | Verified |
+| COVER-02       | Capa privada | T4     | Verified |
+| COVER-03       | Capa privada | T4     | Verified |
+| COVER-04       | Capa privada | T5     | Verified |
+| COVER-05       | Capa privada | T4     | Verified |
+| COVER-06       | Capa privada | T5     | Verified |
+| COVER-07       | Capa privada | T4, T5 | Verified |
+| COVER-08       | Capa privada | T5     | Verified |
+| COVER-09       | Capa privada | T4     | Verified |
+| COVER-10       | Capa privada | T6     | Verified |
+| PERF-01        | Performance  | T3     | Verified |
+| PERF-02        | Performance  | T3     | Verified |
+| MAINT-01       | Manutenção   | T2     | Verified |
+| MAINT-02       | Manutenção   | T6     | Verified |
+| OPS-01         | Operação     | T7     | Verified |
+| OPS-02         | Operação     | T7     | Verified |
+| OPS-03         | Operação     | T7     | Verified |
+| TEST-01        | Validação    | T8     | Verified |
+| TEST-02        | Validação    | T8     | Verified |
 
 **Coverage:** 19 total, 19 mapped to tasks, 0 unmapped.
 
 ## Success Criteria
 
-- [ ] Entry web menor que 500.000 bytes e rotas operacionais dinâmicas.
-- [ ] Duas tentativas máximas de capa, sem chamada real nos testes.
-- [ ] Referências e capas acessíveis apenas por capability e referências removidas no prazo.
-- [ ] Fastify sem opção depreciada e Doctor sem avisos nos arquivos públicos alterados.
-- [ ] Gates locais e verifier passam; dependências externas permanecem nomeadas como bloqueios.
+- [x] Entry web menor que 500.000 bytes e rotas operacionais dinâmicas.
+- [x] Duas tentativas máximas de capa, sem chamada real nos testes.
+- [x] Referências e capas acessíveis apenas por capability e referências removidas no prazo.
+- [x] Fastify sem opção depreciada e Doctor sem avisos nos arquivos públicos alterados.
+- [x] Gates locais e verifier passam; dependências externas permanecem nomeadas como bloqueios.

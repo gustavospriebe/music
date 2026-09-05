@@ -39,3 +39,7 @@
 - **Status**: active
 
 ## Handoff
+
+- P2 readiness is locally complete at `960b195`: 19/19 requirements independently verified, 118 Vitest and 30 Playwright tests passing, migrations replayed and API/worker images built locally.
+- The activation checklist remains `EXTERNAL BLOCKED` for Mercado Pago, Resend, managed S3, paid cover calls and legal approval. No deploy or publication was performed.
+- Validation evidence lives in `.specs/features/p2-readiness/verification.md`.
