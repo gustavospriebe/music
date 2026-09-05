@@ -161,6 +161,23 @@ export const checkoutSchema = z.object({
 });
 export const accessExchangeSchema = z.object({ token: z.string().min(32).max(256) });
 export const deliveryAccessSchema = z.object({}).strict();
+export const coverStatusSchema = z.enum(['pending', 'processing', 'completed', 'failed']);
+export type CoverStatus = z.infer<typeof coverStatusSchema>;
+export const createAlbumCoverSchema = z.object({}).strict();
+export const publicAlbumCoverSchema = z
+  .object({
+    status: coverStatusSchema,
+    attempt: z.number().int().min(1).max(2),
+    canRegenerate: z.boolean(),
+    hasReference: z.boolean(),
+    createdAt: z.string().datetime(),
+    downloadUrl: z.string().startsWith('/api/v1/').optional(),
+  })
+  .strict();
+export type PublicAlbumCover = z.infer<typeof publicAlbumCoverSchema>;
+export const albumCoverResponseSchema = z
+  .object({ available: z.boolean(), cover: publicAlbumCoverSchema.nullable() })
+  .strict();
 export const paginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),

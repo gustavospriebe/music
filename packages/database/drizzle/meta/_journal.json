@@ -36,6 +36,20 @@
       "when": 1788559200000,
       "tag": "0004_mvp_operavel",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788567000000,
+      "tag": "0005_album_covers",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788567300000,
+      "tag": "0006_album_cover_reference_flag",
+      "breakpoints": true
     }
   ]
 }

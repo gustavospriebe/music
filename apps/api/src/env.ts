@@ -18,6 +18,8 @@ const envSchema = z.object({
   OPENROUTER_API_KEY: z.string().optional(),
   OPENROUTER_TEXT_MODEL: z.string().optional(),
   OPENROUTER_MUSIC_MODEL: z.string().optional(),
+  OPENROUTER_COVER_TEXT_MODEL: z.string().optional(),
+  OPENROUTER_COVER_REFERENCE_MODEL: z.string().optional(),
   MERCADO_PAGO_ACCESS_TOKEN: z.string().optional(),
   MERCADO_PAGO_WEBHOOK_SECRET: z.string().optional(),
   MERCADO_PAGO_WEBHOOK_URL: z.string().optional(),
@@ -35,6 +37,8 @@ export const parseEnv = (source: NodeJS.ProcessEnv = process.env): Env => {
       throw new Error('OpenRouter production configuration is required');
     if (!env.MERCADO_PAGO_ACCESS_TOKEN || !env.MERCADO_PAGO_WEBHOOK_SECRET)
       throw new Error('Mercado Pago production configuration is required');
+    if (!env.OPENROUTER_COVER_TEXT_MODEL || !env.OPENROUTER_COVER_REFERENCE_MODEL)
+      throw new Error('OpenRouter cover production configuration is required');
   }
   return env;
 };

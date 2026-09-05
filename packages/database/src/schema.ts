@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -148,6 +149,36 @@ export const audioGenerations = pgTable(
     ...dates,
   },
   (t) => [uniqueIndex('audio_order_variant').on(t.orderId, t.variant)],
+);
+export const albumCovers = pgTable(
+  'album_covers',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    orderId: uuid('order_id')
+      .references(() => orders.id, { onDelete: 'cascade' })
+      .notNull(),
+    attempt: integer('attempt').notNull(),
+    status: varchar('status', { length: 30 }).default('pending').notNull(),
+    referenceAssetId: uuid('reference_asset_id').references(() => storedFiles.id, {
+      onDelete: 'set null',
+    }),
+    hadReference: boolean('had_reference').default(false).notNull(),
+    coverAssetId: uuid('cover_asset_id').references(() => storedFiles.id, {
+      onDelete: 'set null',
+    }),
+    provider: varchar('provider', { length: 30 }).notNull().default('openrouter'),
+    model: varchar('model', { length: 120 }).notNull(),
+    lastError: text('last_error'),
+    ...dates,
+  },
+  (t) => [
+    uniqueIndex('album_covers_order_attempt').on(t.orderId, t.attempt),
+    check('album_covers_attempt_range', sql`${t.attempt} between 1 and 2`),
+    check(
+      'album_covers_status_valid',
+      sql`${t.status} in ('pending','processing','completed','failed')`,
+    ),
+  ],
 );
 /** Append-only AI cost ledger: one row per provider call (lyrics + each audio variant). */
 export const aiUsage = pgTable(

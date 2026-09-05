@@ -133,7 +133,7 @@ T6 → T7
 
 ### T4: Persist covers and expose the safe public API
 
-**Status**: Pending  
+**Status**: Complete
 **What**: Add the historical cover aggregate, validated transient reference upload, attempt creation and capability-only DTO/download routes.  
 **Where**: `album-cover API slice`  
 **Depends on**: T3  
@@ -147,10 +147,10 @@ T6 → T7
 
 **Done when**:
 
-- [ ] Migration/schema guarantee unique attempts one and two.
-- [ ] Validation rejects bad state/access/file/consent before persistence.
-- [ ] Concurrent requests create one attempt/job and public responses expose no internal data.
-- [ ] Reference bytes are normalized without EXIF in private storage.
+- [x] Migration/schema guarantee unique attempts one and two.
+- [x] Validation rejects bad state/access/file/consent before persistence.
+- [x] Concurrent requests create one attempt/job and public responses expose no internal data.
+- [x] Reference bytes are normalized without EXIF in private storage.
 
 **Tests**: Contracts + Fastify/PostgreSQL integration, all route edges  
 **Gate**: Full

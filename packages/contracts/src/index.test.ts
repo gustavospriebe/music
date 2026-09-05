@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  albumCoverResponseSchema,
   checkoutResponseSchema,
   createOrderResponseSchema,
   createOrderSchema,
@@ -135,6 +136,35 @@ describe('public order contracts', () => {
       checkoutResponseSchema.safeParse({
         paymentId: 'ae52d924-4dd6-4b8e-bd05-20da31a98f02',
         checkoutUrl: '/pedido/order-demo-123',
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('album cover contract', () => {
+  it('accepts only the public cover fields and two product attempts', () => {
+    const response = {
+      available: true,
+      cover: {
+        status: 'completed',
+        attempt: 1,
+        canRegenerate: true,
+        hasReference: false,
+        createdAt: '2026-09-04T12:00:00.000Z',
+        downloadUrl: '/api/v1/orders/order-demo-123/cover/download',
+      },
+    };
+    expect(albumCoverResponseSchema.parse(response)).toEqual(response);
+    expect(
+      albumCoverResponseSchema.safeParse({
+        ...response,
+        cover: { ...response.cover, id: 'ae52d924-4dd6-4b8e-bd05-20da31a98f02' },
+      }).success,
+    ).toBe(false);
+    expect(
+      albumCoverResponseSchema.safeParse({
+        ...response,
+        cover: { ...response.cover, attempt: 3 },
       }).success,
     ).toBe(false);
   });

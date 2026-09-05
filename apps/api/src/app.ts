@@ -3,6 +3,7 @@ import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
+import multipart from '@fastify/multipart';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import type { FastifyReply, FastifyRequest } from 'fastify';
@@ -12,6 +13,7 @@ import { ZodError } from 'zod';
 import {
   adminOrdersQuerySchema,
   approveLyricsSchema,
+  createAlbumCoverSchema,
   beaconEventSchema,
   createOrderSchema,
   deliveryAccessSchema,
@@ -21,6 +23,7 @@ import {
 } from '@resenha/contracts';
 import {
   adminNotes,
+  albumCovers,
   adminSessions,
   adminUsers,
   aiUsage,
@@ -54,6 +57,8 @@ import {
   createLocalStorage,
   createLyricsProvider,
   createMercadoPagoProvider,
+  MAX_REFERENCE_IMAGE_BYTES,
+  normalizeReferenceImage,
   verifyMercadoPagoSignature,
   type LyricsProvider,
   type LyricsResult,
@@ -170,6 +175,9 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
     referrerPolicy: { policy: 'same-origin' },
   });
   await app.register(rateLimit, { max: 120, timeWindow: '1 minute' });
+  await app.register(multipart, {
+    limits: { files: 1, fileSize: MAX_REFERENCE_IMAGE_BYTES, fields: 2 },
+  });
   void app.register(swagger, {
     openapi: {
       info: { title: 'Música da Resenha API', version: '1.0.0' },
@@ -268,6 +276,45 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
    */
   const hasViewAccess = (publicId: string, request: FastifyRequest) =>
     hasAccess(publicId, request) || hasSignedAccess('order_view', publicId, request);
+  const coverAvailable = Boolean(
+    env.OPENROUTER_API_KEY &&
+    env.OPENROUTER_COVER_TEXT_MODEL &&
+    env.OPENROUTER_COVER_REFERENCE_MODEL,
+  );
+  type CoverRow = {
+    status: string;
+    attempt: number;
+    referenceAssetId: string | null;
+    hadReference: boolean;
+    coverAssetId: string | null;
+    createdAt: Date;
+  };
+  const publicCover = (row: CoverRow, canMutate: boolean) => ({
+    status: row.status,
+    attempt: row.attempt,
+    canRegenerate: canMutate && row.status === 'completed' && row.attempt === 1,
+    hasReference: row.hadReference,
+    createdAt: row.createdAt.toISOString(),
+    ...(row.status === 'completed' && row.coverAssetId
+      ? { downloadUrl: '/api/v1/cover/download' }
+      : {}),
+  });
+  const latestCover = async (orderId: string): Promise<CoverRow | undefined> => {
+    const [cover] = await db
+      .select({
+        status: albumCovers.status,
+        attempt: albumCovers.attempt,
+        referenceAssetId: albumCovers.referenceAssetId,
+        hadReference: albumCovers.hadReference,
+        coverAssetId: albumCovers.coverAssetId,
+        createdAt: albumCovers.createdAt,
+      })
+      .from(albumCovers)
+      .where(eq(albumCovers.orderId, orderId))
+      .orderBy(desc(albumCovers.attempt))
+      .limit(1);
+    return cover;
+  };
   const requireAdmin = async (request: { cookies: Record<string, string | undefined> }) => {
     const token = request.cookies.admin_session;
     if (!token) throw fail('Autenticação administrativa necessária', 401);
@@ -853,6 +900,142 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
       privateAccess: full,
     };
   });
+  app.get('/api/v1/orders/:publicId/cover', async (request) => {
+    const publicId = (request.params as { publicId: string }).publicId;
+    if (!hasViewAccess(publicId, request)) throw fail('Acesso privado necessário', 401);
+    const order = await orderFor(publicId);
+    const cover = await latestCover(order.id);
+    return {
+      available: coverAvailable,
+      cover: cover
+        ? {
+            ...publicCover(cover, hasAccess(publicId, request)),
+            ...(cover.status === 'completed' && cover.coverAssetId
+              ? { downloadUrl: `/api/v1/orders/${publicId}/cover/download` }
+              : {}),
+          }
+        : null,
+    };
+  });
+  app.post(
+    '/api/v1/orders/:publicId/cover',
+    {
+      bodyLimit: MAX_REFERENCE_IMAGE_BYTES + 64 * 1024,
+      config: { rateLimit: { max: 8, timeWindow: '1 hour' } },
+    },
+    async (request, reply) => {
+      const publicId = (request.params as { publicId: string }).publicId;
+      if (!hasAccess(publicId, request)) throw fail('Acesso privado necessário', 401);
+      if (!coverAvailable) throw fail('Geração de capa indisponível neste ambiente.', 503);
+      const order = await orderFor(publicId);
+
+      let normalizedReference: Buffer | undefined;
+      if (request.isMultipart()) {
+        const upload = await request.file().catch(() => {
+          throw fail('Não foi possível ler a foto enviada.');
+        });
+        if (!upload || upload.fieldname !== 'reference')
+          throw fail('Envie uma foto de referência válida.');
+        const consent = (upload.fields.consent as { value?: unknown } | undefined)?.value;
+        if (consent !== 'true')
+          throw fail('Confirme que você pode usar as pessoas presentes na foto.');
+        const bytes = await upload.toBuffer();
+        if (upload.file.truncated) throw fail('A foto deve ter no máximo 8 MB.', 413);
+        normalizedReference = await normalizeReferenceImage(bytes, upload.mimetype).catch(
+          (error) => {
+            throw fail(error instanceof Error ? error.message : 'Foto inválida.');
+          },
+        );
+      } else {
+        createAlbumCoverSchema.parse(request.body ?? {});
+      }
+
+      const referenceKey = normalizedReference
+        ? `orders/${publicId}/references/${nanoid(24)}.jpg`
+        : undefined;
+      if (referenceKey && normalizedReference)
+        await storage.put(referenceKey, normalizedReference, 'image/jpeg');
+
+      const client = await pool.connect();
+      let committed = false;
+      try {
+        await client.query('begin');
+        await client.query('select id from orders where id=$1 for update', [order.id]);
+        const payment = await client.query(
+          "select 1 from payments where order_id=$1 and status='approved' limit 1",
+          [order.id],
+        );
+        if (!payment.rowCount)
+          throw fail('A capa fica disponível após a confirmação do pagamento.');
+        const previous = await client.query<CoverRow>(
+          `select status,attempt,reference_asset_id as "referenceAssetId",had_reference as "hadReference",cover_asset_id as "coverAssetId",created_at as "createdAt"
+           from album_covers where order_id=$1 order by attempt desc limit 1`,
+          [order.id],
+        );
+        const latest = previous.rows[0];
+        const attempt = latest ? 2 : 1;
+        if (latest && !(latest.attempt === 1 && latest.status === 'completed'))
+          throw fail(
+            latest.attempt >= 2
+              ? 'As duas capas incluídas neste pedido já foram usadas.'
+              : 'A primeira capa ainda está sendo criada.',
+            409,
+          );
+        let referenceAssetId: string | null = null;
+        if (referenceKey && normalizedReference) {
+          const asset = await client.query<{ id: string }>(
+            `insert into stored_files(order_id,storage_key,mime_type,size_bytes)
+             values($1,$2,'image/jpeg',$3) returning id`,
+            [order.id, referenceKey, normalizedReference.length],
+          );
+          referenceAssetId = asset.rows[0]?.id ?? null;
+        }
+        const model = referenceAssetId
+          ? env.OPENROUTER_COVER_REFERENCE_MODEL!
+          : env.OPENROUTER_COVER_TEXT_MODEL!;
+        const inserted = await client.query<CoverRow>(
+          `insert into album_covers(order_id,attempt,status,reference_asset_id,had_reference,model)
+           values($1,$2,'pending',$3,$4,$5)
+           returning status,attempt,reference_asset_id as "referenceAssetId",had_reference as "hadReference",cover_asset_id as "coverAssetId",created_at as "createdAt"`,
+          [order.id, attempt, referenceAssetId, Boolean(referenceAssetId), model],
+        );
+        await client.query(
+          `insert into generation_jobs(type,order_id,payload,idempotency_key,max_attempts)
+           values('generate_cover',$1,$2,$3,3) on conflict(idempotency_key) do nothing`,
+          [order.id, JSON.stringify({ attempt }), `cover:${order.id}:${attempt}`],
+        );
+        await client.query('commit');
+        committed = true;
+        return reply.status(202).send(publicCover(inserted.rows[0]!, true));
+      } catch (error) {
+        await client.query('rollback');
+        throw error;
+      } finally {
+        client.release();
+        if (!committed && referenceKey) await storage.delete(referenceKey).catch(() => undefined);
+      }
+    },
+  );
+  app.get('/api/v1/orders/:publicId/cover/download', async (request, reply) => {
+    const publicId = (request.params as { publicId: string }).publicId;
+    if (!hasViewAccess(publicId, request)) throw fail('Acesso privado necessário', 401);
+    const order = await orderFor(publicId);
+    const result = await pool.query<{ storage_key: string; mime_type: string }>(
+      `select f.storage_key,f.mime_type from album_covers c
+       join stored_files f on f.id=c.cover_asset_id
+       where c.order_id=$1 and c.status='completed'
+       order by c.attempt desc limit 1`,
+      [order.id],
+    );
+    const asset = result.rows[0];
+    if (!asset) throw fail('Capa ainda indisponível.', 404);
+    const extension =
+      asset.mime_type === 'image/png' ? 'png' : asset.mime_type === 'image/webp' ? 'webp' : 'jpg';
+    reply
+      .type(asset.mime_type)
+      .header('content-disposition', `attachment; filename="capa-${publicId}.${extension}"`);
+    return storage.get(asset.storage_key);
+  });
   app.get('/api/v1/orders/:publicId/assets/:variant/download', async (request, reply) => {
     const { publicId, variant } = request.params as { publicId: string; variant: string };
     if (!hasViewAccess(publicId, request)) throw fail('Acesso privado necessário', 401);
@@ -961,6 +1144,57 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
         `attachment; filename="musica-da-resenha${asset.storageKey.slice(asset.storageKey.lastIndexOf('.'))}"`,
       );
     return storage.get(asset.storageKey);
+  });
+  const deliveredOrderFor = async (token: string) => {
+    const [delivery] = await db
+      .select()
+      .from(deliveries)
+      .where(
+        and(
+          eq(deliveries.tokenHash, hashToken(token, env.CUSTOMER_ACCESS_TOKEN_PEPPER)),
+          sql`${deliveries.revokedAt} is null`,
+        ),
+      );
+    if (!delivery || (delivery.expiresAt && delivery.expiresAt <= new Date()))
+      throw fail('Link de entrega inválido ou expirado.', 404);
+    const [order] = await db.select().from(orders).where(eq(orders.id, delivery.orderId));
+    if (!order || order.status !== 'delivered') throw fail('Entrega indisponível.', 404);
+    return order;
+  };
+  app.get('/api/v1/deliveries/:token/cover', async (request) => {
+    const token = (request.params as { token: string }).token;
+    const order = await deliveredOrderFor(token);
+    const cover = await latestCover(order.id);
+    return {
+      available: coverAvailable,
+      cover: cover
+        ? {
+            ...publicCover(cover, false),
+            ...(cover.status === 'completed' && cover.coverAssetId
+              ? { downloadUrl: `/api/v1/deliveries/${token}/cover/download` }
+              : {}),
+          }
+        : null,
+    };
+  });
+  app.get('/api/v1/deliveries/:token/cover/download', async (request, reply) => {
+    const token = (request.params as { token: string }).token;
+    const order = await deliveredOrderFor(token);
+    const result = await pool.query<{ storage_key: string; mime_type: string }>(
+      `select f.storage_key,f.mime_type from album_covers c
+       join stored_files f on f.id=c.cover_asset_id
+       where c.order_id=$1 and c.status='completed'
+       order by c.attempt desc limit 1`,
+      [order.id],
+    );
+    const asset = result.rows[0];
+    if (!asset) throw fail('Capa ainda indisponível.', 404);
+    const extension =
+      asset.mime_type === 'image/png' ? 'png' : asset.mime_type === 'image/webp' ? 'webp' : 'jpg';
+    reply
+      .type(asset.mime_type)
+      .header('content-disposition', `attachment; filename="capa-musica-da-resenha.${extension}"`);
+    return storage.get(asset.storage_key);
   });
   app.post('/api/v1/orders/:publicId/revision-requests', async (request) => {
     const order = await orderFor((request.params as { publicId: string }).publicId);
