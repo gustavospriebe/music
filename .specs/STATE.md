@@ -20,4 +20,22 @@
 - **Date**: 2026-09-04
 - **Status**: active
 
+### AD-003
+
+- **Decision**: A capa de álbum é um agregado opcional pós-pagamento, com até duas tentativas históricas, sem participar de `orders.status`.
+- **Reason**: A música continua sendo o produto contratado; uma falha visual não pode bloquear áudio, entrega ou reembolso.
+- **Trade-off**: A UI combina dois estados assíncronos independentes e o suporte precisa observá-los separadamente.
+- **Scope**: API pública, worker, storage e entrega.
+- **Date**: 2026-09-04
+- **Status**: active
+
+### AD-004
+
+- **Decision**: Arquivos de produção usam storage S3 compatível privado; disco local é permitido somente fora de produção. Downloads continuam mediados pela API e pelas capabilities existentes.
+- **Reason**: URLs públicas ou enumeráveis violariam a privacidade de áudio e referências pessoais.
+- **Trade-off**: Produção exige bucket, credenciais, backup de objetos e teste de restore antes do lançamento.
+- **Scope**: API, worker e operação.
+- **Date**: 2026-09-04
+- **Status**: active
+
 ## Handoff
