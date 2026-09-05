@@ -25,4 +25,4 @@ RUN addgroup -S app && adduser -S app -G app
 COPY --from=build --chown=app:app /app /app
 USER app
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD node -e "try { process.kill(1, 0); } catch { process.exit(1); }"
-CMD ["node_modules/.bin/tsx", "apps/worker/src/index.ts"]
+CMD ["apps/worker/node_modules/.bin/tsx", "apps/worker/src/index.ts"]

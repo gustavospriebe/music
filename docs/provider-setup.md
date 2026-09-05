@@ -25,6 +25,6 @@ Defina `EMAIL_PROVIDER=resend`, `RESEND_API_KEY` e `EMAIL_FROM` usando domínio 
 
 ## Armazenamento
 
-Fora de produção use `STORAGE_PROVIDER=local` e `LOCAL_STORAGE_PATH` compartilhado. Em produção é obrigatório `STORAGE_PROVIDER=s3`, `STORAGE_S3_BUCKET` e `STORAGE_S3_REGION`; `STORAGE_S3_ENDPOINT`, force-path-style e credenciais explícitas existem para provedores compatíveis. Prefira identidade IAM do runtime. O bucket deve bloquear acesso público e ter versionamento/backup; downloads passam pela API, nunca por URL pública.
+Fora de produção use `STORAGE_PROVIDER=local` e `LOCAL_STORAGE_PATH` compartilhado. Em produção é obrigatório `STORAGE_PROVIDER=s3`, `STORAGE_S3_BUCKET` e `STORAGE_S3_REGION`; `STORAGE_S3_ENDPOINT`, force-path-style e credenciais explícitas existem para provedores compatíveis. Prefira identidade IAM do runtime. O bucket deve bloquear acesso público e ter backup/versionamento quando suportado; downloads passam pela API, nunca por URL pública. Railway Bucket requer export/backup separado porque atualmente não oferece versionamento ou lifecycle.
 
 Nenhuma integração real acima é declarada validada sem chamada autorizada e bem-sucedida. As referências oficiais e variáveis também estão em [providers.md](providers.md).

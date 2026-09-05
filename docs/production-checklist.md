@@ -6,7 +6,7 @@
 - [ ] Usar PostgreSQL gerenciado ou isolado, backups testados e retenção definida.
 - [ ] Aplicar migrations em ambiente controlado e testar restauração.
 - [ ] Configurar domínio, HTTPS, CORS restrito, `WEB_URL`, cookies `Secure` e proxy confiável.
-- [ ] Configurar bucket S3 privado, bloqueio público, versionamento e provar download apenas pela capability da API.
+- [ ] Configurar bucket S3 privado, bloqueio público, backup/versionamento quando suportado e provar download apenas pela capability da API. Railway Bucket exige export/backup separado porque não oferece versionamento.
 - [ ] Homologar Mercado Pago sandbox: assinatura, consulta, duplicação e estados não aprovados.
 - [ ] Validar OpenRouter/Resend apenas com autorização, limites de custo e alertas configurados.
 - [ ] Criar admin com `pnpm admin:create <email> <senha-de-12-ou-mais-caracteres>`, sem senha padrão; registrar o acesso em local seguro.

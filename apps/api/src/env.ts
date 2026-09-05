@@ -38,7 +38,8 @@ const envSchema = z.object({
 });
 export type Env = z.infer<typeof envSchema>;
 export const parseEnv = (source: NodeJS.ProcessEnv = process.env): Env => {
-  const parsed = envSchema.safeParse(source);
+  const platformPort = source.PORT?.trim();
+  const parsed = envSchema.safeParse(platformPort ? { ...source, API_PORT: platformPort } : source);
   if (!parsed.success)
     throw new Error(
       `Invalid environment: ${parsed.error.issues.map((i) => i.path.join('.')).join(', ')}`,

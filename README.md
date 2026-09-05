@@ -6,7 +6,7 @@ MVP brasileiro para transformar histórias de amigos em música personalizada. A
 
 Turborepo + pnpm + TypeScript estrito. `apps/web` contém React/Vite; `apps/api`, Fastify; `apps/worker`, a fila PostgreSQL. `packages/contracts`, `domain` e `database` são compartilhados. As fronteiras de adapters/configuração estão em `packages/providers` e `packages/config`; presets compartilhados ficam em `packages/eslint-config` e `packages/typescript-config`.
 
-Mais detalhes: [arquitetura](docs/architecture.md), [plano histórico](docs/implementation-plan.md), [configuração de providers](docs/provider-setup.md) e [checklist de produção](docs/production-checklist.md).
+Mais detalhes: [arquitetura](docs/architecture.md), [plano histórico](docs/implementation-plan.md), [configuração de providers](docs/provider-setup.md), [deploy no Railway](docs/railway-setup.md) e [checklist de produção](docs/production-checklist.md).
 
 ## Rodando localmente
 

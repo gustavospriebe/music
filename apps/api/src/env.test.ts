@@ -20,6 +20,12 @@ describe('environment validation', () => {
     expect(env.API_PORT).toBe(3001);
   });
 
+  it('uses the platform PORT when Railway injects one', () => {
+    const env = parseEnv({ ...localEnv, API_PORT: '3001', PORT: '4567' });
+
+    expect(env.API_PORT).toBe(4567);
+  });
+
   it('requires all OpenRouter settings in production', () => {
     expect(() => parseEnv({ ...localEnv, NODE_ENV: 'production' })).toThrow(
       'OpenRouter production configuration is required',

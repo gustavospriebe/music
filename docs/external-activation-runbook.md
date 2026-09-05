@@ -21,7 +21,7 @@ Estado inicial de Mercado Pago, Resend, S3 e capa OpenRouter: **EXTERNAL BLOCKED
 - Comando: configurar `STORAGE_PROVIDER=s3`, bucket/região e identidade IAM; executar `pnpm --filter @resenha/providers test` e um upload/download/exclusão sintético pelo fluxo da aplicação.
 - Evidência esperada: bloqueio público habilitado, objeto sem ACL pública, acesso direto negado, capability autenticada funciona, exclusão remove objeto.
 - Rollback: retirar permissão da identidade, remover apenas objetos do prefixo sintético e restaurar backup/configuração anterior.
-- Aceite: `[ ] responsável`, `[ ] data UTC`, `[ ] bucket sem segredo`, `[ ] políticas revisadas`, `[ ] backup/versionamento`, `[ ] rollback testado`.
+- Aceite: `[ ] responsável`, `[ ] data UTC`, `[ ] bucket sem segredo`, `[ ] políticas revisadas`, `[ ] backup externo/versionamento quando suportado`, `[ ] rollback testado`.
 
 ## Capa OpenRouter
 
