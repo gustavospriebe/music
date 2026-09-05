@@ -5,3 +5,4 @@ export interface ProviderDescriptor {
   readonly mode: ProviderMode;
   readonly validatedInProduction: false;
 }
+export * from './storage.js';

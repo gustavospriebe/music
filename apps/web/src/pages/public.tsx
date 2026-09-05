@@ -847,15 +847,61 @@ export function Delivery() {
   );
 }
 export function Legal({ kind }: { kind: 'privacidade' | 'termos' }) {
+  const privacy = kind === 'privacidade';
   return (
     <>
       <Header />
       <main className="form-page">
-        <h1>{kind === 'privacidade' ? 'Privacidade' : 'Termos de uso'}</h1>
-        <p>
+        <h1>{privacy ? 'Privacidade' : 'Termos de uso'}</h1>
+        <p className="error">
           Este conteúdo é informativo no MVP e deve passar por revisão jurídica antes da produção.
         </p>
-        <p>Usamos seus dados apenas para criar, entregar e dar suporte à música solicitada.</p>
+        {privacy ? (
+          <>
+            <h2>Dados e finalidade</h2>
+            <p>
+              Usamos história, e-mail e preferências para criar, entregar e dar suporte à música. A
+              letra, o áudio e a capa podem ser processados por fornecedores de inteligência
+              artificial e infraestrutura contratados para essa finalidade.
+            </p>
+            <h2>Foto de referência</h2>
+            <p>
+              O envio é opcional e exige que você tenha autorização das pessoas retratadas. A foto é
+              normalizada, mantida de forma privada e apagada ao fim da tentativa ou, em caso de
+              abandono, em até sete dias. A capa criada e registros financeiros seguem a retenção do
+              pedido.
+            </p>
+            <h2>Seus direitos</h2>
+            <p>
+              Antes do lançamento, o canal de privacidade e os prazos para acesso, correção,
+              oposição e exclusão deverão ser aprovados juridicamente. Para solicitar esses direitos
+              no piloto, responda ao e-mail privado de entrega; a operação deve confirmar que essa
+              caixa é monitorada antes de aceitar pedidos. Solicitações de exclusão não apagam
+              registros que precisem ser mantidos por obrigação legal.
+            </p>
+          </>
+        ) : (
+          <>
+            <h2>Conteúdo criado com IA</h2>
+            <p>
+              Letra, áudio e capa são produzidos com inteligência artificial a partir do contexto
+              fornecido. O resultado pode conter imprecisões e não deve imitar artista, celebridade
+              ou pessoa sem autorização.
+            </p>
+            <h2>Direitos e responsabilidades</h2>
+            <p>
+              Você declara ter direito de usar as histórias e fotos enviadas e deve revisar a letra
+              antes do pagamento. Não envie material ilegal, abusivo, íntimo ou envolvendo menores
+              sem a política e as autorizações aplicáveis.
+            </p>
+            <h2>Entrega e ajustes</h2>
+            <p>
+              O pedido inclui duas versões de áudio, uma capa opcional e uma regeneração de capa.
+              Prazos, reembolso, suporte e licença final ainda dependem de aprovação
+              jurídico-comercial antes da produção.
+            </p>
+          </>
+        )}
       </main>
       <Footer />
     </>

@@ -1,4 +1,9 @@
 import { z } from 'zod';
+import { readStorageConfig } from '@resenha/providers';
+const optionalUrl = z.preprocess(
+  (value) => (value === '' ? undefined : value),
+  z.string().url().optional(),
+);
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   API_PORT: z.coerce.number().default(3001),
@@ -15,6 +20,13 @@ const envSchema = z.object({
   EMAIL_PROVIDER: z.enum(['resend']).default('resend'),
   AUDIO_REVIEW_MODE: z.enum(['automatic', 'manual']).default('automatic'),
   LOCAL_STORAGE_PATH: z.string().default('./var/storage'),
+  STORAGE_PROVIDER: z.enum(['local', 's3']).optional(),
+  STORAGE_S3_BUCKET: z.string().optional(),
+  STORAGE_S3_REGION: z.string().optional(),
+  STORAGE_S3_ENDPOINT: optionalUrl,
+  STORAGE_S3_FORCE_PATH_STYLE: z.enum(['true', 'false']).optional(),
+  STORAGE_S3_ACCESS_KEY_ID: z.string().optional(),
+  STORAGE_S3_SECRET_ACCESS_KEY: z.string().optional(),
   OPENROUTER_API_KEY: z.string().optional(),
   OPENROUTER_TEXT_MODEL: z.string().optional(),
   OPENROUTER_MUSIC_MODEL: z.string().optional(),
@@ -40,5 +52,6 @@ export const parseEnv = (source: NodeJS.ProcessEnv = process.env): Env => {
     if (!env.OPENROUTER_COVER_TEXT_MODEL || !env.OPENROUTER_COVER_REFERENCE_MODEL)
       throw new Error('OpenRouter cover production configuration is required');
   }
+  readStorageConfig(env);
   return env;
 };

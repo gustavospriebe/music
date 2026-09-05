@@ -63,7 +63,7 @@ describe('API client', () => {
   });
 
   it('envia referência de capa como multipart sem sobrescrever o boundary', async () => {
-    const fetch = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) =>
+    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
       Response.json(
         {
           status: 'pending',

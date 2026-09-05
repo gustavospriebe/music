@@ -20,4 +20,12 @@ assert ids == {
 for requirement in ids:
     assert requirement in tasks, f"unmapped requirement {requirement}"
 assert len(re.findall(r"^### T\d+:", tasks, flags=re.MULTILINE)) == 8
+activation = (ROOT / "docs/external-activation-runbook.md").read_text()
+for marker in ["EXTERNAL BLOCKED", "Comando", "Evidência esperada", "Rollback", "Aceite", "Restore drill"]:
+    assert marker in activation, f"missing activation marker: {marker}"
+env_example = (ROOT / ".env.example").read_text()
+for setting in ["OPENROUTER_COVER_TEXT_MODEL", "OPENROUTER_COVER_REFERENCE_MODEL", "STORAGE_PROVIDER", "STORAGE_S3_BUCKET"]:
+    assert setting in env_example, f"missing env setting: {setting}"
+restore = ROOT / "scripts/restore-drill.sh"
+assert restore.is_file() and "RESTORE_DRILL_CONFIRM" in restore.read_text()
 print(f"PASS: {len(ids)} requirements mapped across 8 tasks")

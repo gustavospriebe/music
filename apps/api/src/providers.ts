@@ -1,6 +1,4 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { join, relative, resolve } from 'node:path';
 import { generatedLyricsSchema, type GeneratedLyrics, type Story } from '@resenha/contracts';
 import type { Env } from './env.js';
 
@@ -211,38 +209,7 @@ export const verifyMercadoPagoSignature = (input: {
   return actual.length === received.length && timingSafeEqual(actual, received);
 };
 
-export type StorageProvider = {
-  put: (
-    key: string,
-    data: Buffer,
-    mime: string,
-  ) => Promise<{ key: string; size: number; mime: string }>;
-  get: (key: string) => Promise<Buffer>;
-  delete: (key: string) => Promise<void>;
-};
-export const createLocalStorage = (basePath: string): StorageProvider => ({
-  put: async (key, data, mime) => {
-    const safe = key.replace(/[^a-zA-Z0-9._/-]/g, '_');
-    const root = resolve(basePath);
-    const target = resolve(root, safe);
-    if (relative(root, target).startsWith('..')) throw new Error('Invalid storage key');
-    await mkdir(join(target, '..'), { recursive: true });
-    await writeFile(target, data);
-    return { key: safe, size: data.length, mime };
-  },
-  get: async (key) => {
-    const root = resolve(basePath);
-    const target = resolve(root, key);
-    if (relative(root, target).startsWith('..')) throw new Error('Invalid storage key');
-    return readFile(target);
-  },
-  delete: async (key) => {
-    const root = resolve(basePath);
-    const target = resolve(root, key);
-    if (relative(root, target).startsWith('..')) throw new Error('Invalid storage key');
-    await rm(target, { force: true });
-  },
-});
+export { createLocalStorage } from '@resenha/providers';
 
 export const MAX_REFERENCE_IMAGE_BYTES = 8 * 1024 * 1024;
 

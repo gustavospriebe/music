@@ -18,7 +18,9 @@ Revogue acesso, gere token forte novo, armazene apenas o hash e envie novo link.
 
 ## Armazenamento e backup
 
-Assets são privados. Em desenvolvimento, `var/storage` é descartável; em produção, faça backup versionado do PostgreSQL e do bucket, teste restauração e aplique política de retenção/anominização aprovada juridicamente.
+Assets são privados. Em desenvolvimento, `var/storage` é descartável; produção exige S3 compatível privado. O worker remove referências ao encerrar cada tentativa e um safety net limpa órfãs com mais de sete dias. Não apague capas/áudios ou registros financeiros por esse processo. Faça backup versionado do PostgreSQL e do bucket, execute o restore drill isolado e aplique política de retenção/anonimização aprovada juridicamente.
+
+Procedimentos externos e restore: [external-activation-runbook.md](external-activation-runbook.md). Sem evidência anexada, registre **EXTERNAL BLOCKED**; não transforme “adapter implementado” em “provider homologado”.
 
 ## Observabilidade mínima
 

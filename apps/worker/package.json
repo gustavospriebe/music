@@ -15,6 +15,7 @@
     "@resenha/contracts": "workspace:*",
     "@resenha/database": "workspace:*",
     "@resenha/domain": "workspace:*",
+    "@resenha/providers": "workspace:*",
     "dotenv": "^16.6.1",
     "drizzle-orm": "^0.44.5",
     "pg": "^8.16.3",

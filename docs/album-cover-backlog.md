@@ -1,6 +1,6 @@
 # Capa de álbum gerada por IA — pesquisa e backlog
 
-**Decisão para este ciclo:** oportunidade aprovada como P2, fora do caminho crítico do MVP operável. Nenhuma chamada paga foi feita.
+**Estado em 04/09/2026:** P2 implementado e validado localmente; ativação permanece **EXTERNAL BLOCKED**. Nenhuma chamada paga de capa foi feita.
 
 ## Por que vale testar
 
@@ -26,7 +26,7 @@ Fontes oficiais:
 
 Todas as imagens geradas pelos modelos Gemini recebem SynthID. Antes de implementar via OpenRouter, validar em documentação oficial o identificador vigente do modelo, suporte a `input_references`, formato de resposta e contabilização real de custo; não reutilizar por suposição o endpoint de texto/áudio atual.
 
-## Fatia proposta
+## Fatia implementada
 
 1. Disponibilizar a ação apenas após pagamento confirmado.
 2. Gerar uma capa quadrada 1024 × 1024 com título, gênero, clima e resumo da letra; texto legível na imagem não é requisito.

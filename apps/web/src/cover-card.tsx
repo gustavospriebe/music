@@ -30,6 +30,105 @@ function CoverDisclosure({ cover }: { cover: AlbumCover | null }) {
   );
 }
 
+function CoverStatus({ cover }: { cover: AlbumCover | null }) {
+  if (isCreating(cover))
+    return <p role="status">Criando sua capa. Você pode sair e voltar depois.</p>;
+  if (cover?.status === 'failed')
+    return (
+      <p className="error" role="alert">
+        Não foi possível concluir esta capa. A foto enviada já foi descartada; fale com o suporte.
+      </p>
+    );
+  return null;
+}
+
+function CompletedOwnerCover({
+  cover,
+  publicId,
+  showRegeneration,
+  onRegenerate,
+}: {
+  cover: AlbumCover | null;
+  publicId: string;
+  showRegeneration: boolean;
+  onRegenerate: () => void;
+}) {
+  if (cover?.status !== 'completed') return null;
+  return (
+    <>
+      <CoverArtwork cover={cover} downloadUrl={api.coverDownloadUrl(publicId)} />
+      <p>{cover.canRegenerate ? '1 nova criação disponível.' : 'Criações incluídas usadas.'}</p>
+      {cover.canRegenerate && !showRegeneration && (
+        <button type="button" className="button secondary" onClick={onRegenerate}>
+          Gerar uma nova capa
+        </button>
+      )}
+    </>
+  );
+}
+
+function CoverForm({
+  visible,
+  hasPreviousCover,
+  reference,
+  consent,
+  pending,
+  error,
+  onReference,
+  onConsent,
+  onSubmit,
+}: {
+  visible: boolean;
+  hasPreviousCover: boolean;
+  reference: File | undefined;
+  consent: boolean;
+  pending: boolean;
+  error: Error | null;
+  onReference: (file: File | undefined) => void;
+  onConsent: (value: boolean) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  if (!visible) return null;
+  return (
+    <form className="cover-form" onSubmit={onSubmit}>
+      <p>
+        A foto é opcional. Aceitamos JPEG, PNG ou WebP de até 8 MB e removemos a referência depois
+        da tentativa.
+      </p>
+      <label>
+        Foto de referência (opcional)
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          onChange={(event) => onReference(event.target.files?.[0])}
+        />
+      </label>
+      {reference && (
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={consent}
+            onChange={(event) => onConsent(event.target.checked)}
+          />
+          Tenho permissão para usar as pessoas presentes nesta foto.
+        </label>
+      )}
+      {error && (
+        <p className="error" role="alert">
+          {error.message}
+        </p>
+      )}
+      <button
+        type="submit"
+        className="button primary"
+        disabled={pending || Boolean(reference && !consent)}
+      >
+        {pending ? 'Enviando contexto…' : hasPreviousCover ? 'Gerar nova capa' : 'Gerar minha capa'}
+      </button>
+    </form>
+  );
+}
+
 export function OwnerCoverCard({ publicId }: { publicId: string }) {
   const queryClient = useQueryClient();
   const [reference, setReference] = useState<File>();
@@ -71,72 +170,27 @@ export function OwnerCoverCard({ publicId }: { publicId: string }) {
         <h2 id="cover-title">Uma capa para a sua música</h2>
       </div>
       <CoverDisclosure cover={cover} />
-      {isCreating(cover) && <p role="status">Criando sua capa. Você pode sair e voltar depois.</p>}
-      {cover?.status === 'failed' && (
-        <p className="error" role="alert">
-          Não foi possível concluir esta capa. A foto enviada já foi descartada; fale com o suporte.
-        </p>
-      )}
-      {cover?.status === 'completed' && (
-        <>
-          <CoverArtwork cover={cover} downloadUrl={api.coverDownloadUrl(publicId)} />
-          <p>{cover.canRegenerate ? '1 nova criação disponível.' : 'Criações incluídas usadas.'}</p>
-          {cover.canRegenerate && !showRegeneration && (
-            <button
-              type="button"
-              className="button secondary"
-              onClick={() => setShowRegeneration(true)}
-            >
-              Gerar uma nova capa
-            </button>
-          )}
-        </>
-      )}
-      {showForm && !isCreating(cover) && cover?.status !== 'failed' && (
-        <form className="cover-form" onSubmit={submit}>
-          <p>
-            A foto é opcional. Aceitamos JPEG, PNG ou WebP de até 8 MB e removemos a referência
-            depois da tentativa.
-          </p>
-          <label>
-            Foto de referência (opcional)
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={(event) => {
-                setReference(event.target.files?.[0]);
-                setConsent(false);
-              }}
-            />
-          </label>
-          {reference && (
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={consent}
-                onChange={(event) => setConsent(event.target.checked)}
-              />
-              Tenho permissão para usar as pessoas presentes nesta foto.
-            </label>
-          )}
-          {create.error && (
-            <p className="error" role="alert">
-              {create.error.message}
-            </p>
-          )}
-          <button
-            type="submit"
-            className="button primary"
-            disabled={create.isPending || Boolean(reference && !consent)}
-          >
-            {create.isPending
-              ? 'Enviando contexto…'
-              : cover
-                ? 'Gerar nova capa'
-                : 'Gerar minha capa'}
-          </button>
-        </form>
-      )}
+      <CoverStatus cover={cover} />
+      <CompletedOwnerCover
+        cover={cover}
+        publicId={publicId}
+        showRegeneration={showRegeneration}
+        onRegenerate={() => setShowRegeneration(true)}
+      />
+      <CoverForm
+        visible={showForm && !isCreating(cover) && cover?.status !== 'failed'}
+        hasPreviousCover={Boolean(cover)}
+        reference={reference}
+        consent={consent}
+        pending={create.isPending}
+        error={create.error}
+        onReference={(file) => {
+          setReference(file);
+          setConsent(false);
+        }}
+        onConsent={setConsent}
+        onSubmit={submit}
+      />
     </section>
   );
 }

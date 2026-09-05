@@ -205,7 +205,7 @@ T6 → T7
 
 ### T7: Complete production activation and legal/restore readiness
 
-**Status**: Pending  
+**Status**: Complete
 **What**: Add persistent private storage selection, fail-fast production config and executable activation/retention/restore runbooks.  
 **Where**: `production readiness slice`  
 **Depends on**: T6  
@@ -219,10 +219,10 @@ T6 → T7
 
 **Done when**:
 
-- [ ] Production rejects local/implicit storage and missing cover model config.
-- [ ] S3-compatible private adapter is covered without remote calls.
-- [ ] Sandbox/e-mail/storage/restore runbooks name command, evidence, rollback and `EXTERNAL BLOCKED` state.
-- [ ] Legal pages disclose AI/reference lifecycle and remain marked for legal approval.
+- [x] Production rejects local/implicit storage and missing cover model config.
+- [x] S3-compatible private adapter is covered without remote calls.
+- [x] Sandbox/e-mail/storage/restore runbooks name command, evidence, rollback and `EXTERNAL BLOCKED` state.
+- [x] Legal pages disclose AI/reference lifecycle and remain marked for legal approval.
 
 **Tests**: Config/provider unit tests plus deterministic documentation validation  
 **Gate**: Build

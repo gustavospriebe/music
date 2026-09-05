@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { Pool } from 'pg';
 import type { ClaimedJob } from '@resenha/database';
 import {
+  cleanupExpiredCoverReferences,
   processAudioJob,
   processCoverJob,
   type CoverProvider,
@@ -18,13 +19,15 @@ const pool = new Pool({
     process.env.DATABASE_URL_TEST ?? 'postgresql://resenha:resenha@localhost:5433/resenha_test',
 });
 
+const flowStoragePath = mkdtempSync(join(tmpdir(), 'worker-flow-'));
 const config: WorkerConfig = {
   databaseUrl: 'postgresql://resenha:resenha@localhost:5433/resenha_test',
   workerId: 'flow-test',
   pollIntervalMs: 1000,
   lockTimeoutMs: 300_000,
   concurrency: 1,
-  storagePath: mkdtempSync(join(tmpdir(), 'worker-flow-')),
+  storagePath: flowStoragePath,
+  storage: { kind: 'local', basePath: flowStoragePath },
   reviewMode: 'manual',
   webUrl: 'http://localhost:5175',
   tokenPepper: 'a-local-token-pepper-with-more-than-32-chars',
@@ -299,6 +302,130 @@ describe('processCoverJob persistence', () => {
       kind: 'album_cover',
       status: 'error',
       error: 'provider rejected image',
+    });
+  });
+
+  it('removes abandoned reference objects after seven days', async () => {
+    const order = await pool.query<{ id: string }>(
+      `insert into orders(public_id,product_type,status,price_cents,access_token_hash)
+       values('cover-expired-ref-1','friend_roast','paid',4990,'hash') returning id`,
+    );
+    const orderId = order.rows[0]?.id as string;
+    const reference = await pool.query<{ id: string }>(
+      `insert into stored_files(order_id,storage_key,mime_type,size_bytes)
+       values($1,'orders/cover-expired-ref-1/references/ref.jpg','image/jpeg',3) returning id`,
+      [orderId],
+    );
+    await pool.query(
+      `insert into album_covers(order_id,attempt,status,reference_asset_id,had_reference,model,created_at)
+       values($1,1,'pending',$2,true,'cover-model',now()-interval '8 days')`,
+      [orderId, reference.rows[0]?.id],
+    );
+    const remove = vi.fn(async () => undefined);
+
+    await expect(
+      cleanupExpiredCoverReferences(pool, {
+        put: vi.fn(),
+        get: vi.fn(),
+        delete: remove,
+      }),
+    ).resolves.toBe(1);
+    expect(remove).toHaveBeenCalledWith('orders/cover-expired-ref-1/references/ref.jpg');
+    const cover = await pool.query(
+      'select reference_asset_id,had_reference from album_covers where order_id=$1',
+      [orderId],
+    );
+    expect(cover.rows[0]).toMatchObject({ reference_asset_id: null, had_reference: true });
+    const asset = await pool.query('select 1 from stored_files where id=$1', [
+      reference.rows[0]?.id,
+    ]);
+    expect(asset.rowCount).toBe(0);
+  });
+
+  it('records provider cost without recalling it when cover storage fails', async () => {
+    const order = await pool.query<{ id: string }>(
+      `insert into orders(public_id,product_type,status,price_cents,access_token_hash)
+       values('cover-storage-failure-1','friend_roast','audio_queued',4990,'hash') returning id`,
+    );
+    const orderId = order.rows[0]?.id as string;
+    await pool.query('insert into story_sessions(order_id,data) values($1,$2)', [
+      orderId,
+      JSON.stringify({
+        productType: 'friend_roast',
+        buyerEmail: 'ana@example.test',
+        subjectName: 'Bia',
+        occasion: 'Aniversário',
+        genre: 'pagode',
+        voice: 'female',
+        mood: 'animado',
+        facts: ['Fato um', 'Fato dois'],
+        relationship: 'Amiga',
+        traits: ['Leal'],
+        biggestStory: 'Fato um',
+        roastLevel: 'light',
+        safetyConfirmed: true,
+        termsAccepted: true,
+        marketingAccepted: false,
+      }),
+    ]);
+    await pool.query(
+      `insert into lyric_versions(order_id,number,kind,content,approved_at)
+       values($1,1,'approved',$2,now())`,
+      [orderId, JSON.stringify(approvedContent)],
+    );
+    await pool.query(
+      `insert into album_covers(order_id,attempt,status,had_reference,model)
+       values($1,1,'pending',false,$2)`,
+      [orderId, config.openRouterCoverTextModel],
+    );
+    const insertedJob = await pool.query<{ id: string }>(
+      `insert into generation_jobs(type,order_id,payload,idempotency_key,max_attempts)
+       values('generate_cover',$1,'{"attempt":1}',$2,1) returning id`,
+      [orderId, `cover:${orderId}:1`],
+    );
+    const job: ClaimedJob = {
+      id: insertedJob.rows[0]?.id as string,
+      orderId,
+      type: 'generate_cover',
+      attempts: 1,
+      maxAttempts: 1,
+      payload: { attempt: 1 },
+    };
+    const generate = vi.fn(async () => ({
+      bytes: Buffer.from([0xff, 0xd8, 0xff]),
+      mime: 'image/jpeg' as const,
+      usage: {
+        requestId: null,
+        model: config.openRouterCoverTextModel as string,
+        inputTokens: 10,
+        outputTokens: 100,
+        costUsd: '0.0336',
+        latencyMs: 15,
+      },
+    }));
+    await expect(
+      processCoverJob(
+        pool,
+        job,
+        config,
+        { generate },
+        {
+          put: async () => {
+            throw new Error('storage unavailable');
+          },
+          get: vi.fn(),
+          delete: vi.fn(),
+        },
+      ),
+    ).rejects.toMatchObject({ terminal: true });
+    expect(generate).toHaveBeenCalledTimes(1);
+    const usage = await pool.query('select status,cost_usd,error from ai_usage where order_id=$1', [
+      orderId,
+    ]);
+    expect(usage.rows[0]).toMatchObject({
+      status: 'error',
+      cost_usd: '0.033600',
+      error: 'storage unavailable',
     });
   });
 });

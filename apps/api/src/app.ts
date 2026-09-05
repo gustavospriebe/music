@@ -52,9 +52,9 @@ import {
   type AiUsageSample,
   type AiUsageStatus,
 } from '@resenha/domain';
+import { createStorage, readStorageConfig } from '@resenha/providers';
 import type { Env } from './env.js';
 import {
-  createLocalStorage,
   createLyricsProvider,
   createMercadoPagoProvider,
   MAX_REFERENCE_IMAGE_BYTES,
@@ -154,7 +154,7 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
   });
   const { db, pool } = createDb(env.DATABASE_URL);
   const lyrics = overrides.lyrics ?? createLyricsProvider(env);
-  const storage = createLocalStorage(env.LOCAL_STORAGE_PATH);
+  const storage = createStorage(readStorageConfig(env));
   const mercadoPago = createMercadoPagoProvider(env);
   /** POSTs sem corpo (ex.: gerar letra, aprovar) são válidos; JSON inválido segue 400. */
   app.addContentTypeParser('application/json', { parseAs: 'string' }, (_request, body, done) => {

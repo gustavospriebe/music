@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
 import { generatedLyricsSchema, storySchema } from '@resenha/contracts';
 import {
@@ -17,6 +17,12 @@ import {
   retryJob,
   type ClaimedJob,
 } from '@resenha/database';
+import {
+  createStorage,
+  readStorageConfig,
+  type StorageConfig,
+  type StorageProvider,
+} from '@resenha/providers';
 import type { Pool } from 'pg';
 
 export type WorkerConfig = {
@@ -26,6 +32,7 @@ export type WorkerConfig = {
   lockTimeoutMs: number;
   concurrency: number;
   storagePath: string;
+  storage: StorageConfig;
   reviewMode: 'automatic' | 'manual';
   webUrl: string;
   tokenPepper: string;
@@ -55,6 +62,8 @@ export const readWorkerConfig = (env: NodeJS.ProcessEnv): WorkerConfig => {
   const isProduction = env.NODE_ENV === 'production';
   const resendApiKey = env.RESEND_API_KEY;
   if (isProduction && !resendApiKey) throw new Error('RESEND_API_KEY is required');
+  if (isProduction && (!env.OPENROUTER_COVER_TEXT_MODEL || !env.OPENROUTER_COVER_REFERENCE_MODEL))
+    throw new Error('OpenRouter cover production configuration is required');
   return {
     databaseUrl: required(env, 'DATABASE_URL'),
     workerId: env.WORKER_ID ?? `worker-${process.pid}`,
@@ -62,6 +71,7 @@ export const readWorkerConfig = (env: NodeJS.ProcessEnv): WorkerConfig => {
     lockTimeoutMs: positiveInt(env.JOB_LOCK_TIMEOUT_MS, 300_000, 'JOB_LOCK_TIMEOUT_MS'),
     concurrency: positiveInt(env.WORKER_CONCURRENCY, 1, 'WORKER_CONCURRENCY'),
     storagePath: env.LOCAL_STORAGE_PATH ?? './var/storage',
+    storage: readStorageConfig(env),
     // Human approval is the safe default; automatic delivery is an explicit opt-in.
     reviewMode: env.AUDIO_REVIEW_MODE === 'automatic' ? 'automatic' : 'manual',
     webUrl: env.WEB_URL ?? 'http://localhost:5175',
@@ -626,6 +636,7 @@ export const processAudioJob = async (
     webUrl: config.webUrl,
   }),
   variants: readonly number[] = [1, 2],
+  storage: StorageProvider = createStorage(config.storage),
 ): Promise<void> => {
   const orderResult = await pool.query<OrderRow>(
     'select id, public_id, status from orders where id=$1',
@@ -691,7 +702,7 @@ export const processAudioJob = async (
     const generation = result.generation;
     const { mime, ext } = detectAudioMime(generation.bytes);
     const key = `orders/${order.public_id}/audio-${variant}.${ext}`;
-    await writeLocalAsset(config.storagePath, key, generation.bytes);
+    await storage.put(key, generation.bytes, mime);
     const asset = await pool.query<{ id: string }>(
       `insert into stored_files(order_id,storage_key,mime_type,size_bytes)
        values($1,$2,$3,$4)
@@ -765,11 +776,11 @@ const coverPayload = (payload: unknown): CoverJobPayload => {
 
 const cleanupCoverReference = async (
   pool: Pool,
-  config: WorkerConfig,
+  storage: StorageProvider,
   cover: Pick<CoverJobRow, 'id' | 'reference_asset_id' | 'reference_key'>,
 ): Promise<void> => {
   if (!cover.reference_asset_id || !cover.reference_key) return;
-  await rm(safeStoragePath(config.storagePath, cover.reference_key), { force: true });
+  await storage.delete(cover.reference_key);
   const client = await pool.connect();
   try {
     await client.query('begin');
@@ -785,6 +796,36 @@ const cleanupCoverReference = async (
   } finally {
     client.release();
   }
+};
+
+/** Safety net for abandoned jobs; successful and terminal attempts erase immediately. */
+export const cleanupExpiredCoverReferences = async (
+  pool: Pool,
+  storage: StorageProvider,
+): Promise<number> => {
+  const expired = await pool.query<{
+    id: string;
+    reference_asset_id: string;
+    reference_key: string;
+  }>(
+    `select c.id,c.reference_asset_id,f.storage_key as reference_key
+     from album_covers c
+     join stored_files f on f.id=c.reference_asset_id
+     where c.reference_asset_id is not null
+       and c.created_at < now()-interval '7 days'
+     order by c.created_at
+     limit 100`,
+  );
+  let removed = 0;
+  for (const cover of expired.rows) {
+    try {
+      await cleanupCoverReference(pool, storage, cover);
+      removed += 1;
+    } catch (error) {
+      console.warn({ error: sanitizeError(error) }, 'expired cover reference cleanup failed');
+    }
+  }
+  return removed;
 };
 
 const makeCoverPrompt = (storyValue: unknown, lyricsValue: unknown): string => {
@@ -825,6 +866,7 @@ export const processCoverJob = async (
     apiKey: config.openRouterApiKey,
     webUrl: config.webUrl,
   }),
+  storage: StorageProvider = createStorage(config.storage),
 ): Promise<void> => {
   const { attempt } = coverPayload(job.payload);
   const result = await pool.query<CoverJobRow>(
@@ -839,7 +881,7 @@ export const processCoverJob = async (
   const cover = result.rows[0];
   if (!cover) throw Object.assign(new Error('Cover attempt was not found'), { terminal: true });
   if (cover.status === 'completed') {
-    await cleanupCoverReference(pool, config, cover);
+    await cleanupCoverReference(pool, storage, cover);
     return;
   }
   if (cover.status !== 'pending')
@@ -851,7 +893,7 @@ export const processCoverJob = async (
   if (!claimed.rowCount)
     throw Object.assign(new Error('Cover provider call was already claimed'), { terminal: true });
 
-  let generation: CoverGeneration;
+  let generation: CoverGeneration | undefined;
   try {
     if (!config.openRouterCoverTextModel || !config.openRouterCoverReferenceModel)
       throw Object.assign(new Error('Cover models are not configured'), { terminal: true });
@@ -869,9 +911,7 @@ export const processCoverJob = async (
           terminal: true,
         },
       );
-    const reference = cover.reference_key
-      ? await readFile(safeStoragePath(config.storagePath, cover.reference_key))
-      : undefined;
+    const reference = cover.reference_key ? await storage.get(cover.reference_key) : undefined;
     generation = await provider.generate({
       model: cover.model,
       prompt: makeCoverPrompt(storyResult.rows[0]?.data, lyricsResult.rows[0]?.content),
@@ -880,7 +920,7 @@ export const processCoverJob = async (
     const extension =
       generation.mime === 'image/png' ? 'png' : generation.mime === 'image/webp' ? 'webp' : 'jpg';
     const key = `orders/${cover.public_id}/cover-${attempt}.${extension}`;
-    await writeLocalAsset(config.storagePath, key, generation.bytes);
+    await storage.put(key, generation.bytes, generation.mime);
     const client = await pool.connect();
     try {
       await client.query('begin');
@@ -917,10 +957,9 @@ export const processCoverJob = async (
     } finally {
       client.release();
     }
-    await cleanupCoverReference(pool, config, cover);
   } catch (error) {
     const message = sanitizeError(error);
-    const usage = usageFromCoverError(error);
+    const usage = generation?.usage ?? usageFromCoverError(error);
     await pool.query(
       "update album_covers set status='failed',last_error=$1,updated_at=now() where id=$2 and status!='completed'",
       [message, cover.id],
@@ -942,13 +981,22 @@ export const processCoverJob = async (
           attempt,
         ],
       );
-    await cleanupCoverReference(pool, config, cover);
+    await cleanupCoverReference(pool, storage, cover).catch((cleanupError) =>
+      console.warn(
+        { error: sanitizeError(cleanupError) },
+        'terminal cover reference cleanup failed',
+      ),
+    );
     throw Object.assign(error instanceof Error ? error : new Error(message), { terminal: true });
   }
+  await cleanupCoverReference(pool, storage, cover).catch((error) =>
+    console.warn({ error: sanitizeError(error) }, 'completed cover reference cleanup failed'),
+  );
 };
 
 export const createWorker = ({ pool, config }: { pool: Pool; config: WorkerConfig }) => {
   let active = 0;
+  const storage = createStorage(config.storage);
 
   const processOne = async (): Promise<boolean> => {
     const job = await claimNextJob(pool, config.workerId);
@@ -959,8 +1007,9 @@ export const createWorker = ({ pool, config }: { pool: Pool; config: WorkerConfi
         throw new Error('Invalid job payload');
       if (job.maxAttempts < job.attempts) throw new Error('Job retry limit exceeded');
       if (job.type === 'generate_audio' || job.type === 'deliver-notify')
-        await processAudioJob(pool, job, config);
-      else if (job.type === 'generate_cover') await processCoverJob(pool, job, config);
+        await processAudioJob(pool, job, config, undefined, undefined, storage);
+      else if (job.type === 'generate_cover')
+        await processCoverJob(pool, job, config, undefined, storage);
       else throw Object.assign(new Error(`Unsupported job type: ${job.type}`), { terminal: true });
       await completeJob(pool, job.id);
       console.info(jobLogContext(job, 'completed', Date.now() - startedAt), 'worker job completed');
@@ -993,6 +1042,7 @@ export const createWorker = ({ pool, config }: { pool: Pool; config: WorkerConfi
     sanitizeError,
     tick: async (): Promise<void> => {
       await releaseStaleJobs(pool, config.lockTimeoutMs);
+      await cleanupExpiredCoverReferences(pool, storage);
       const capacity = Math.max(0, config.concurrency - active);
       if (!capacity) return;
       active += capacity;

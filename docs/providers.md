@@ -1,12 +1,13 @@
 # Providers e variáveis
 
-| Provider  | Implementação                       | Produção                  | Status                                                  |
-| --------- | ----------------------------------- | ------------------------- | ------------------------------------------------------- |
-| Lyrics    | OpenRouter chat completions (JSON)  | `openrouter`              | validado com chamada real (gemini-3-flash-preview)      |
-| Música    | OpenRouter SSE áudio (2 versões)    | OpenRouter Lyria          | validado com chamada real (lyria-3-pro, US$ 0,08/faixa) |
-| Pagamento | Mercado Pago Checkout Pro + webhook | Mercado Pago Checkout Pro | implementado, sem credenciais (dev usa fallback local)  |
-| E-mail    | Resend com link privado de entrega  | Resend                    | implementado, sem credenciais (dev usa fallback local)  |
-| Arquivos  | disco local (`LOCAL_STORAGE_PATH`)  | volume/bucket privado     | funcionando                                             |
+| Provider  | Implementação                       | Produção                   | Status                                                  |
+| --------- | ----------------------------------- | -------------------------- | ------------------------------------------------------- |
+| Lyrics    | OpenRouter chat completions (JSON)  | `openrouter`               | validado com chamada real (gemini-3-flash-preview)      |
+| Música    | OpenRouter SSE áudio (2 versões)    | OpenRouter Lyria           | validado com chamada real (lyria-3-pro, US$ 0,08/faixa) |
+| Pagamento | Mercado Pago Checkout Pro + webhook | Mercado Pago Checkout Pro  | implementado, sem credenciais (dev usa fallback local)  |
+| E-mail    | Resend com link privado de entrega  | Resend                     | implementado, sem credenciais (dev usa fallback local)  |
+| Capa      | OpenRouter Images API               | Gemini Flash Image         | implementado; sem chamada paga de validação             |
+| Arquivos  | local dev / adapter S3 compatível   | bucket privado obrigatório | testado localmente; infraestrutura externa bloqueada    |
 
 ## OpenRouter
 
@@ -14,12 +15,14 @@ Chat Completions: `POST https://openrouter.ai/api/v1/chat/completions`, Bearer `
 
 Filtro de conteúdo de áudio é probabilístico: a mesma letra pode retornar `PROHIBITED_CONTENT`. Manter a instrução de variante ANTES da letra reduz falsos positivos; o worker ainda tenta várias vezes e marca o job como `failed` se persistir. `GEMINI_API_KEY` não substitui `OPENROUTER_API_KEY`. Qualquer chave compartilhada em conversa deve ser tratada como exposta e rotacionada.
 
+Capas usam `POST https://openrouter.ai/api/v1/images`, 1K e proporção 1:1. Sem foto, `OPENROUTER_COVER_TEXT_MODEL` recomenda `google/gemini-3.1-flash-lite-image` (~US$ 0,0336 por saída 1K); com foto, `OPENROUTER_COVER_REFERENCE_MODEL` recomenda `google/gemini-3.1-flash-image` (~US$ 0,067). O pior caso incluído (duas capas com referência) é ~US$ 0,134 de saída, antes de entrada, impostos, câmbio e storage. Estes preços são públicos, consultados em 04/09/2026; nenhuma chamada paga de capa foi feita. Referências: [OpenRouter Images API](https://openrouter.ai/docs/api-reference/images/generate-images), [modelos de imagem](https://openrouter.ai/api/v1/images/models) e [preços Gemini](https://ai.google.dev/gemini-api/docs/pricing).
+
 ## Mercado Pago
 
 Checkout Pro cria preferência em `POST /checkout/preferences` com `external_reference`, item BRL, `back_urls` e `notification_url`. Webhook apenas notifica: validar assinatura `x-signature`/`x-request-id`, buscar o pagamento na API e conferir valor, moeda, pedido e status antes de marcar pago. A deduplicação é obrigatória. [Preferências](https://www.mercadopago.com.br/developers/pt/reference/online-payments/checkout-pro/preferences/create-preference/post), [webhooks](https://www.mercadopago.com.br/developers/pt/docs/your-integrations/notifications/webhooks).
 
 ## Resend e S3
 
-Resend envia `POST https://api.resend.com/emails` com `RESEND_API_KEY`, `EMAIL_FROM` e `Idempotency-Key`. S3 requer endpoint, região, bucket e credenciais, com bucket privado e URLs assinadas curtas. [Resend](https://resend.com/docs/api-reference/emails/send-email).
+Resend envia `POST https://api.resend.com/emails` com `RESEND_API_KEY`, `EMAIL_FROM` e `Idempotency-Key`. O adapter S3 usa `PutObject`, `GetObject` e `DeleteObject`, sem ACL pública; downloads continuam mediados pelas capabilities da API. Endpoint e credenciais são opcionais quando a infraestrutura fornece IAM. [Resend](https://resend.com/docs/api-reference/emails/send-email), [AWS S3 SDK](https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/s3/).
 
-As variáveis completas estão em `.env.example`; em produção, a validação deve falhar rapidamente para segredo ausente.
+As variáveis completas estão em `.env.example`; produção falha ao iniciar sem modelos de capa, Mercado Pago/Resend e storage S3 explícito. Estado externo atual: **EXTERNAL BLOCKED** até homologação com credenciais e infraestrutura autorizadas.

@@ -37,4 +37,36 @@ describe('environment validation', () => {
       }),
     ).toThrow('Mercado Pago production configuration is required');
   });
+
+  it('requires cover models and managed private storage in production', () => {
+    const providers = {
+      ...localEnv,
+      NODE_ENV: 'production',
+      OPENROUTER_API_KEY: 'key',
+      OPENROUTER_TEXT_MODEL: 'text-model',
+      OPENROUTER_MUSIC_MODEL: 'music-model',
+      MERCADO_PAGO_ACCESS_TOKEN: 'mp-token',
+      MERCADO_PAGO_WEBHOOK_SECRET: 'mp-secret',
+    };
+    expect(() => parseEnv(providers)).toThrow(
+      'OpenRouter cover production configuration is required',
+    );
+    expect(() =>
+      parseEnv({
+        ...providers,
+        OPENROUTER_COVER_TEXT_MODEL: 'cover-text',
+        OPENROUTER_COVER_REFERENCE_MODEL: 'cover-reference',
+      }),
+    ).toThrow('STORAGE_PROVIDER=s3 is required in production');
+    expect(
+      parseEnv({
+        ...providers,
+        OPENROUTER_COVER_TEXT_MODEL: 'cover-text',
+        OPENROUTER_COVER_REFERENCE_MODEL: 'cover-reference',
+        STORAGE_PROVIDER: 's3',
+        STORAGE_S3_BUCKET: 'private-bucket',
+        STORAGE_S3_REGION: 'us-east-1',
+      }).STORAGE_PROVIDER,
+    ).toBe('s3');
+  });
 });

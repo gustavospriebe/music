@@ -7,6 +7,7 @@ COPY apps/worker/package.json apps/worker/package.json
 COPY packages/contracts/package.json packages/contracts/package.json
 COPY packages/database/package.json packages/database/package.json
 COPY packages/domain/package.json packages/domain/package.json
+COPY packages/providers/package.json packages/providers/package.json
 RUN pnpm install --frozen-lockfile
 
 FROM dependencies AS build
@@ -14,6 +15,7 @@ COPY apps/worker apps/worker
 COPY packages/contracts packages/contracts
 COPY packages/database packages/database
 COPY packages/domain packages/domain
+COPY packages/providers packages/providers
 RUN pnpm --filter @resenha/worker build
 
 FROM node:22-alpine AS runtime

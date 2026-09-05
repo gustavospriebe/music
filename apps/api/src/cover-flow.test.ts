@@ -177,7 +177,7 @@ describe('album cover public flow', () => {
       available: true,
       cover: { status: 'pending', attempt: 2, canRegenerate: false, hasReference: false },
     });
-    expect(JSON.stringify(summary.json())).not.toMatch(/storage|assetId|orderId|\"id\"/);
+    expect(JSON.stringify(summary.json())).not.toMatch(/storage|assetId|orderId|"id"/);
   });
 
   it('requires consent, validates raster bytes and stores a metadata-free private JPEG', async () => {
@@ -278,7 +278,7 @@ describe('album cover public flow', () => {
       available: true,
       cover: { status: 'completed', attempt: 1, canRegenerate: false },
     });
-    expect(JSON.stringify(deliverySummary.json())).not.toMatch(/storage|assetId|orderId|\"id\"/);
+    expect(JSON.stringify(deliverySummary.json())).not.toMatch(/storage|assetId|orderId|"id"/);
     const deliveryDownload = await app.inject({
       method: 'GET',
       url: `/api/v1/deliveries/${deliveryToken}/cover/download`,

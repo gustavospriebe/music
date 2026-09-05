@@ -1,6 +1,6 @@
 # Música da Resenha
 
-MVP brasileiro para transformar histórias de amigos em música personalizada. A pessoa conta a resenha, revisa a letra, paga via Mercado Pago e recebe duas versões de áudio em página privada. Letra e áudio são gerados via OpenRouter; a entrega é avisada por e-mail (Resend).
+MVP brasileiro para transformar histórias de amigos em música personalizada. A pessoa conta a resenha, revisa a letra, paga via Mercado Pago e recebe duas versões de áudio e uma capa opcional em página privada. Letra, áudio e capa são gerados via OpenRouter; a entrega é avisada por e-mail (Resend).
 
 ## Stack e estrutura
 
@@ -22,9 +22,9 @@ pnpm db:seed
 pnpm dev
 ```
 
-URLs locais: web `http://localhost:5175`, API `http://localhost:3001`, OpenAPI `http://localhost:3001/documentation`. O banco publicado localmente usa `localhost:5433`. `LOCAL_STORAGE_PATH` deve ser absoluto para que API e worker compartilhem o mesmo diretório de arquivos.
+URLs locais: web `http://localhost:5175`, API `http://localhost:3001`, OpenAPI `http://localhost:3001/documentation`. O banco publicado localmente usa `localhost:5433`. Com `STORAGE_PROVIDER=local`, `LOCAL_STORAGE_PATH` deve ser absoluto para API e worker compartilharem os mesmos arquivos. Produção exige `STORAGE_PROVIDER=s3` e bucket privado.
 
-Os adapters de rede são reais e selecionados por variáveis de ambiente (`LYRICS_PROVIDER`, `MUSIC_PROVIDER`, `PAYMENT_PROVIDER`, `EMAIL_PROVIDER`); não existe modo fake de provider. OpenRouter é necessário para gerar letra e áudio. Os modelos e custos medidos em uma chamada autorizada de 04/09/2026 estão registrados em [providers](docs/providers.md) e [evolução do MVP](docs/evolucao-mvp.md); o gate local atual usa providers controlados e não revalida a rede. Sem credenciais de Mercado Pago ou Resend fora de produção, o checkout usa confirmação local pelo pedido e o e-mail é gravado em `var/emails` com o link privado. Em produção, a API exige OpenRouter e Mercado Pago; o worker exige OpenRouter e Resend.
+Os adapters de rede são reais e selecionados por variáveis de ambiente (`LYRICS_PROVIDER`, `MUSIC_PROVIDER`, `PAYMENT_PROVIDER`, `EMAIL_PROVIDER`, `STORAGE_PROVIDER`); não existe modo fake de provider. OpenRouter é necessário para gerar letra, áudio e capa. Os modelos e custos estão registrados em [providers](docs/providers.md); o gate local atual usa providers controlados e não revalida a rede. Sem credenciais de Mercado Pago ou Resend fora de produção, o checkout usa confirmação local pelo pedido e o e-mail é gravado em `var/emails` com o link privado. Em produção, a API exige OpenRouter, Mercado Pago e S3; o worker exige OpenRouter, Resend e S3.
 
 Modelos de áudio têm filtro de conteúdo probabilístico: uma letra pode ser bloqueada (`PROHIBITED_CONTENT`) mesmo passando nas regras locais. O worker tenta várias vezes, o job fica visível no painel e o admin pode editar a letra ou regenerar.
 
@@ -57,13 +57,13 @@ npx react-doctor@latest --verbose --scope changed
 
 ## Providers e produção
 
-OpenRouter, Mercado Pago e Resend são selecionados apenas por variáveis de ambiente. Configure-os seguindo [docs/provider-setup.md](docs/provider-setup.md); as integrações reais são consideradas validadas somente após chamada autorizada e bem-sucedida. O webhook do Mercado Pago precisa de URL pública (ex.: túnel em desenvolvimento). Nenhuma chave Gemini é usada nem salva: uma chave previamente exposta em conversa deve ser rotacionada.
+OpenRouter, Mercado Pago, Resend e S3 são selecionados apenas por variáveis de ambiente. Configure-os seguindo [docs/provider-setup.md](docs/provider-setup.md) e execute o [runbook de ativação externa](docs/external-activation-runbook.md); integrações reais só são consideradas validadas após chamada autorizada e bem-sucedida. O webhook do Mercado Pago precisa de URL pública (ex.: túnel em desenvolvimento). Nenhuma chave Gemini é usada nem salva: uma chave previamente exposta em conversa deve ser rotacionada.
 
 Há imagens de produção multi-stage e não-root em `docker/api/Dockerfile`, `docker/worker/Dockerfile` e `docker/web/Dockerfile`. O projeto não faz deploy. Antes de publicar, siga [docs/production-checklist.md](docs/production-checklist.md).
 
 ## Custo de IA
 
-Cada chamada ao OpenRouter grava uma linha em `ai_usage` (pedido, `kind` letra/áudio, modelo, tokens, `cost_usd` em dólar como devolvido em `usage.cost`, latência, status `ok`/`blocked`/`error`/`rejected`, `requestId` e tentativa, inclusive bloqueios do filtro e tentativas reprovadas na validação local). Somas em USD usam `numeric` no PostgreSQL e trafegam como string decimal exata até o painel. O admin vê o custo por pedido, o agregado do mês/30 dias em `GET /admin/ai-usage/summary` e o uso da key em `GET /key`, gratuito e best-effort. Respostas públicas carregam só referências públicas. Logs HTTP usam request ID, template de rota, status e duração; logs do worker usam tipo, status, tentativa e duração, sem UUID de job/pedido, token, letra ou formulário.
+Cada chamada ao OpenRouter grava uma linha em `ai_usage` (pedido, `kind` letra/áudio/capa, modelo, tokens, `cost_usd` em dólar como devolvido em `usage.cost`, latência, status, `requestId` e tentativa). Somas em USD usam `numeric` no PostgreSQL e trafegam como string decimal exata até o painel. Respostas públicas carregam só referências públicas. Logs HTTP usam request ID, template de rota, status e duração; logs do worker usam tipo, status, tentativa e duração, sem UUID de job/pedido, token, letra, imagem ou formulário.
 
 ## Limites do MVP
 

@@ -36,10 +36,33 @@ describe('worker config', () => {
     expect(() => readWorkerConfig({ ...fullEnv, NODE_ENV: 'production' })).toThrow(
       'RESEND_API_KEY is required',
     );
-    expect(
-      readWorkerConfig({ ...fullEnv, NODE_ENV: 'production', RESEND_API_KEY: 'resend-key' })
-        .resendApiKey,
-    ).toBe('resend-key');
+    expect(() =>
+      readWorkerConfig({ ...fullEnv, NODE_ENV: 'production', RESEND_API_KEY: 'resend-key' }),
+    ).toThrow('OpenRouter cover production configuration is required');
+  });
+
+  it('requires managed private storage in production after cover models are configured', () => {
+    expect(() =>
+      readWorkerConfig({
+        ...fullEnv,
+        NODE_ENV: 'production',
+        RESEND_API_KEY: 'resend-key',
+        OPENROUTER_COVER_TEXT_MODEL: 'cover-text',
+        OPENROUTER_COVER_REFERENCE_MODEL: 'cover-reference',
+      }),
+    ).toThrow('STORAGE_PROVIDER=s3 is required in production');
+    const config = readWorkerConfig({
+      ...fullEnv,
+      NODE_ENV: 'production',
+      RESEND_API_KEY: 'resend-key',
+      OPENROUTER_COVER_TEXT_MODEL: 'cover-text',
+      OPENROUTER_COVER_REFERENCE_MODEL: 'cover-reference',
+      STORAGE_PROVIDER: 's3',
+      STORAGE_S3_BUCKET: 'private-bucket',
+      STORAGE_S3_REGION: 'us-east-1',
+    });
+    expect(config.storage).toMatchObject({ kind: 's3', bucket: 'private-bucket' });
+    expect(config.resendApiKey).toBe('resend-key');
   });
 });
 
@@ -128,7 +151,7 @@ describe('music sing parsing', () => {
   });
 
   it('encerra bloqueios do filtro após orçamento curto com erro terminal', async () => {
-    const fetch = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) =>
+    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
       sse([{ id: 'gen-blocked', error: { message: 'PROHIBITED_CONTENT' } }]),
     );
     vi.stubGlobal('fetch', fetch);
@@ -169,7 +192,7 @@ describe('cover image parsing', () => {
   );
 
   it('uses the official Images API shape and returns measured usage', async () => {
-    const fetch = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) =>
+    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
       Response.json({
         data: [{ b64_json: png.toString('base64'), media_type: 'image/png' }],
         usage: { prompt_tokens: 40, completion_tokens: 1120, cost: 0.0336 },

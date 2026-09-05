@@ -14,7 +14,11 @@
     "test:unit": "vitest run --passWithNoTests"
   },
   "devDependencies": {
+    "@types/node": "^22.20.1",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1127.0"
   }
 }

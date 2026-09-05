@@ -14,29 +14,29 @@ O MVP funciona, mas ainda entrega JavaScript público pesado, não oferece uma c
 
 ## Out of Scope
 
-| Feature | Reason |
-| --- | --- |
-| Chamada real/paga de capa | Exige orçamento e autorização adicional. |
-| Homologar Mercado Pago/Resend | Exige credenciais, webhook/domínio e efeitos externos. |
-| Provisionar bucket ou fazer deploy | Infraestrutura externa e publicação não foram autorizadas. |
-| Aprovar texto jurídico | Depende de jurídico/comercial e política para menores. |
-| Alterar `orders.status` pela capa | A música continua sendo o produto contratado. |
-| Editor, múltiplas referências ou mais de duas capas | Não são necessários para testar valor e custo. |
-| Alterar `apps/web/src/admin/routes.tsx` | O arquivo já contém mudanças do dono que não podem ser absorvidas. |
+| Feature                                             | Reason                                                             |
+| --------------------------------------------------- | ------------------------------------------------------------------ |
+| Chamada real/paga de capa                           | Exige orçamento e autorização adicional.                           |
+| Homologar Mercado Pago/Resend                       | Exige credenciais, webhook/domínio e efeitos externos.             |
+| Provisionar bucket ou fazer deploy                  | Infraestrutura externa e publicação não foram autorizadas.         |
+| Aprovar texto jurídico                              | Depende de jurídico/comercial e política para menores.             |
+| Alterar `orders.status` pela capa                   | A música continua sendo o produto contratado.                      |
+| Editor, múltiplas referências ou mais de duas capas | Não são necessários para testar valor e custo.                     |
+| Alterar `apps/web/src/admin/routes.tsx`             | O arquivo já contém mudanças do dono que não podem ser absorvidas. |
 
 ## Assumptions & Open Questions
 
-| Assumption / decision | Chosen default | Rationale | Confirmed? |
-| --- | --- | --- | --- |
-| Continuação autônoma | Especificar, implementar, testar e verificar sem nova pausa | O dono pediu para deixar todos os P2 prontos e continuar até o objetivo. | y |
-| Momento da capa | Disponível após `paid` e em todas as etapas posteriores | Evita abuso gratuito sem bloquear a música. | y |
-| Limite comercial | Uma geração e uma regeneração explícita | Mantém teto de custo previsível. | y |
-| Modelo | Lite sem foto; Flash com foto, configuráveis por env | Equilibra custo e consistência conforme pesquisa oficial. | y |
-| Falta de credencial em dev | Mostrar indisponibilidade, sem imagem fake | A convenção do repositório proíbe provider falso. | y |
-| Referência | Um raster de até 8 MiB, re-encoded e removido ao encerrar | Minimiza exposição e remove metadados. | y |
-| Storage em produção | S3 compatível privado; local só fora de produção | Downloads já são mediados por capability da API. | y |
-| Texto na arte | Não é requisito | Modelos não garantem tipografia exata; o título fica na UI/metadado. | y |
-| Jurídico e providers externos | Prontos para ativação, mas `EXTERNAL BLOCKED` | Não existe evidência real sem terceiro/credencial. | y |
+| Assumption / decision         | Chosen default                                              | Rationale                                                                | Confirmed? |
+| ----------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------ | ---------- |
+| Continuação autônoma          | Especificar, implementar, testar e verificar sem nova pausa | O dono pediu para deixar todos os P2 prontos e continuar até o objetivo. | y          |
+| Momento da capa               | Disponível após `paid` e em todas as etapas posteriores     | Evita abuso gratuito sem bloquear a música.                              | y          |
+| Limite comercial              | Uma geração e uma regeneração explícita                     | Mantém teto de custo previsível.                                         | y          |
+| Modelo                        | Lite sem foto; Flash com foto, configuráveis por env        | Equilibra custo e consistência conforme pesquisa oficial.                | y          |
+| Falta de credencial em dev    | Mostrar indisponibilidade, sem imagem fake                  | A convenção do repositório proíbe provider falso.                        | y          |
+| Referência                    | Um raster de até 8 MiB, re-encoded e removido ao encerrar   | Minimiza exposição e remove metadados.                                   | y          |
+| Storage em produção           | S3 compatível privado; local só fora de produção            | Downloads já são mediados por capability da API.                         | y          |
+| Texto na arte                 | Não é requisito                                             | Modelos não garantem tipografia exata; o título fica na UI/metadado.     | y          |
+| Jurídico e providers externos | Prontos para ativação, mas `EXTERNAL BLOCKED`               | Não existe evidência real sem terceiro/credencial.                       | y          |
 
 **Open questions: none.**
 
@@ -122,45 +122,45 @@ O MVP funciona, mas ainda entrega JavaScript público pesado, não oferece uma c
 - IF duas solicitações concorrentes ocorrerem THEN o sistema SHALL persistir uma única tentativa de produto por número.
 - IF a referência for arquivo ativo, truncado ou tiver MIME divergente THEN o sistema SHALL responder 400 sem persistir bytes, tentativa ou job.
 - IF o output do provider for SVG, vazio ou base64 inválido THEN o worker SHALL marcar falha terminal e remover a referência.
-- IF storage externo falhar após provider cobrado THEN o worker SHALL manter a mesma tentativa e registrar erro sanitizado para retry técnico.
+- IF storage externo falhar após provider cobrado THEN o worker SHALL manter a mesma tentativa, registrar custo/erro sanitizado e não repetir automaticamente a chamada paga.
 
 ## Implicit-Requirement Dimensions
 
-| Dimension | Resolution |
-| --- | --- |
-| Input validation & bounds | COVER-05 e edge case de assinatura/MIME. |
-| Failure / partial failure | Edge cases de provider e storage; capa não altera pedido. |
-| Idempotency / retry | COVER-02, COVER-07 e índice único por tentativa. |
-| Auth boundaries & rate limits | COVER-03/09; criação recebe limite dedicado. |
-| Concurrency / ordering | Tentativas 1 e 2 são serializadas em transação. |
-| Data lifecycle / expiry | COVER-06 e OPS-03. |
-| Observability | COVER-08 e MAINT-01. |
-| External dependency failure | Falha explícita sem fake; retry técnico no mesmo job. |
-| State transition integrity | Capa é independente; status principal não muda. |
+| Dimension                     | Resolution                                                |
+| ----------------------------- | --------------------------------------------------------- |
+| Input validation & bounds     | COVER-05 e edge case de assinatura/MIME.                  |
+| Failure / partial failure     | Edge cases de provider e storage; capa não altera pedido. |
+| Idempotency / retry           | COVER-02, COVER-07 e índice único por tentativa.          |
+| Auth boundaries & rate limits | COVER-03/09; criação recebe limite dedicado.              |
+| Concurrency / ordering        | Tentativas 1 e 2 são serializadas em transação.           |
+| Data lifecycle / expiry       | COVER-06 e OPS-03.                                        |
+| Observability                 | COVER-08 e MAINT-01.                                      |
+| External dependency failure   | Falha explícita sem fake; retry técnico no mesmo job.     |
+| State transition integrity    | Capa é independente; status principal não muda.           |
 
 ## Requirement Traceability
 
-| Requirement ID | Story | Phase | Status |
-| --- | --- | --- | --- |
-| COVER-01 | Capa privada | T4 | In Tasks |
-| COVER-02 | Capa privada | T4 | In Tasks |
-| COVER-03 | Capa privada | T4 | In Tasks |
-| COVER-04 | Capa privada | T5 | In Tasks |
-| COVER-05 | Capa privada | T4 | In Tasks |
-| COVER-06 | Capa privada | T5 | In Tasks |
-| COVER-07 | Capa privada | T4, T5 | In Tasks |
-| COVER-08 | Capa privada | T5 | In Tasks |
-| COVER-09 | Capa privada | T4 | In Tasks |
-| COVER-10 | Capa privada | T6 | In Tasks |
-| PERF-01 | Performance | T3 | In Tasks |
-| PERF-02 | Performance | T3 | In Tasks |
-| MAINT-01 | Manutenção | T2 | In Tasks |
-| MAINT-02 | Manutenção | T6 | In Tasks |
-| OPS-01 | Operação | T7 | In Tasks |
-| OPS-02 | Operação | T7 | In Tasks |
-| OPS-03 | Operação | T7 | In Tasks |
-| TEST-01 | Validação | T8 | In Tasks |
-| TEST-02 | Validação | T8 | In Tasks |
+| Requirement ID | Story        | Phase  | Status   |
+| -------------- | ------------ | ------ | -------- |
+| COVER-01       | Capa privada | T4     | In Tasks |
+| COVER-02       | Capa privada | T4     | In Tasks |
+| COVER-03       | Capa privada | T4     | In Tasks |
+| COVER-04       | Capa privada | T5     | In Tasks |
+| COVER-05       | Capa privada | T4     | In Tasks |
+| COVER-06       | Capa privada | T5     | In Tasks |
+| COVER-07       | Capa privada | T4, T5 | In Tasks |
+| COVER-08       | Capa privada | T5     | In Tasks |
+| COVER-09       | Capa privada | T4     | In Tasks |
+| COVER-10       | Capa privada | T6     | In Tasks |
+| PERF-01        | Performance  | T3     | In Tasks |
+| PERF-02        | Performance  | T3     | In Tasks |
+| MAINT-01       | Manutenção   | T2     | In Tasks |
+| MAINT-02       | Manutenção   | T6     | In Tasks |
+| OPS-01         | Operação     | T7     | In Tasks |
+| OPS-02         | Operação     | T7     | In Tasks |
+| OPS-03         | Operação     | T7     | In Tasks |
+| TEST-01        | Validação    | T8     | In Tasks |
+| TEST-02        | Validação    | T8     | In Tasks |
 
 **Coverage:** 19 total, 19 mapped to tasks, 0 unmapped.
 
