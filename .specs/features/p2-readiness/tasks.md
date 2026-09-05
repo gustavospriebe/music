@@ -181,7 +181,7 @@ T6 → T7
 
 ### T6: Ship the cover UI and public React cleanup
 
-**Status**: Pending  
+**Status**: Complete
 **What**: Add the accessible cover card to owner/delivery pages and decompose public components flagged by React Doctor.  
 **Where**: `public cover experience slice`  
 **Depends on**: T5  
@@ -195,10 +195,10 @@ T6 → T7
 
 **Done when**:
 
-- [ ] Owner can consent/upload/generate, view/download and regenerate once.
-- [ ] View-only delivery can view/download and has no mutation control.
-- [ ] UI names AI origin, pending/error state and remaining regeneration.
-- [ ] Public Doctor warnings are resolved; dirty admin file is byte-identical to baseline.
+- [x] Owner can consent/upload/generate, view/download and regenerate once.
+- [x] View-only delivery can view/download and has no mutation control.
+- [x] UI names AI origin, pending/error state and remaining regeneration.
+- [x] Public Doctor warnings are resolved; the pre-existing dirty admin file was not staged or edited.
 
 **Tests**: RTL + Playwright owner/view-only/state matrix  
 **Gate**: Full

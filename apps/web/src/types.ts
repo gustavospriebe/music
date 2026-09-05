@@ -32,15 +32,31 @@ export type Order = {
   priceCents: number;
   createdAt?: string;
 };
-export type OrderDetail = { order: Order; story?: Story; lyrics: Lyrics[]; audio: Audio[] };
+export type OrderDetail = {
+  order: Order;
+  story?: Story;
+  lyrics: Lyrics[];
+  audio: Audio[];
+  privateAccess: boolean;
+};
+export type AlbumCover = {
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  attempt: 1 | 2;
+  canRegenerate: boolean;
+  hasReference: boolean;
+  createdAt: string;
+  downloadUrl?: string;
+};
+export type AlbumCoverResponse = { available: boolean; cover: AlbumCover | null };
 export type Audio = {
   variant: number;
   status: string;
 };
 /** Admin-authenticated views keep addressing internal rows directly. */
 export type AdminAudio = Audio & { id: string; assetId: string };
-export const formatUsd = (value: number): string =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+const usdFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+const brlFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+export const formatUsd = (value: number): string => usdFormatter.format(value);
 /** Formats an exact decimal USD string (from PostgreSQL `numeric`) without float math. */
 export const formatUsdExact = (value: string): string => {
   const [int = '0', frac = ''] = value.split('.');
@@ -94,5 +110,4 @@ export const products: Record<
   },
 };
 
-export const formatMoney = (cents: number) =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100);
+export const formatMoney = (cents: number) => brlFormatter.format(cents / 100);

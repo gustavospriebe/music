@@ -1,5 +1,7 @@
 import type {
   AdminAudio,
+  AlbumCover,
+  AlbumCoverResponse,
   Audio,
   Lyrics,
   LyricsContent,
@@ -61,21 +63,23 @@ export type PublicProduct = {
 };
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {};
-  if (init?.body != null) headers['content-type'] = 'application/json';
+  if (init?.body != null && !(init.body instanceof FormData))
+    headers['content-type'] = 'application/json';
   const response = await fetch(url(path), {
     credentials: 'include',
     ...init,
     headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) },
   });
-  const body = (await response.json().catch(() => undefined)) as
-    { error?: { message?: string } } | T | undefined;
-  if (!response.ok)
+  if (!response.ok) {
+    const body = (await response.json().catch(() => undefined)) as
+      { error?: { message?: string } } | undefined;
     throw new ApiError(
-      (body as { error?: { message?: string } })?.error?.message ??
-        'Não foi possível concluir essa ação.',
+      body?.error?.message ?? 'Não foi possível concluir essa ação.',
       response.status,
     );
-  return body as T;
+  }
+  if (response.status === 204) return undefined as T;
+  return (await response.json()) as T;
 }
 
 export const api = {
@@ -95,6 +99,19 @@ export const api = {
       body: JSON.stringify(story),
     }),
   getOrder: (publicId: string) => request<OrderDetail>(`/orders/${publicId}`),
+  cover: (publicId: string) => request<AlbumCoverResponse>(`/orders/${publicId}/cover`),
+  createCover: (publicId: string, reference?: File, consent = false) => {
+    if (!reference)
+      return request<AlbumCover>(`/orders/${publicId}/cover`, {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+    const body = new FormData();
+    body.append('consent', String(consent));
+    body.append('reference', reference);
+    return request<AlbumCover>(`/orders/${publicId}/cover`, { method: 'POST', body });
+  },
+  coverDownloadUrl: (publicId: string) => url(`/orders/${publicId}/cover/download`),
   editLyrics: (publicId: string, versionNumber: number, content: LyricsContent) =>
     request(`/orders/${publicId}/lyrics/${versionNumber}`, {
       method: 'PATCH',
@@ -121,6 +138,8 @@ export const api = {
     }>(`/deliveries/${token}`),
   deliveryDownloadUrl: (token: string, variant: number) =>
     url(`/deliveries/${token}/files/${variant}/download`),
+  deliveryCover: (token: string) => request<AlbumCoverResponse>(`/deliveries/${token}/cover`),
+  deliveryCoverDownloadUrl: (token: string) => url(`/deliveries/${token}/cover/download`),
   exchangeAccess: (publicId: string, token: string) =>
     request<{ ok: true }>(`/orders/${publicId}/access/exchange`, {
       method: 'POST',

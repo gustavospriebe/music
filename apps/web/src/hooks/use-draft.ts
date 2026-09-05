@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 export type Draft = Record<string, unknown>;
-const key = 'resenha:story-draft';
+const key = 'resenha:v1:story-draft';
 
 export function readDraft(): Draft {
   try {

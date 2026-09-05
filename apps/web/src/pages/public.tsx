@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { api, visitorId } from '../api';
 import { Footer, Header, Loading, ProductionRail } from '../components';
+import { DeliveryCoverCard, OwnerCoverCard } from '../cover-card';
 import { clearDraft, readDraft, useDraft } from '../hooks/use-draft';
 import { readMyOrders, rememberMyOrder } from '../my-orders';
 import {
@@ -17,7 +18,13 @@ import {
   latestLyrics,
 } from '../order-journey';
 import { clearCreationKey, creationKey } from '../submission-attempt';
-import { formatMoney, type LyricsContent, type Story } from '../types';
+import {
+  formatMoney,
+  type Lyrics,
+  type LyricsContent,
+  type OrderDetail,
+  type Story,
+} from '../types';
 
 const storySchema = z.object({
   buyerName: z.string().min(2, 'Informe seu nome'),
@@ -58,6 +65,7 @@ const defaults: StoryForm = {
 };
 export function CreateStory() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   useEffect(() => {
     api.sendBeacon('form_started');
   }, []);
@@ -97,6 +105,7 @@ export function CreateStory() {
       return created.publicId;
     },
     onSuccess: (publicId) => {
+      void queryClient.invalidateQueries({ queryKey: ['order', publicId] });
       clearCreationKey();
       clearDraft();
       api.sendBeacon('form_completed');
@@ -220,7 +229,7 @@ export function CreateStory() {
             <input type="checkbox" {...form.register('marketingAccepted')} /> Quero receber
             novidades (opcional).
           </label>
-          <button className="button primary wide" disabled={submit.isPending}>
+          <button type="submit" className="button primary wide" disabled={submit.isPending}>
             {submit.isPending ? 'Salvando…' : 'Gerar minha letra'} <ArrowRight size={17} />
           </button>
         </form>
@@ -266,37 +275,120 @@ export function LyricsReview() {
   const approve = useMutation({
     mutationFn: ({ number, content }: { number: number; content?: LyricsContent }) =>
       api.approveLyrics(publicId, number, content),
-    onSuccess: () => navigate(`/criar/checkout?pedido=${publicId}`),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['order', publicId] });
+      navigate(`/criar/checkout?pedido=${publicId}`);
+    },
   });
   if (!publicId) return <Navigate to="/criar" replace />;
   if (order.isLoading) return <Loading label="Carregando sua história…" />;
   if (order.isError || !order.data)
     return <PageError message="Não foi possível abrir sua história." />;
-  const status = order.data.order.status;
+  return (
+    <LyricsReviewContent
+      detail={order.data}
+      generating={generate.isPending}
+      operation={edit.isPending ? 'saving' : approve.isPending ? 'approving' : null}
+      saved={edit.isSuccess}
+      mutationError={generate.error ?? edit.error ?? approve.error}
+      onGenerate={() => generate.mutate()}
+      onSave={(number, content) => {
+        approve.reset();
+        edit.mutate({ number, content });
+      }}
+      onApprove={(number, content) => {
+        edit.reset();
+        approve.mutate({ number, content });
+      }}
+    />
+  );
+}
+
+function LyricsReviewContent({
+  detail,
+  generating,
+  operation,
+  saved,
+  mutationError,
+  onGenerate,
+  onSave,
+  onApprove,
+}: {
+  detail: OrderDetail;
+  generating: boolean;
+  operation: 'saving' | 'approving' | null;
+  saved: boolean;
+  mutationError: Error | null;
+  onGenerate: () => void;
+  onSave: (number: number, content: LyricsContent) => void;
+  onApprove: (number: number, content?: LyricsContent) => void;
+}) {
+  const status = detail.order.status;
   if (!isOrderStatus(status))
     return <PageError message="O pedido está com um estado inconsistente." />;
-  const lyric = latestLyrics(order.data.lyrics);
-  const approved = order.data.lyrics.some((version) => Boolean(version.approvedAt));
-  if (status === 'lyrics_generating')
-    return (
-      <>
-        <Header />
-        <main className="review">
-          <p className="eyebrow">ETAPA 2 DE 5 · LETRA</p>
-          <h1>Criando sua letra</h1>
-          <p role="status">
-            Criando sua letra. A criação continua mesmo se você recarregar esta página.
-          </p>
-        </main>
-        <Footer />
-      </>
-    );
+  const lyric = latestLyrics(detail.lyrics);
+  const approved = detail.lyrics.some((version) => Boolean(version.approvedAt));
+  if (status === 'lyrics_generating') return <LyricsGeneratingView />;
   const canGenerate = status === 'story_completed' || (status === 'failed' && !approved);
   if (status === 'lyrics_ready' && !lyric)
     return <PageError message="O pedido está com um estado inconsistente: a letra está ausente." />;
   if (!canGenerate && status !== 'lyrics_ready')
     return <PageError message="A revisão da letra não está disponível nesta etapa." />;
-  const mutationError = generate.error ?? edit.error ?? approve.error;
+  return (
+    <LyricsWorkspace
+      status={status}
+      lyric={lyric}
+      canGenerate={canGenerate}
+      generating={generating}
+      operation={operation}
+      saved={saved}
+      mutationError={mutationError}
+      onGenerate={onGenerate}
+      onSave={onSave}
+      onApprove={onApprove}
+    />
+  );
+}
+
+function LyricsGeneratingView() {
+  return (
+    <>
+      <Header />
+      <main className="review">
+        <p className="eyebrow">ETAPA 2 DE 5 · LETRA</p>
+        <h1>Criando sua letra</h1>
+        <p role="status">
+          Criando sua letra. A criação continua mesmo se você recarregar esta página.
+        </p>
+      </main>
+      <Footer />
+    </>
+  );
+}
+
+function LyricsWorkspace({
+  status,
+  lyric,
+  canGenerate,
+  generating,
+  operation,
+  saved,
+  mutationError,
+  onGenerate,
+  onSave,
+  onApprove,
+}: {
+  status: string;
+  lyric: Lyrics | undefined;
+  canGenerate: boolean;
+  generating: boolean;
+  operation: 'saving' | 'approving' | null;
+  saved: boolean;
+  mutationError: Error | null;
+  onGenerate: () => void;
+  onSave: (number: number, content: LyricsContent) => void;
+  onApprove: (number: number, content?: LyricsContent) => void;
+}) {
   return (
     <>
       <Header />
@@ -308,39 +400,44 @@ export function LyricsReview() {
             {mutationError.message}
           </p>
         )}
-        {canGenerate ? (
-          <>
-            {status === 'failed' && <p>A letra não foi concluída. Sua história continua salva.</p>}
-            <button
-              className="button primary"
-              onClick={() => generate.mutate()}
-              disabled={generate.isPending}
-            >
-              {generate.isPending
-                ? 'Tentando gerar novamente'
-                : status === 'failed'
-                  ? 'Tentar gerar novamente'
-                  : 'Criar letra agora'}
-            </button>
-          </>
-        ) : (
+        {canGenerate && (
+          <LyricsGenerateAction status={status} pending={generating} onGenerate={onGenerate} />
+        )}
+        {!canGenerate && lyric && (
           <LyricEditor
-            key={lyric!.number}
-            lyric={lyric!}
-            onSave={(content) => {
-              approve.reset();
-              edit.mutate({ number: lyric!.number, content });
-            }}
-            onApprove={(content) => {
-              edit.reset();
-              approve.mutate({ number: lyric!.number, content });
-            }}
-            operation={edit.isPending ? 'saving' : approve.isPending ? 'approving' : null}
-            saved={edit.isSuccess}
+            key={lyric.number}
+            lyric={lyric}
+            onSave={(content) => onSave(lyric.number, content)}
+            onApprove={(content) => onApprove(lyric.number, content)}
+            operation={operation}
+            saved={saved}
           />
         )}
       </main>
       <Footer />
+    </>
+  );
+}
+
+function LyricsGenerateAction({
+  status,
+  pending,
+  onGenerate,
+}: {
+  status: string;
+  pending: boolean;
+  onGenerate: () => void;
+}) {
+  return (
+    <>
+      {status === 'failed' && <p>A letra não foi concluída. Sua história continua salva.</p>}
+      <button type="button" className="button primary" onClick={onGenerate} disabled={pending}>
+        {pending
+          ? 'Tentando gerar novamente'
+          : status === 'failed'
+            ? 'Tentar gerar novamente'
+            : 'Criar letra agora'}
+      </button>
     </>
   );
 }
@@ -477,9 +574,31 @@ export function OrderStatus() {
   if (order.isLoading) return <Loading label="Atualizando pedido…" />;
   if (order.isError || !order.data)
     return <PageError message="Pedido não encontrado ou acesso inválido." />;
-  const approved = latestLyrics(order.data.lyrics.filter((lyric) => lyric.approvedAt));
-  const completedAudio = completedAudioCount(order.data.audio);
-  const journey = deriveOrderJourney(order.data.order.status, {
+  return <OrderStatusContent publicOrderId={publicOrderId} detail={order.data} />;
+}
+
+const orderJourneyAction = (action: string | null | undefined, publicOrderId: string) => {
+  const actions: Record<string, { label: string; to: string }> = {
+    continue_story: { label: 'Continuar história', to: '/criar' },
+    open_lyrics: { label: 'Acompanhar letra', to: `/criar/letra?pedido=${publicOrderId}` },
+    review_lyrics: { label: 'Revisar letra', to: `/criar/letra?pedido=${publicOrderId}` },
+    retry_lyrics: { label: 'Tentar gerar novamente', to: `/criar/letra?pedido=${publicOrderId}` },
+    checkout: { label: 'Ir para o pagamento', to: `/criar/checkout?pedido=${publicOrderId}` },
+    listen: { label: 'Ouvir versões', to: `/pedido/${publicOrderId}/entrega` },
+  };
+  return action ? (actions[action] ?? null) : null;
+};
+
+function OrderStatusContent({
+  publicOrderId,
+  detail,
+}: {
+  publicOrderId: string;
+  detail: OrderDetail;
+}) {
+  const approved = latestLyrics(detail.lyrics.filter((lyric) => lyric.approvedAt));
+  const completedAudio = completedAudioCount(detail.audio);
+  const journey = deriveOrderJourney(detail.order.status, {
     hasApprovedLyrics: Boolean(approved),
     completedAudio,
   });
@@ -493,20 +612,7 @@ export function OrderStatus() {
         }
       />
     );
-  const action =
-    journey.action === 'continue_story'
-      ? { label: 'Continuar história', to: '/criar' }
-      : journey.action === 'open_lyrics'
-        ? { label: 'Acompanhar letra', to: `/criar/letra?pedido=${publicOrderId}` }
-        : journey.action === 'review_lyrics'
-          ? { label: 'Revisar letra', to: `/criar/letra?pedido=${publicOrderId}` }
-          : journey.action === 'retry_lyrics'
-            ? { label: 'Tentar gerar novamente', to: `/criar/letra?pedido=${publicOrderId}` }
-            : journey.action === 'checkout'
-              ? { label: 'Ir para o pagamento', to: `/criar/checkout?pedido=${publicOrderId}` }
-              : journey.action === 'listen'
-                ? { label: 'Ouvir versões', to: `/pedido/${publicOrderId}/entrega` }
-                : null;
+  const action = orderJourneyAction(journey.action, publicOrderId);
   return (
     <>
       <Header />
@@ -520,6 +626,7 @@ export function OrderStatus() {
           </Link>
         )}
         <ProductionRail step={journey.step} complete={journey.complete} />
+        {journey.step >= 4 && detail.privateAccess && <OwnerCoverCard publicId={publicOrderId} />}
         {approved && (
           <details className="price-card" open={!journey.complete}>
             <summary>
@@ -571,6 +678,7 @@ export function OrderPlayer() {
             </a>
           </div>
         ))}
+        {order.data.privateAccess && <OwnerCoverCard publicId={publicOrderId} />}
         <Link className="button secondary" to={`/pedido/${publicOrderId}`}>
           ← Status do pedido
         </Link>
@@ -662,6 +770,7 @@ export function MyOrders() {
 export function Delivery() {
   const { deliveryToken = '' } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const delivery = useQuery({
     queryKey: ['delivery', deliveryToken],
     queryFn: () => api.delivery(deliveryToken),
@@ -672,6 +781,8 @@ export function Delivery() {
     mutationFn: () => api.recoverViaDelivery(deliveryToken),
     onSuccess: ({ publicId }) => {
       rememberMyOrder(publicId);
+      void queryClient.invalidateQueries({ queryKey: ['delivery', deliveryToken] });
+      void queryClient.invalidateQueries({ queryKey: ['order', publicId] });
       navigate(`/pedido/${publicId}`);
     },
     onError: (e) => toast.error(e.message),
@@ -710,6 +821,7 @@ export function Delivery() {
                     </pre>
                   </details>
                 )}
+                <DeliveryCoverCard token={deliveryToken} />
               </>
             ) : (
               <>
@@ -720,6 +832,7 @@ export function Delivery() {
               </>
             )}
             <button
+              type="button"
               className="button secondary"
               disabled={recover.isPending}
               onClick={() => recover.mutate()}

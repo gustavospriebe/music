@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { HttpResponse, http } from 'msw';
 import { setupServer } from 'msw/node';
 import { api } from './api';
@@ -6,7 +6,10 @@ import { api } from './api';
 const server = setupServer();
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  vi.unstubAllGlobals();
+});
 afterAll(() => server.close());
 
 describe('API client', () => {
@@ -57,6 +60,31 @@ describe('API client', () => {
 
     await api.generateLyrics('public-order-1');
     expect(sawContentType).toBeNull();
+  });
+
+  it('envia referência de capa como multipart sem sobrescrever o boundary', async () => {
+    const fetch = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) =>
+      Response.json(
+        {
+          status: 'pending',
+          attempt: 1,
+          canRegenerate: false,
+          hasReference: true,
+          createdAt: '2026-09-04T12:00:00.000Z',
+        },
+        { status: 202 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetch);
+
+    const reference = new File(['jpeg'], 'lembranca.jpg', { type: 'image/jpeg' });
+    await api.createCover('public-order-1', reference, true);
+    const init = fetch.mock.calls[0]?.[1];
+    expect(init?.headers).not.toHaveProperty('content-type');
+    const form = init?.body as FormData;
+    expect(form).toBeInstanceOf(FormData);
+    expect(form.get('consent')).toBe('true');
+    expect((form.get('reference') as File).name).toBe('lembranca.jpg');
   });
 
   it('envia o texto atual ao aprovar e troca link de entrega por acesso', async () => {

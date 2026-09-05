@@ -37,7 +37,7 @@ describe('formulário público', () => {
 
   it('restaura o rascunho e associa o primeiro erro ao controle focado', async () => {
     localStorage.setItem(
-      'resenha:story-draft',
+      'resenha:v1:story-draft',
       JSON.stringify({ subjectName: 'Bia', factsText: 'Só uma lembrança' }),
     );
     renderForm();

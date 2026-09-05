@@ -9,9 +9,9 @@ const Probe = ({ value }: { value: string }) => {
 
 describe('rascunho local', () => {
   it('restaura JSON válido e ignora conteúdo indisponível ou corrompido', () => {
-    localStorage.setItem('resenha:story-draft', JSON.stringify({ subjectName: 'Bia' }));
+    localStorage.setItem('resenha:v1:story-draft', JSON.stringify({ subjectName: 'Bia' }));
     expect(readDraft()).toEqual({ subjectName: 'Bia' });
-    localStorage.setItem('resenha:story-draft', '{quebrado');
+    localStorage.setItem('resenha:v1:story-draft', '{quebrado');
     expect(readDraft()).toEqual({});
   });
 
