@@ -110,7 +110,7 @@ T6 → T7
 
 ### T3: Split the public entry by route
 
-**Status**: Complete  
+**Status**: Complete
 **What**: Keep the landing in the entry and load every operational public page through dynamic imports.  
 **Where**: `public web routing slice`  
 **Depends on**: T2  
@@ -157,7 +157,7 @@ T6 → T7
 
 ### T5: Generate covers in the resumable worker
 
-**Status**: Pending  
+**Status**: Complete
 **What**: Process cover jobs with the official OpenRouter Images API, private storage and complete usage accounting.  
 **Where**: `album-cover worker slice`  
 **Depends on**: T4  
@@ -171,10 +171,10 @@ T6 → T7
 
 **Done when**:
 
-- [ ] Controlled tests prove exact endpoint/body and parse one raster plus usage.
-- [ ] Success persists asset/status/ledger exactly once.
-- [ ] Retry reuses the attempt; terminal outcomes remove the reference.
-- [ ] No paid provider call occurs.
+- [x] Controlled tests prove exact endpoint/body and parse one raster plus usage.
+- [x] Success persists asset/status/ledger exactly once.
+- [x] Retry reuses the attempt; terminal outcomes remove the reference.
+- [x] No paid provider call occurs (17/17 worker tests use controlled providers/fetch).
 
 **Tests**: Worker unit and real-PostgreSQL integration  
 **Gate**: Full

@@ -1,10 +1,17 @@
-import { mkdtempSync } from 'node:fs';
+import { existsSync, mkdtempSync } from 'node:fs';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { Pool } from 'pg';
 import type { ClaimedJob } from '@resenha/database';
-import { processAudioJob, type MusicResult, type WorkerConfig } from './worker.js';
+import {
+  processAudioJob,
+  processCoverJob,
+  type CoverProvider,
+  type MusicResult,
+  type WorkerConfig,
+} from './worker.js';
 
 const pool = new Pool({
   connectionString:
@@ -23,6 +30,8 @@ const config: WorkerConfig = {
   tokenPepper: 'a-local-token-pepper-with-more-than-32-chars',
   openRouterApiKey: 'test-key',
   openRouterMusicModel: 'test-music-model',
+  openRouterCoverTextModel: 'google/gemini-3.1-flash-lite-image',
+  openRouterCoverReferenceModel: 'google/gemini-3.1-flash-image',
   emailFrom: 'test@example.test',
 };
 
@@ -77,6 +86,221 @@ const okMusic = (requestId: string): MusicResult => ({
       error: null,
     },
   ],
+});
+
+describe('processCoverJob persistence', () => {
+  it('stores one private raster and usage, removes the reference and never calls again', async () => {
+    const publicId = 'cover-worker-1';
+    const order = await pool.query<{ id: string }>(
+      `insert into orders(public_id,product_type,status,price_cents,access_token_hash)
+       values($1,'friend_roast','audio_queued',4990,'hash') returning id`,
+      [publicId],
+    );
+    const orderId = order.rows[0]?.id as string;
+    await pool.query(`insert into story_sessions(order_id,data) values($1,$2)`, [
+      orderId,
+      JSON.stringify({
+        productType: 'friend_roast',
+        buyerEmail: 'ana@example.test',
+        subjectName: 'Bia',
+        occasion: 'Aniversário',
+        genre: 'pagode',
+        voice: 'female',
+        mood: 'animado',
+        facts: ['Fato um', 'Fato dois'],
+        relationship: 'Amiga',
+        traits: ['Leal'],
+        biggestStory: 'Fato um',
+        roastLevel: 'light',
+        safetyConfirmed: true,
+        termsAccepted: true,
+        marketingAccepted: false,
+      }),
+    ]);
+    await pool.query(
+      `insert into lyric_versions(order_id,number,kind,content,approved_at)
+       values($1,1,'approved',$2,now())`,
+      [orderId, JSON.stringify(approvedContent)],
+    );
+    const referenceKey = `orders/${publicId}/references/ref.jpg`;
+    await mkdir(join(config.storagePath, 'orders', publicId, 'references'), { recursive: true });
+    const referenceBytes = Buffer.from([0xff, 0xd8, 0xff, 0x01]);
+    await writeFile(join(config.storagePath, referenceKey), referenceBytes);
+    const reference = await pool.query<{ id: string }>(
+      `insert into stored_files(order_id,storage_key,mime_type,size_bytes)
+       values($1,$2,'image/jpeg',$3) returning id`,
+      [orderId, referenceKey, referenceBytes.length],
+    );
+    await pool.query(
+      `insert into album_covers(order_id,attempt,status,reference_asset_id,had_reference,model)
+       values($1,1,'pending',$2,true,$3)`,
+      [orderId, reference.rows[0]?.id, config.openRouterCoverReferenceModel],
+    );
+    const insertedJob = await pool.query<{ id: string }>(
+      `insert into generation_jobs(type,order_id,payload,idempotency_key,max_attempts)
+       values('generate_cover',$1,'{"attempt":1}',$2,1) returning id`,
+      [orderId, `cover:${orderId}:1`],
+    );
+    const job: ClaimedJob = {
+      id: insertedJob.rows[0]?.id as string,
+      orderId,
+      type: 'generate_cover',
+      attempts: 1,
+      maxAttempts: 1,
+      payload: { attempt: 1 },
+    };
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+      'base64',
+    );
+    const calls: Parameters<CoverProvider['generate']>[0][] = [];
+    const provider: CoverProvider = {
+      generate: async (input) => {
+        calls.push(input);
+        return {
+          bytes: png,
+          mime: 'image/png',
+          usage: {
+            requestId: null,
+            model: input.model,
+            inputTokens: 35,
+            outputTokens: 1120,
+            costUsd: '0.067',
+            latencyMs: 90,
+          },
+        };
+      },
+    };
+    await processCoverJob(pool, job, config, provider);
+    await processCoverJob(pool, job, config, provider);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      model: config.openRouterCoverReferenceModel,
+      reference: referenceBytes,
+    });
+    expect(calls[0]?.prompt).toContain('Bia');
+    const cover = await pool.query(
+      `select c.status,c.reference_asset_id,c.had_reference,f.mime_type,f.storage_key
+       from album_covers c join stored_files f on f.id=c.cover_asset_id
+       where c.order_id=$1`,
+      [orderId],
+    );
+    expect(cover.rows[0]).toMatchObject({
+      status: 'completed',
+      reference_asset_id: null,
+      had_reference: true,
+      mime_type: 'image/png',
+    });
+    expect(existsSync(join(config.storagePath, referenceKey))).toBe(false);
+    expect(existsSync(join(config.storagePath, cover.rows[0]?.storage_key))).toBe(true);
+    const usage = await pool.query(
+      'select kind,provider,model,input_tokens,output_tokens,cost_usd,status from ai_usage where order_id=$1',
+      [orderId],
+    );
+    expect(usage.rows).toHaveLength(1);
+    expect(usage.rows[0]).toMatchObject({
+      kind: 'album_cover',
+      provider: 'openrouter',
+      model: config.openRouterCoverReferenceModel,
+      input_tokens: 35,
+      output_tokens: 1120,
+      status: 'ok',
+    });
+  });
+
+  it('marks a provider failure terminal and still erases the reference', async () => {
+    const publicId = 'cover-worker-failed-1';
+    const order = await pool.query<{ id: string }>(
+      `insert into orders(public_id,product_type,status,price_cents,access_token_hash)
+       values($1,'friend_roast','audio_queued',4990,'hash') returning id`,
+      [publicId],
+    );
+    const orderId = order.rows[0]?.id as string;
+    await pool.query('insert into story_sessions(order_id,data) values($1,$2)', [
+      orderId,
+      JSON.stringify({
+        productType: 'friend_roast',
+        buyerEmail: 'ana@example.test',
+        subjectName: 'Bia',
+        occasion: 'Aniversário',
+        genre: 'pagode',
+        voice: 'female',
+        mood: 'animado',
+        facts: ['Fato um', 'Fato dois'],
+        relationship: 'Amiga',
+        traits: ['Leal'],
+        biggestStory: 'Fato um',
+        roastLevel: 'light',
+        safetyConfirmed: true,
+        termsAccepted: true,
+        marketingAccepted: false,
+      }),
+    ]);
+    await pool.query(
+      `insert into lyric_versions(order_id,number,kind,content,approved_at)
+       values($1,1,'approved',$2,now())`,
+      [orderId, JSON.stringify(approvedContent)],
+    );
+    const referenceKey = `orders/${publicId}/references/ref.jpg`;
+    await mkdir(join(config.storagePath, 'orders', publicId, 'references'), { recursive: true });
+    await writeFile(join(config.storagePath, referenceKey), Buffer.from([0xff, 0xd8, 0xff]));
+    const reference = await pool.query<{ id: string }>(
+      `insert into stored_files(order_id,storage_key,mime_type,size_bytes)
+       values($1,$2,'image/jpeg',3) returning id`,
+      [orderId, referenceKey],
+    );
+    await pool.query(
+      `insert into album_covers(order_id,attempt,status,reference_asset_id,had_reference,model)
+       values($1,1,'pending',$2,true,$3)`,
+      [orderId, reference.rows[0]?.id, config.openRouterCoverReferenceModel],
+    );
+    const insertedJob = await pool.query<{ id: string }>(
+      `insert into generation_jobs(type,order_id,payload,idempotency_key,max_attempts)
+       values('generate_cover',$1,'{"attempt":1}',$2,1) returning id`,
+      [orderId, `cover:${orderId}:1`],
+    );
+    const job: ClaimedJob = {
+      id: insertedJob.rows[0]?.id as string,
+      orderId,
+      type: 'generate_cover',
+      attempts: 1,
+      maxAttempts: 1,
+      payload: { attempt: 1 },
+    };
+    const usage = {
+      requestId: null,
+      model: config.openRouterCoverReferenceModel as string,
+      inputTokens: 0,
+      outputTokens: 0,
+      costUsd: null,
+      latencyMs: 12,
+    };
+    await expect(
+      processCoverJob(pool, job, config, {
+        generate: async () => {
+          throw Object.assign(new Error('provider rejected image'), { usage });
+        },
+      }),
+    ).rejects.toMatchObject({ terminal: true });
+    const cover = await pool.query(
+      'select status,reference_asset_id,last_error from album_covers where order_id=$1',
+      [orderId],
+    );
+    expect(cover.rows[0]).toMatchObject({
+      status: 'failed',
+      reference_asset_id: null,
+      last_error: 'provider rejected image',
+    });
+    expect(existsSync(join(config.storagePath, referenceKey))).toBe(false);
+    const usageRows = await pool.query('select kind,status,error from ai_usage where order_id=$1', [
+      orderId,
+    ]);
+    expect(usageRows.rows[0]).toMatchObject({
+      kind: 'album_cover',
+      status: 'error',
+      error: 'provider rejected image',
+    });
+  });
 });
 
 const setupOrder = async (publicId: string, key: string) => {

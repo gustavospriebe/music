@@ -1001,7 +1001,7 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
         );
         await client.query(
           `insert into generation_jobs(type,order_id,payload,idempotency_key,max_attempts)
-           values('generate_cover',$1,$2,$3,3) on conflict(idempotency_key) do nothing`,
+           values('generate_cover',$1,$2,$3,1) on conflict(idempotency_key) do nothing`,
           [order.id, JSON.stringify({ attempt }), `cover:${order.id}:${attempt}`],
         );
         await client.query('commit');

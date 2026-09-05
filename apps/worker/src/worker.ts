@@ -1,6 +1,6 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
-import { generatedLyricsSchema } from '@resenha/contracts';
+import { generatedLyricsSchema, storySchema } from '@resenha/contracts';
 import {
   assertTransition,
   createAccessToken,
@@ -31,6 +31,8 @@ export type WorkerConfig = {
   tokenPepper: string;
   openRouterApiKey: string;
   openRouterMusicModel: string;
+  openRouterCoverTextModel?: string;
+  openRouterCoverReferenceModel?: string;
   /** Presente => envio real via Resend. Ausente fora de produção => registro local. */
   resendApiKey?: string;
   emailFrom: string;
@@ -66,6 +68,8 @@ export const readWorkerConfig = (env: NodeJS.ProcessEnv): WorkerConfig => {
     tokenPepper: required(env, 'CUSTOMER_ACCESS_TOKEN_PEPPER'),
     openRouterApiKey: required(env, 'OPENROUTER_API_KEY'),
     openRouterMusicModel: required(env, 'OPENROUTER_MUSIC_MODEL'),
+    openRouterCoverTextModel: env.OPENROUTER_COVER_TEXT_MODEL || undefined,
+    openRouterCoverReferenceModel: env.OPENROUTER_COVER_REFERENCE_MODEL || undefined,
     resendApiKey: resendApiKey || undefined,
     emailFrom: env.EMAIL_FROM ?? 'Música da Resenha <onboarding@resend.dev>',
   };
@@ -111,6 +115,128 @@ export type MusicGeneration = {
 export type MusicAttempt = { sample: AiUsageSample; status: AiUsageStatus; error: string | null };
 export type MusicResult = { generation: MusicGeneration; attempts: MusicAttempt[] };
 export type MusicProvider = { generate: (prompt: string) => Promise<MusicResult> };
+
+export type CoverGeneration = {
+  bytes: Buffer;
+  mime: 'image/jpeg' | 'image/png' | 'image/webp';
+  usage: AiUsageSample;
+};
+export type CoverInput = { model: string; prompt: string; reference?: Buffer };
+export type CoverProvider = { generate: (input: CoverInput) => Promise<CoverGeneration> };
+
+const detectCoverMime = (bytes: Buffer): CoverGeneration['mime'] | null => {
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff)
+    return 'image/jpeg';
+  if (
+    bytes.length >= 8 &&
+    bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+  )
+    return 'image/png';
+  if (
+    bytes.length >= 12 &&
+    bytes.subarray(0, 4).toString() === 'RIFF' &&
+    bytes.subarray(8, 12).toString() === 'WEBP'
+  )
+    return 'image/webp';
+  return null;
+};
+
+/** OpenRouter Images API. Exportada como seam porque qualquer chamada real pode cobrar. */
+export const generateCoverOnce = async (
+  config: { apiKey: string; webUrl: string },
+  input: CoverInput,
+): Promise<CoverGeneration> => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 120_000);
+  const startedAt = Date.now();
+  const blankUsage = (): AiUsageSample => ({
+    requestId: null,
+    model: input.model,
+    inputTokens: 0,
+    outputTokens: 0,
+    costUsd: null,
+    latencyMs: Date.now() - startedAt,
+  });
+  try {
+    const response = await fetch('https://openrouter.ai/api/v1/images', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        authorization: `Bearer ${config.apiKey}`,
+        'content-type': 'application/json',
+        'http-referer': config.webUrl,
+        'x-title': 'Musica da Resenha',
+      },
+      body: JSON.stringify({
+        model: input.model,
+        prompt: input.prompt,
+        resolution: '1K',
+        aspect_ratio: '1:1',
+        n: 1,
+        ...(input.reference
+          ? {
+              input_references: [
+                {
+                  type: 'image_url',
+                  image_url: {
+                    url: `data:image/jpeg;base64,${input.reference.toString('base64')}`,
+                  },
+                },
+              ],
+            }
+          : {}),
+      }),
+    });
+    if (!response.ok)
+      throw Object.assign(new Error(`OpenRouter cover failed (${response.status})`), {
+        terminal: true,
+        usage: blankUsage(),
+      });
+    const body = (await response.json()) as {
+      data?: Array<{ b64_json?: string; media_type?: string }>;
+      usage?: { prompt_tokens?: number; completion_tokens?: number; cost?: number | string };
+    };
+    const encoded = body.data?.[0]?.b64_json;
+    if (!encoded || encoded.length > 28_000_000)
+      throw Object.assign(new Error('OpenRouter cover returned no valid image'), {
+        terminal: true,
+        usage: blankUsage(),
+      });
+    const bytes = Buffer.from(encoded, 'base64');
+    const mime = detectCoverMime(bytes);
+    const declared = body.data?.[0]?.media_type;
+    if (!mime || (declared && declared !== mime))
+      throw Object.assign(new Error('OpenRouter cover returned an unsupported image'), {
+        terminal: true,
+        usage: blankUsage(),
+      });
+    return {
+      bytes,
+      mime,
+      usage: {
+        requestId: null,
+        model: input.model,
+        inputTokens: body.usage?.prompt_tokens ?? 0,
+        outputTokens: body.usage?.completion_tokens ?? 0,
+        costUsd: body.usage?.cost === undefined ? null : String(body.usage.cost),
+        latencyMs: Date.now() - startedAt,
+      },
+    };
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && 'terminal' in error) throw error;
+    throw Object.assign(error instanceof Error ? error : new Error(String(error)), {
+      terminal: true,
+      usage: blankUsage(),
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
+export const createOpenRouterCoverProvider = (config: {
+  apiKey: string;
+  webUrl: string;
+}): CoverProvider => ({ generate: (input) => generateCoverOnce(config, input) });
 
 /** Detecta o contêiner real retornado pelo modelo (o format pedido pode ser ignorado). */
 export const detectAudioMime = (bytes: Buffer): { mime: string; ext: string } => {
@@ -615,6 +741,212 @@ export const processAudioJob = async (
   }
 };
 
+type CoverJobPayload = { attempt: 1 | 2 };
+type CoverJobRow = {
+  id: string;
+  status: string;
+  model: string;
+  reference_asset_id: string | null;
+  cover_asset_id: string | null;
+  public_id: string;
+  reference_key: string | null;
+};
+
+const coverPayload = (payload: unknown): CoverJobPayload => {
+  if (
+    typeof payload !== 'object' ||
+    payload === null ||
+    !('attempt' in payload) ||
+    (payload.attempt !== 1 && payload.attempt !== 2)
+  )
+    throw Object.assign(new Error('Invalid cover job payload'), { terminal: true });
+  return { attempt: payload.attempt };
+};
+
+const cleanupCoverReference = async (
+  pool: Pool,
+  config: WorkerConfig,
+  cover: Pick<CoverJobRow, 'id' | 'reference_asset_id' | 'reference_key'>,
+): Promise<void> => {
+  if (!cover.reference_asset_id || !cover.reference_key) return;
+  await rm(safeStoragePath(config.storagePath, cover.reference_key), { force: true });
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    await client.query(
+      'update album_covers set reference_asset_id=null,updated_at=now() where id=$1',
+      [cover.id],
+    );
+    await client.query('delete from stored_files where id=$1', [cover.reference_asset_id]);
+    await client.query('commit');
+  } catch (error) {
+    await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+const makeCoverPrompt = (storyValue: unknown, lyricsValue: unknown): string => {
+  const story = storySchema.parse(storyValue);
+  const lyrics = generatedLyricsSchema.parse(lyricsValue);
+  const context = {
+    title: lyrics.title,
+    subject: story.subjectName,
+    occasion: story.occasion,
+    genre: lyrics.musicalDirection.genre,
+    mood: lyrics.musicalDirection.mood,
+    summary: lyrics.summary,
+    memories: story.facts.slice(0, 5),
+    lyricExcerpt: lyrics.fullLyrics.slice(0, 1_200),
+  };
+  return [
+    'Crie uma capa de single original, quadrada, expressiva e presenteável.',
+    'Use composição editorial brasileira, contraste forte e espaço visual limpo.',
+    'Não inclua logotipos, celebridades, artistas reconhecíveis, nudez ou imitação de estilo de artista vivo.',
+    'Não dependa de texto legível dentro da imagem; o título será aplicado pela interface.',
+    'Se houver foto, preserve a identidade geral das pessoas sem inventar outras pessoas.',
+    `Contexto: ${JSON.stringify(context)}`,
+  ].join('\n');
+};
+
+const usageFromCoverError = (error: unknown): AiUsageSample | null => {
+  if (typeof error !== 'object' || error === null || !('usage' in error)) return null;
+  const usage = error.usage;
+  if (typeof usage !== 'object' || usage === null || !('model' in usage)) return null;
+  return usage as AiUsageSample;
+};
+
+export const processCoverJob = async (
+  pool: Pool,
+  job: ClaimedJob,
+  config: WorkerConfig,
+  provider: CoverProvider = createOpenRouterCoverProvider({
+    apiKey: config.openRouterApiKey,
+    webUrl: config.webUrl,
+  }),
+): Promise<void> => {
+  const { attempt } = coverPayload(job.payload);
+  const result = await pool.query<CoverJobRow>(
+    `select c.id,c.status,c.model,c.reference_asset_id,c.cover_asset_id,o.public_id,
+            reference.storage_key as reference_key
+     from album_covers c
+     join orders o on o.id=c.order_id
+     left join stored_files reference on reference.id=c.reference_asset_id
+     where c.order_id=$1 and c.attempt=$2`,
+    [job.orderId, attempt],
+  );
+  const cover = result.rows[0];
+  if (!cover) throw Object.assign(new Error('Cover attempt was not found'), { terminal: true });
+  if (cover.status === 'completed') {
+    await cleanupCoverReference(pool, config, cover);
+    return;
+  }
+  if (cover.status !== 'pending')
+    throw Object.assign(new Error('Cover provider call was already claimed'), { terminal: true });
+  const claimed = await pool.query(
+    "update album_covers set status='processing',updated_at=now() where id=$1 and status='pending' returning id",
+    [cover.id],
+  );
+  if (!claimed.rowCount)
+    throw Object.assign(new Error('Cover provider call was already claimed'), { terminal: true });
+
+  let generation: CoverGeneration;
+  try {
+    if (!config.openRouterCoverTextModel || !config.openRouterCoverReferenceModel)
+      throw Object.assign(new Error('Cover models are not configured'), { terminal: true });
+    const [storyResult, lyricsResult] = await Promise.all([
+      pool.query('select data from story_sessions where order_id=$1', [job.orderId]),
+      pool.query(
+        'select content from lyric_versions where order_id=$1 and approved_at is not null order by number desc limit 1',
+        [job.orderId],
+      ),
+    ]);
+    if (!storyResult.rowCount || !lyricsResult.rowCount)
+      throw Object.assign(
+        new Error('Story and approved lyrics are required for cover generation'),
+        {
+          terminal: true,
+        },
+      );
+    const reference = cover.reference_key
+      ? await readFile(safeStoragePath(config.storagePath, cover.reference_key))
+      : undefined;
+    generation = await provider.generate({
+      model: cover.model,
+      prompt: makeCoverPrompt(storyResult.rows[0]?.data, lyricsResult.rows[0]?.content),
+      ...(reference ? { reference } : {}),
+    });
+    const extension =
+      generation.mime === 'image/png' ? 'png' : generation.mime === 'image/webp' ? 'webp' : 'jpg';
+    const key = `orders/${cover.public_id}/cover-${attempt}.${extension}`;
+    await writeLocalAsset(config.storagePath, key, generation.bytes);
+    const client = await pool.connect();
+    try {
+      await client.query('begin');
+      const asset = await client.query<{ id: string }>(
+        `insert into stored_files(order_id,storage_key,mime_type,size_bytes)
+         values($1,$2,$3,$4)
+         on conflict(storage_key) do update set mime_type=excluded.mime_type,size_bytes=excluded.size_bytes,updated_at=now()
+         returning id`,
+        [job.orderId, key, generation.mime, generation.bytes.length],
+      );
+      await client.query(
+        "update album_covers set status='completed',cover_asset_id=$1,last_error=null,updated_at=now() where id=$2",
+        [asset.rows[0]?.id, cover.id],
+      );
+      await client.query(
+        `insert into ai_usage(order_id,job_id,kind,provider,model,external_id,input_tokens,output_tokens,cost_usd,latency_ms,status,error,attempt)
+         values($1,$2,'album_cover','openrouter',$3,$4,$5,$6,$7,$8,'ok',null,$9)`,
+        [
+          job.orderId,
+          job.id,
+          generation.usage.model,
+          generation.usage.requestId,
+          generation.usage.inputTokens,
+          generation.usage.outputTokens,
+          generation.usage.costUsd,
+          generation.usage.latencyMs,
+          attempt,
+        ],
+      );
+      await client.query('commit');
+    } catch (error) {
+      await client.query('rollback');
+      throw error;
+    } finally {
+      client.release();
+    }
+    await cleanupCoverReference(pool, config, cover);
+  } catch (error) {
+    const message = sanitizeError(error);
+    const usage = usageFromCoverError(error);
+    await pool.query(
+      "update album_covers set status='failed',last_error=$1,updated_at=now() where id=$2 and status!='completed'",
+      [message, cover.id],
+    );
+    if (usage)
+      await pool.query(
+        `insert into ai_usage(order_id,job_id,kind,provider,model,external_id,input_tokens,output_tokens,cost_usd,latency_ms,status,error,attempt)
+         values($1,$2,'album_cover','openrouter',$3,$4,$5,$6,$7,$8,'error',$9,$10)`,
+        [
+          job.orderId,
+          job.id,
+          usage.model,
+          usage.requestId,
+          usage.inputTokens,
+          usage.outputTokens,
+          usage.costUsd,
+          usage.latencyMs,
+          message,
+          attempt,
+        ],
+      );
+    await cleanupCoverReference(pool, config, cover);
+    throw Object.assign(error instanceof Error ? error : new Error(message), { terminal: true });
+  }
+};
+
 export const createWorker = ({ pool, config }: { pool: Pool; config: WorkerConfig }) => {
   let active = 0;
 
@@ -626,7 +958,10 @@ export const createWorker = ({ pool, config }: { pool: Pool; config: WorkerConfi
       if (job.payload === null || typeof job.payload !== 'object')
         throw new Error('Invalid job payload');
       if (job.maxAttempts < job.attempts) throw new Error('Job retry limit exceeded');
-      await processAudioJob(pool, job, config);
+      if (job.type === 'generate_audio' || job.type === 'deliver-notify')
+        await processAudioJob(pool, job, config);
+      else if (job.type === 'generate_cover') await processCoverJob(pool, job, config);
+      else throw Object.assign(new Error(`Unsupported job type: ${job.type}`), { terminal: true });
       await completeJob(pool, job.id);
       console.info(jobLogContext(job, 'completed', Date.now() - startedAt), 'worker job completed');
     } catch (error) {

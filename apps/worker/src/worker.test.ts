@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { generateMusicOnce, jobLogContext, readWorkerConfig, sanitizeError } from './worker.js';
+import {
+  generateCoverOnce,
+  generateMusicOnce,
+  jobLogContext,
+  readWorkerConfig,
+  sanitizeError,
+} from './worker.js';
 
 const fullEnv = {
   DATABASE_URL: 'postgresql://local/test',
@@ -122,7 +128,7 @@ describe('music sing parsing', () => {
   });
 
   it('encerra bloqueios do filtro após orçamento curto com erro terminal', async () => {
-    const fetch = vi.fn(async () =>
+    const fetch = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) =>
       sse([{ id: 'gen-blocked', error: { message: 'PROHIBITED_CONTENT' } }]),
     );
     vi.stubGlobal('fetch', fetch);
@@ -152,5 +158,76 @@ describe('music sing parsing', () => {
     if (outcome.ok) return;
     expect(outcome.error.message).toContain('fetch failed');
     expect(outcome.usage.requestId).toBeNull();
+  });
+});
+
+describe('cover image parsing', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+    'base64',
+  );
+
+  it('uses the official Images API shape and returns measured usage', async () => {
+    const fetch = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) =>
+      Response.json({
+        data: [{ b64_json: png.toString('base64'), media_type: 'image/png' }],
+        usage: { prompt_tokens: 40, completion_tokens: 1120, cost: 0.0336 },
+      }),
+    );
+    vi.stubGlobal('fetch', fetch);
+    const outcome = await generateCoverOnce(
+      { apiKey: 'key', webUrl: 'http://local' },
+      {
+        model: 'google/gemini-3.1-flash-lite-image',
+        prompt: 'album cover',
+        reference: Buffer.from([0xff, 0xd8, 0xff]),
+      },
+    );
+    expect(fetch).toHaveBeenCalledWith(
+      'https://openrouter.ai/api/v1/images',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ authorization: 'Bearer key' }),
+      }),
+    );
+    const request = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
+    expect(request).toEqual({
+      model: 'google/gemini-3.1-flash-lite-image',
+      prompt: 'album cover',
+      resolution: '1K',
+      aspect_ratio: '1:1',
+      n: 1,
+      input_references: [{ type: 'image_url', image_url: { url: 'data:image/jpeg;base64,/9j/' } }],
+    });
+    expect(outcome).toMatchObject({
+      bytes: png,
+      mime: 'image/png',
+      usage: {
+        model: 'google/gemini-3.1-flash-lite-image',
+        inputTokens: 40,
+        outputTokens: 1120,
+        costUsd: '0.0336',
+      },
+    });
+  });
+
+  it('rejects active or malformed output as terminal', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          data: [
+            { b64_json: Buffer.from('<svg/>').toString('base64'), media_type: 'image/svg+xml' },
+          ],
+        }),
+      ),
+    );
+    await expect(
+      generateCoverOnce(
+        { apiKey: 'key', webUrl: 'http://local' },
+        { model: 'model', prompt: 'cover' },
+      ),
+    ).rejects.toMatchObject({ terminal: true });
   });
 });
