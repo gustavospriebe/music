@@ -787,13 +787,21 @@ export function Delivery() {
     },
     onError: (e) => toast.error(e.message),
   });
+  if (delivery.isError) {
+    return (
+      <>
+        <Header />
+        <PageError message="Link de entrega inválido ou expirado." />
+        <Footer />
+      </>
+    );
+  }
   return (
     <>
       <Header />
       <main className="delivery">
         <p className="eyebrow">ENTREGA PRIVADA</p>
         {delivery.isLoading && <Loading label="Abrindo sua entrega…" />}
-        {delivery.isError && <PageError message="Link de entrega inválido ou expirado." />}
         {delivery.data && (
           <>
             {delivery.data.audio.length === 2 ? (
