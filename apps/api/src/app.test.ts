@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildApp, httpLogContext } from './app.js';
+import { buildApp, httpLogContext, requestLogController } from './app.js';
 import type { Env } from './env.js';
 
 const env: Env = {
@@ -27,6 +27,11 @@ describe('HTTP foundation', () => {
       statusCode: 200,
       latencyMs: 13,
     });
+  });
+
+  it('disables Fastify request logs through the Fastify 6-compatible controller', () => {
+    expect(requestLogController.disableRequestLogging).toBe(true);
+    expect(requestLogController.isLogDisabled({} as never)).toBe(true);
   });
 
   it('serves a live health probe through fastify.inject', async () => {

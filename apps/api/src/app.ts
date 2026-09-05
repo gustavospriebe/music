@@ -1,4 +1,4 @@
-import Fastify from 'fastify';
+import Fastify, { LogController } from 'fastify';
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
@@ -123,13 +123,15 @@ export const httpLogContext = (route: string, statusCode: number, elapsedTime: n
   latencyMs: Math.round(elapsedTime),
 });
 
+export const requestLogController = new LogController({ disableRequestLogging: true });
+
 export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } = {}) => {
   const app = Fastify({
     logger: {
       level: process.env.LOG_LEVEL ?? 'info',
       redact: ['req.headers.authorization', 'req.headers.cookie'],
     },
-    disableRequestLogging: true,
+    logController: requestLogController,
     genReqId: () => nanoid(12),
     bodyLimit: 100_000,
   });

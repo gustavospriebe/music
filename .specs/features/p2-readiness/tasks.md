@@ -87,7 +87,7 @@ T6 → T7
 
 ### T2: Adopt the Fastify 6 logging API
 
-**Status**: Pending  
+**Status**: Complete  
 **What**: Replace the deprecated top-level logging option while preserving one sanitized completion event.  
 **Where**: `Fastify bootstrap`  
 **Depends on**: T1  
@@ -101,9 +101,9 @@ T6 → T7
 
 **Done when**:
 
-- [ ] A failing test first proves the intended log contract.
-- [ ] `LogController` replaces top-level `disableRequestLogging`.
-- [ ] Existing sanitization assertions and API tests pass.
+- [x] A failing test first proves the intended log contract.
+- [x] `LogController` replaces top-level `disableRequestLogging`.
+- [x] Existing sanitization assertions and API tests pass (31/31).
 
 **Tests**: API unit/integration logging assertions  
 **Gate**: Quick
