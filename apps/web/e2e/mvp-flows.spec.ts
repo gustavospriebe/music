@@ -208,7 +208,8 @@ test('minhas músicas lista pedidos do navegador com fallback de acesso', async 
   await expect(page.getByText('Criada em', { exact: true })).toBeVisible();
   await expect(page.getByText('04/09/2026', { exact: true })).toBeVisible();
   await expect(page.getByText('Progresso', { exact: true })).toBeVisible();
-  await expect(page.getByText('Em criação', { exact: true })).toBeVisible();
+  await expect(page.locator('.library-status-pill')).toHaveText('Em criação');
+  await expect(page.getByRole('definition').filter({ hasText: 'Em criação' })).toBeVisible();
   await expect(page.getByRole('main')).not.toContainText('order-mine-123');
   await expect(page.getByRole('main')).not.toContainText('order-gone-456');
   await expect(page.getByText(/continuar criação/i).first()).toBeVisible();

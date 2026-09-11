@@ -220,6 +220,7 @@ test('ajuste recebido aparece no acompanhamento e no admin, que pode revogar ace
     });
   });
   await page.goto('/pedido/adjust/entrega');
+  await page.getByText('Solicitar ajuste', { exact: true }).click();
   await page
     .getByLabel(/o que você gostaria de ajustar/i)
     .fill('A pronúncia do nome precisa de ajuste.');
