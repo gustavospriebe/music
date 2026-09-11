@@ -29,9 +29,11 @@ describe('AbacatePay provider', () => {
         expect(url).toBe('https://api.abacatepay.com/v2/checkouts/create');
         const payload = JSON.parse(init?.body ?? '{}') as {
           items?: Array<{ id?: string; quantity?: number }>;
+          methods?: string[];
           externalId?: string;
         };
         expect(payload.items).toEqual([{ id: 'prod_test_123', quantity: 1 }]);
+        expect(payload.methods).toEqual(['PIX']);
         expect(payload.externalId).toBe('pedido-1');
         return jsonResponse({
           data: {

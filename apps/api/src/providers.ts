@@ -191,6 +191,7 @@ export const createAbacatePayProvider = (env: Env): AbacatePayProvider => ({
         },
         body: JSON.stringify({
           items: [{ id: requireAbacatePayProduct(env), quantity: 1 }],
+          methods: ['PIX'],
           externalId: input.externalReference,
           returnUrl: input.backUrl,
           completionUrl: input.backUrl,
