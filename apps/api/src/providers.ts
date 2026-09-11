@@ -213,7 +213,7 @@ export const createAbacatePayProvider = (env: Env): AbacatePayProvider => ({
     const timeout = setTimeout(() => controller.abort(), 30_000);
     try {
       const response = await fetch(
-        `https://api.abacatepay.com/v2/checkouts/one?id=${encodeURIComponent(billingId)}`,
+        `https://api.abacatepay.com/v2/checkouts/get?id=${encodeURIComponent(billingId)}`,
         {
           method: 'GET',
           signal: controller.signal,

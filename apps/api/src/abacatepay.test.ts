@@ -85,13 +85,14 @@ describe('AbacatePay provider', () => {
   it('mapeia billing pago para status approved', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () =>
-        jsonResponse({
+      vi.fn(async (url: string) => {
+        expect(url).toBe('https://api.abacatepay.com/v2/checkouts/get?id=bill_9');
+        return jsonResponse({
           data: { id: 'bill_9', status: 'PAID', amount: 4990, externalId: 'pedido-9' },
           success: true,
           error: null,
-        }),
-      ),
+        });
+      }),
     );
     await expect(createAbacatePayProvider(env).getBilling('bill_9')).resolves.toEqual({
       id: 'bill_9',
