@@ -826,6 +826,7 @@ export const buildApp = async (
         status: 'pending',
         amountCents: order.priceCents,
         checkoutUrl,
+        externalPaymentId: preference?.id,
       });
       return config.devFallback ? { checkoutUrl, dev: true as const } : { checkoutUrl };
     });
@@ -1013,7 +1014,75 @@ export const buildApp = async (
     const publicId = (request.params as { publicId: string }).publicId;
     if (!(await hasViewAccess(publicId, request))) throw fail('Acesso privado necessário', 401);
     const full = await hasAccess(publicId, request);
-    const order = await orderFor(publicId);
+    let order = await orderFor(publicId);
+
+    if (order.status === 'payment_pending' && env.PAYMENT_PROVIDER === 'abacatepay') {
+      const [pendingPayment] = await db
+        .select()
+        .from(payments)
+        .where(
+          and(
+            eq(payments.orderId, order.id),
+            eq(payments.provider, 'abacate-pay'),
+            eq(payments.status, 'pending'),
+          ),
+        );
+      if (pendingPayment?.externalPaymentId) {
+        try {
+          const billing = await paymentProvider.getPayment(pendingPayment.externalPaymentId);
+          if (
+            billing.status === 'approved' &&
+            billing.amountCents === order.priceCents &&
+            billing.currency === 'BRL'
+          ) {
+            const updated = await db.transaction(async (tx) => {
+              const [fresh] = await tx
+                .select()
+                .from(orders)
+                .where(eq(orders.id, order.id))
+                .for('update');
+              if (!fresh || fresh.status !== 'payment_pending') return fresh ?? order;
+              await tx
+                .update(payments)
+                .set({ status: 'approved', updatedAt: new Date() })
+                .where(eq(payments.id, pendingPayment.id));
+              assertTransition(fresh.status, 'paid');
+              assertTransition('paid', 'audio_queued');
+              await tx
+                .update(orders)
+                .set({ status: 'audio_queued', updatedAt: new Date() })
+                .where(eq(orders.id, fresh.id));
+              await tx
+                .insert(generationJobs)
+                .values({
+                  type: 'generate_audio',
+                  orderId: fresh.id,
+                  payload: currentAudioJobSelection(env),
+                  idempotencyKey: `audio:${fresh.id}`,
+                  maxAttempts: 6,
+                })
+                .onConflictDoNothing();
+              return { ...fresh, status: 'audio_queued' as const };
+            });
+            if (updated.status === 'audio_queued') {
+              await recordEvent('paid', updated);
+              order = updated;
+            }
+          } else if (['rejected', 'cancelled'].includes(billing.status)) {
+            await db
+              .update(payments)
+              .set({ status: 'rejected', updatedAt: new Date() })
+              .where(eq(payments.id, pendingPayment.id));
+          }
+        } catch (error) {
+          request.log.warn(
+            { err: error instanceof Error ? error.message : String(error) },
+            'failed to reconcile pending payment on order read',
+          );
+        }
+      }
+    }
+
     const [story] = full
       ? await db.select().from(storySubmissions).where(eq(storySubmissions.orderId, order.id))
       : [undefined];

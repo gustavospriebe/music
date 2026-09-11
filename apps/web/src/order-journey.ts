@@ -134,7 +134,7 @@ export function deriveOrderJourney(
       action: status === 'lyrics_ready' ? 'review_lyrics' : 'open_lyrics',
       complete: false,
     };
-  if (['lyrics_approved', 'payment_pending'].includes(status))
+  if (status === 'lyrics_approved')
     return {
       valid: true,
       status,
@@ -142,6 +142,18 @@ export function deriveOrderJourney(
       kind: 'payment',
       heading: 'Falta o pagamento',
       message: 'Sua letra foi aprovada. Conclua o pagamento para produzir o áudio.',
+      action: 'checkout',
+      complete: false,
+    };
+  if (status === 'payment_pending')
+    return {
+      valid: true,
+      status,
+      step: 3,
+      kind: 'payment',
+      heading: 'Aguardando confirmação do pagamento',
+      message:
+        'Recebemos sua solicitação e estamos aguardando a confirmação do pagamento. Assim que confirmado, a produção da sua música começa automaticamente.',
       action: 'checkout',
       complete: false,
     };

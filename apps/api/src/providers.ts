@@ -223,10 +223,10 @@ export const createAbacatePayProvider = (env: Env): AbacatePayProvider => ({
       if (!response.ok) throw new Error(`AbacatePay billing lookup failed (${response.status})`);
       const body = (await response.json()) as { data?: unknown };
       const item = Array.isArray(body.data)
-        ? body.data.find(
+        ? (body.data.find(
             (candidate: Record<string, unknown>) =>
               candidate && typeof candidate === 'object' && candidate.id === billingId,
-          ) ?? body.data[0]
+          ) ?? body.data[0])
         : body.data;
       const data = abacatePayEnvelope({ data: item });
       return {

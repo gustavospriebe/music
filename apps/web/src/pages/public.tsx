@@ -579,6 +579,7 @@ export function OrderStatus() {
       return status &&
         [
           'lyrics_generating',
+          'payment_pending',
           'paid',
           'audio_queued',
           'audio_generating',
@@ -602,13 +603,20 @@ export function OrderStatus() {
   );
 }
 
-const orderJourneyAction = (action: string | null | undefined, publicOrderId: string) => {
+const orderJourneyAction = (
+  action: string | null | undefined,
+  publicOrderId: string,
+  status?: string,
+) => {
   const actions: Record<string, { label: string; to: string }> = {
     continue_story: { label: 'Continuar história', to: '/criar' },
     open_lyrics: { label: 'Acompanhar letra', to: `/criar/letra?pedido=${publicOrderId}` },
     review_lyrics: { label: 'Revisar letra', to: `/criar/letra?pedido=${publicOrderId}` },
     retry_lyrics: { label: 'Tentar gerar novamente', to: `/criar/letra?pedido=${publicOrderId}` },
-    checkout: { label: 'Ir para o pagamento', to: `/criar/checkout?pedido=${publicOrderId}` },
+    checkout: {
+      label: status === 'payment_pending' ? 'Reabrir página de pagamento' : 'Ir para o pagamento',
+      to: `/criar/checkout?pedido=${publicOrderId}`,
+    },
     listen: { label: 'Ouvir versões', to: `/pedido/${publicOrderId}/entrega` },
     view_orders: { label: 'Ver minhas músicas', to: '/minhas-musicas' },
   };
@@ -632,10 +640,22 @@ function ProductionStatus({
     <section className="production-status" aria-labelledby="production-status-title">
       <div className="production-live">
         <span
-          className={reviewing ? 'production-symbol' : 'production-symbol is-active'}
+          className={
+            detail.order.status === 'revision_requested'
+              ? 'production-symbol is-active'
+              : reviewing
+                ? 'production-symbol'
+                : 'production-symbol is-active'
+          }
           aria-hidden="true"
         >
-          {reviewing ? <CheckCircle2 size={24} /> : <Radio size={24} />}
+          {detail.order.status === 'revision_requested' ? (
+            <Clock3 size={24} />
+          ) : reviewing ? (
+            <CheckCircle2 size={24} />
+          ) : (
+            <Radio size={24} />
+          )}
         </span>
         <div>
           <h2 id="production-status-title">
@@ -717,12 +737,33 @@ function OrderStatusContent({
         }
       />
     );
-  const action = orderJourneyAction(journey.action, publicOrderId);
+  const action = orderJourneyAction(journey.action, publicOrderId, detail.order.status);
   return (
     <CustomerWorkspace step={journey.step} complete={journey.complete} className="delivery">
       <p className="eyebrow">PEDIDO PRIVADO</p>
       <h1>{journey.heading}</h1>
       <p>{journey.message}</p>
+      {detail.order.status === 'payment_pending' && (
+        <div
+          className="status-banner"
+          style={{
+            margin: '1rem 0',
+            padding: '0.85rem 1.15rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            background: 'var(--surface-2, rgba(255,255,255,0.05))',
+            borderRadius: '8px',
+            border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))',
+          }}
+        >
+          <Clock3 size={20} style={{ flexShrink: 0 }} />
+          <p style={{ margin: 0, fontSize: '0.95rem', lineHeight: '1.4' }}>
+            <strong>Verificando pagamento automaticamente...</strong> Não se preocupe se já fez o
+            PIX, esta tela atualizará assim que o banco confirmar.
+          </p>
+        </div>
+      )}
       {journey.kind === 'production' && (
         <ProductionStatus detail={detail} checkedAt={checkedAt} checking={checking} />
       )}

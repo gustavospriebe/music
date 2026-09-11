@@ -4,7 +4,7 @@ import type { PaymentDetails, PaymentCheckoutInput } from './providers.js';
 
 /** Gateway-neutral operations; add a documented adapter when a new provider is selected. */
 export type PaymentProvider = {
-  createCheckout(input: PaymentCheckoutInput): Promise<{ checkoutUrl: string }>;
+  createCheckout(input: PaymentCheckoutInput): Promise<{ id?: string; checkoutUrl: string }>;
   getPayment(id: string): Promise<PaymentDetails>;
 };
 
@@ -17,9 +17,10 @@ export const createPaymentProvider = (env: Env): PaymentProvider => {
   }
   const adapter = createAbacatePayProvider(env);
   return {
-    createCheckout: async (input) => ({
-      checkoutUrl: (await adapter.createCheckout(input)).initPoint,
-    }),
+    createCheckout: async (input) => {
+      const checkout = await adapter.createCheckout(input);
+      return { id: checkout.id, checkoutUrl: checkout.initPoint };
+    },
     getPayment: adapter.getBilling,
   };
 };

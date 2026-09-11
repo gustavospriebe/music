@@ -87,15 +87,34 @@
 - **Date**: 2026-09-11
 - **Status**: active
 
+### AD-011
+
+- **Decision**: O retorno do checkout para a página pública de acompanhamento (`/pedido/:publicId`) conta com persistência imediata de `externalPaymentId` no ato da criação da fatura, verificação ativa e reconciliação proativa na API caso o webhook sofra latência, e polling a cada 2s com feedback visual em `payment_pending`.
+- **Reason**: Elimina o atrito do cliente voltar do banco e ver "Falta o pagamento" ou botão duplicado enquanto o webhook ainda trafega.
+- **Scope**: API, Web, Checkout, Jobs.
+- **Date**: 2026-09-11
+- **Status**: active
+
+### AD-012
+
+- **Decision**: Notificações por e-mail via Resend utilizam o remetente oficial do domínio verificado (`EMAIL_FROM=Música da Resenha <contato@renovagp.com>`).
+- **Reason**: O Resend bloqueia com HTTP 403 remetentes em domínios não verificados (como `@gmail.com`).
+- **Scope**: Worker, Resend, Configuração.
+- **Date**: 2026-09-11
+- **Status**: active
+
 ## Handoff
 
-- **Feature**: MVP Launch & AbacatePay integration.
-- **Phase / Task**: Homologação completa end-to-end no browser e sincronização de produção no Railway.
+- **Feature**: MVP End-to-End Validation & Operations.
+- **Phase / Task**: Homologação completa de todos os fluxos críticos (Pagamento, Reconciliação, Capa de Álbum, Ajustes do Cliente, E-mail e Admin).
 - **Completed**:
-  - Deploy em produção no Railway para `main` (web, api, worker, PostgreSQL e Bucket S3).
-  - Configuração do provider `PAYMENT_PROVIDER=abacatepay`, chaves da API, secret de webhook e catálogo de produtos no PostgreSQL.
-  - Correção dos endpoints do AbacatePay no monorepo (`/v2/checkouts/list` e header `x-webhook-secret`).
-  - Teste end-to-end executado com sucesso no Browser: criação de história em 4 etapas, geração de letra via IA (OpenRouter), aprovação de letra, geração de checkout AbacatePay Sandbox PIX de R$ 49,90, simulação de pagamento, processamento de webhook `checkout.completed`, geração de duas versões de áudio pelo worker e entrega concluída no player com download.
+  - Correção e validação da reconciliação imediata do pagamento AbacatePay no retorno do usuário ao `/pedido/:publicId`.
+  - Configuração do remetente de e-mail no domínio verificado `renovagp.com`, validação de envio via Resend e entrega recebida no Gmail.
+  - Geração de capa de álbum com IA (`generate_cover`) via OpenRouter (`google/gemini-3.1-flash-lite-image`), testada com variantes e download em alta qualidade.
+  - Teste do fluxo completo de solicitação de ajuste pelo cliente ("Algo precisa de ajuste?"), envio do feedback e transição para `revision_requested`.
+  - Teste e homologação do painel administrativo (`/admin`), incluindo visão geral de métricas, custos de IA, listagem de pedidos, visualização do feedback de ajuste e re-geração isolada de variante de áudio com Lyria 3 Pro.
+  - `pnpm check` (Prettier, ESLint, TypeScript, Vitest e Build) 100% verde em todos os 10 pacotes do monorepo.
 - **Next step**:
-  - Revisar com o dono do produto se o modo de revisão de áudio deve permanecer `manual` ou `automatic` em produção.
+  - Configurar e sincronizar no Railway as variáveis de produção `EMAIL_FROM=Música da Resenha <contato@renovagp.com>` e fazer o deploy da versão atualizada com a reconciliação do pagamento.
+  - Definir se em produção o `AUDIO_REVIEW_MODE` será `automatic` (entrega imediata em ~2 min) ou `manual` (curadoria prévia no `/admin`).
   - Realizar teste final de compra com PIX real quando as credenciais de produção do AbacatePay forem ativadas.
