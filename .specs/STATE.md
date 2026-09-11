@@ -79,17 +79,23 @@
 - **Scope**: API, worker, providers e entrega privada.
 - **Status**: active
 
+### AD-010
+
+- **Decision**: Gateway AbacatePay integrado como provedor oficial de pagamento PIX (`PAYMENT_PROVIDER=abacatepay`). O checkout restringe métodos a PIX (`methods: ['PIX']`), consulta status de billing via `/v2/checkouts/list?id=` e aceita assinatura de webhook tanto por query param quanto por headers (`x-webhook-secret`/`x-secret`).
+- **Reason**: O AbacatePay v2 unificou a consulta e requer suporte a headers nos webhooks nativos.
+- **Scope**: API, provedores de pagamento, contratos e checkout.
+- **Date**: 2026-09-11
+- **Status**: active
+
 ## Handoff
 
-- **Feature**: launch-remodel; studio-flow-uat-fixes; lyrics-production-polish; admin-recovery.
-- **Phase / Task**: recuperação administrativa concluída localmente; validação independente PASS, último gate integrado289 testes, 48E2E e sensor7/7 detectados. React Doctor100/100; cópias finais verificadas por29 testes administrativos.
-- **Completed**: criação livre em quatro passos; landing e continuidade visual; configuração comercial/provider; pagamento retomável; email com intenção estável; revogação e downloads privados; ajuste cliente/admin; limpeza de logs com backup; pnpm check Node 22 PASS com 185 testes; E2E 43 PASS; React Doctor full 100/100; migration fresh/upgrade/seed replay/restore isolado/Nginx PASS.
-- **Admin recovery completed**: contador e filtro de falhas atuais; diagnóstico, tentativas e horários; retomada de letra/áudio/capa/aviso de entrega; recuperação de áudio faltante e regeneração de uma ou duas variantes; gates transacionais e histórico sanitizado. Foto removida exige reenvio consentido. API/worker do preview atualizados, sem reprocessar o pedido recusado. Spec/tasks/validation em .specs/features/admin-recovery/ e operação em docs/admin-recovery.md; evidências em output/admin-recovery/. Nenhuma chamada paga nesta entrega; bancos QA descartáveis separados do preview.
-- **In-progress**: aceite humano do painel e avaliação artística das letras; qualidade editorial continua parcial. Google Lyria 3.5 T1–T7 implementados, gates locais PASS e comparação P2 live concluída com quatro chamadas nominais de US$0,32, todas `ok`. A escuta humana, homologação externa e publicação não foram executadas.
-- **Lyrics quality review**: EDIT-03 revisou prompt de composição, preservando modelo/configuração/histórico. Quatro chamadas reais de texto fictício custaramUS$0,015545; rodada acumulada observadaUS$0,6648398. Provider5/domain10 e build/typecheck/lint pertinentes PASS. Resultado editorial parcial: melhora em recomeço, regressão na amostra de viagem; não declarar qualidade artística resolvida. Relatório docs/lyrics-prompt-review.md e comparações output/lyrics-prompt-review/. Próxima avaliação: comparar alternativas de modelo de texto e ouvir os resultados com aceite humano.
-- **Previous UAT follow-up**: pedido sem sinal conferido no banco e browser; falha terminal do filtro, capa concluída, sem reenvio pago. Corrigida atualização automática do detalhe admin e linguagem da falha pública. PROGRESS-02 validado anteriormente por35 testes focais, lint/typecheck/build, React Doctor100 e sensor2/2; agora incluído no gate integrado289. CI/Railway reconfirmados em leitura, sem mudança remota.
-- **Next step**: ouvir os quatro arquivos da rodada live com aceite humano, registrar a avaliação artística, testar o painel de falhas no preview e seguir o runbook externo antes de publicação.
-- **Preview**: http://localhost:5180 (web), API3010 e banco music_launch_preview. API e worker ativos em PREVIEW_AI=all (letra/áudio/capa reais autorizados), pagamento/email locais. Worker sem watch para evitar interrupção de I/O pago; .env preservado. Dois pedidos fictícios validaram letra/edição/refino/histórico, quatro áudios, capa e entrega privada; consumo observado da conta na rodada US$0,6492948 em2026-09-07T22:29Z, teto autorizadoUS$3. Usuário removeu limite da chave que causava402; seu pedido de áudio foi retomado e recusado duas vezes pelo filtro do modelo, sem alteração de sua letra. Não presumir que esse pedido está entregue.
-- **Blockers**: preço e textos finais não definidos; providers reais não homologados nesta entrega; CI remoto segue no último HEAD publicado com failure; Railway web/api/worker sem deployment e sem Postgres/Bucket. Nenhum commit/push/deploy realizado.
-- **Uncommitted files**: WIP anterior preservado; backups e evidências em output/launch-remodel, output/studio-flow-uat-fixes e output/lyrics-production-polish (ignorados). Relatórios atuais docs/studio-flow-uat-fixes.md e docs/lyrics-production-polish.md complementam docs/launch-remodel-report.md. Sem commit/push/deploy.
-- **Branch**: main em c9f3d045e9cba1ef9965e4005882ade0dcc496bb.
+- **Feature**: MVP Launch & AbacatePay integration.
+- **Phase / Task**: Homologação completa end-to-end no browser e sincronização de produção no Railway.
+- **Completed**:
+  - Deploy em produção no Railway para `main` (web, api, worker, PostgreSQL e Bucket S3).
+  - Configuração do provider `PAYMENT_PROVIDER=abacatepay`, chaves da API, secret de webhook e catálogo de produtos no PostgreSQL.
+  - Correção dos endpoints do AbacatePay no monorepo (`/v2/checkouts/list` e header `x-webhook-secret`).
+  - Teste end-to-end executado com sucesso no Browser: criação de história em 4 etapas, geração de letra via IA (OpenRouter), aprovação de letra, geração de checkout AbacatePay Sandbox PIX de R$ 49,90, simulação de pagamento, processamento de webhook `checkout.completed`, geração de duas versões de áudio pelo worker e entrega concluída no player com download.
+- **Next step**:
+  - Revisar com o dono do produto se o modo de revisão de áudio deve permanecer `manual` ou `automatic` em produção.
+  - Realizar teste final de compra com PIX real quando as credenciais de produção do AbacatePay forem ativadas.
