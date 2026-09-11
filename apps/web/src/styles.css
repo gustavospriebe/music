@@ -694,6 +694,8 @@ main:focus {
     display: none;
   }
   .site-header .menu-dialog {
+    display: block;
+    width: 100%;
     position: absolute;
     top: 100%;
     left: 0;

@@ -131,7 +131,8 @@ test('link de entrega mostra a capa sem controles de criação', async ({ page }
 
   await page.goto('/entrega/token-cover-1');
   await expect(page.getByRole('img', { name: /capa gerada por ia/i })).toBeVisible();
-  await expect(page.getByRole('link', { name: /baixar capa/i })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Baixar capa HD' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Baixar capa', exact: true })).toBeVisible();
   await expect(page.getByLabel(/foto de referência/i)).toHaveCount(0);
   await expect(page.getByRole('button', { name: /gerar/i })).toHaveCount(0);
 });
