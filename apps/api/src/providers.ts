@@ -213,7 +213,7 @@ export const createAbacatePayProvider = (env: Env): AbacatePayProvider => ({
     const timeout = setTimeout(() => controller.abort(), 30_000);
     try {
       const response = await fetch(
-        `https://api.abacatepay.com/v2/checkouts/get?id=${encodeURIComponent(billingId)}`,
+        `https://api.abacatepay.com/v2/checkouts/list?id=${encodeURIComponent(billingId)}`,
         {
           method: 'GET',
           signal: controller.signal,
@@ -221,7 +221,14 @@ export const createAbacatePayProvider = (env: Env): AbacatePayProvider => ({
         },
       );
       if (!response.ok) throw new Error(`AbacatePay billing lookup failed (${response.status})`);
-      const data = abacatePayEnvelope(await response.json());
+      const body = (await response.json()) as { data?: unknown };
+      const item = Array.isArray(body.data)
+        ? body.data.find(
+            (candidate: Record<string, unknown>) =>
+              candidate && typeof candidate === 'object' && candidate.id === billingId,
+          ) ?? body.data[0]
+        : body.data;
+      const data = abacatePayEnvelope({ data: item });
       return {
         id: data.id ?? billingId,
         status: billingStatus(data.status),

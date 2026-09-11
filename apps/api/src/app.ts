@@ -837,9 +837,13 @@ export const buildApp = async (
     if (env.PAYMENT_PROVIDER !== 'abacatepay')
       throw fail('Webhook indisponível para provider atual.', 404);
     const query = request.query as Record<string, string | undefined>;
+    const receivedSecret =
+      query.webhookSecret ??
+      (request.headers['x-webhook-secret'] as string | undefined) ??
+      (request.headers['x-secret'] as string | undefined);
     if (
       !verifyAbacatePaySecret({
-        received: query.webhookSecret,
+        received: receivedSecret,
         expected: env.ABACATEPAY_WEBHOOK_SECRET,
       })
     )

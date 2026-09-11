@@ -86,9 +86,9 @@ describe('AbacatePay provider', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string) => {
-        expect(url).toBe('https://api.abacatepay.com/v2/checkouts/get?id=bill_9');
+        expect(url).toBe('https://api.abacatepay.com/v2/checkouts/list?id=bill_9');
         return jsonResponse({
-          data: { id: 'bill_9', status: 'PAID', amount: 4990, externalId: 'pedido-9' },
+          data: [{ id: 'bill_9', status: 'PAID', amount: 4990, externalId: 'pedido-9' }],
           success: true,
           error: null,
         });
