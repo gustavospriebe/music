@@ -41,7 +41,7 @@ describe('worker config', () => {
     ).toThrow('OpenRouter cover production configuration is required');
   });
 
-  it('requires managed private storage in production after cover models are configured', () => {
+  it('requires an absolute local storage path in production after cover models are configured', () => {
     expect(() =>
       readWorkerConfig({
         ...fullEnv,
@@ -50,18 +50,16 @@ describe('worker config', () => {
         OPENROUTER_COVER_TEXT_MODEL: 'cover-text',
         OPENROUTER_COVER_REFERENCE_MODEL: 'cover-reference',
       }),
-    ).toThrow('STORAGE_PROVIDER=s3 is required in production');
+    ).toThrow('LOCAL_STORAGE_PATH must be absolute in production');
     const config = readWorkerConfig({
       ...fullEnv,
       NODE_ENV: 'production',
       RESEND_API_KEY: 'resend-key',
       OPENROUTER_COVER_TEXT_MODEL: 'cover-text',
       OPENROUTER_COVER_REFERENCE_MODEL: 'cover-reference',
-      STORAGE_PROVIDER: 's3',
-      STORAGE_S3_BUCKET: 'private-bucket',
-      STORAGE_S3_REGION: 'us-east-1',
+      LOCAL_STORAGE_PATH: '/data/resenha-storage',
     });
-    expect(config.storage).toMatchObject({ kind: 's3', bucket: 'private-bucket' });
+    expect(config.storage).toMatchObject({ kind: 'local', basePath: '/data/resenha-storage' });
     expect(config.resendApiKey).toBe('resend-key');
   });
 });

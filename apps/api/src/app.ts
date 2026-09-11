@@ -55,11 +55,11 @@ import {
 import { createStorage, readStorageConfig } from '@resenha/providers';
 import type { Env } from './env.js';
 import {
+  createAbacatePayProvider,
   createLyricsProvider,
-  createMercadoPagoProvider,
   MAX_REFERENCE_IMAGE_BYTES,
   normalizeReferenceImage,
-  verifyMercadoPagoSignature,
+  verifyAbacatePaySecret,
   type LyricsProvider,
   type LyricsResult,
 } from './providers.js';
@@ -155,7 +155,7 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
   const { db, pool } = createDb(env.DATABASE_URL);
   const lyrics = overrides.lyrics ?? createLyricsProvider(env);
   const storage = createStorage(readStorageConfig(env));
-  const mercadoPago = createMercadoPagoProvider(env);
+  const abacatePay = createAbacatePayProvider(env);
   /** POSTs sem corpo (ex.: gerar letra, aprovar) são válidos; JSON inválido segue 400. */
   app.addContentTypeParser('application/json', { parseAs: 'string' }, (_request, body, done) => {
     const text = (body as string).trim();
@@ -634,6 +634,27 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
     await recordEvent('lyrics_approved', order);
     return { approved: true };
   });
+  const insertPendingPayment = async (
+    order: typeof orders.$inferSelect,
+    input: { provider: string; checkoutUrl: string },
+  ) => {
+    await db.transaction(async (tx) => {
+      if (order.status === 'lyrics_approved') {
+        assertTransition('lyrics_approved', 'payment_pending');
+        await tx
+          .update(orders)
+          .set({ status: 'payment_pending', updatedAt: new Date() })
+          .where(eq(orders.id, order.id));
+      }
+      await tx.insert(payments).values({
+        orderId: order.id,
+        provider: input.provider,
+        status: 'pending',
+        amountCents: order.priceCents,
+        checkoutUrl: input.checkoutUrl,
+      });
+    });
+  };
   app.post('/api/v1/orders/:publicId/checkout', async (request) => {
     const checkoutPublicId = (request.params as { publicId: string }).publicId;
     if (!hasAccess(checkoutPublicId, request)) throw fail('Acesso privado necessário', 401);
@@ -647,8 +668,7 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
     if (existing?.provider === 'dev')
       return { checkoutUrl: `${env.WEB_URL}/pedido/${order.publicId}`, dev: true as const };
     if (existing?.checkoutUrl) return { checkoutUrl: existing.checkoutUrl };
-    const [product] = await db.select().from(products).where(eq(products.type, order.productType));
-    if (!env.MERCADO_PAGO_ACCESS_TOKEN) {
+    if (!env.ABACATEPAY_API_KEY) {
       if (env.NODE_ENV === 'production') throw fail('Provider de pagamento não configurado.', 501);
       await db.transaction(async (tx) => {
         if (order.status === 'lyrics_approved') {
@@ -672,137 +692,127 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
         dev: true,
       };
     }
-    const preference = await mercadoPago.createPreference({
-      title: product?.name ?? 'Música da Resenha',
-      priceCents: order.priceCents,
-      externalReference: order.publicId,
-      backUrl: `${env.WEB_URL}/pedido/${order.publicId}`,
-    });
+    if (env.PAYMENT_PROVIDER === 'abacatepay') {
+      const checkout = await abacatePay.createCheckout({
+        priceCents: order.priceCents,
+        externalReference: order.publicId,
+        backUrl: `${env.WEB_URL}/pedido/${order.publicId}`,
+      });
+      await insertPendingPayment(order, {
+        provider: 'abacate-pay',
+        checkoutUrl: checkout.initPoint,
+      });
+      await recordEvent('checkout_started', order);
+      return { checkoutUrl: checkout.initPoint };
+    }
+    throw fail('Provider de pagamento não configurado.', 501);
+  });
+  /** Marca o pagamento aprovado e enfileira o áudio uma única vez; devolve se acabou de pagar. */
+  const settleApprovedPayment = async (
+    order: typeof orders.$inferSelect,
+    payment: typeof payments.$inferSelect,
+    externalPaymentId: string,
+  ): Promise<boolean> => {
+    let justPaid = false;
     await db.transaction(async (tx) => {
-      if (order.status === 'lyrics_approved') {
-        assertTransition('lyrics_approved', 'payment_pending');
+      await tx
+        .update(payments)
+        .set({ status: 'approved', externalPaymentId, updatedAt: new Date() })
+        .where(eq(payments.id, payment.id));
+      const [freshOrder] = await tx.select().from(orders).where(eq(orders.id, order.id));
+      if (freshOrder?.status === 'payment_pending') {
+        assertTransition('payment_pending', 'paid');
+        assertTransition('paid', 'audio_queued');
         await tx
           .update(orders)
-          .set({ status: 'payment_pending', updatedAt: new Date() })
+          .set({ status: 'audio_queued', updatedAt: new Date() })
           .where(eq(orders.id, order.id));
+        await tx
+          .insert(generationJobs)
+          .values({
+            type: 'generate_audio',
+            orderId: order.id,
+            payload: {},
+            idempotencyKey: `audio:${order.id}`,
+            maxAttempts: 6,
+          })
+          .onConflictDoNothing();
+        justPaid = true;
       }
-      await tx.insert(payments).values({
-        orderId: order.id,
-        provider: 'mercado-pago',
-        status: 'pending',
-        amountCents: order.priceCents,
-        checkoutUrl: preference.initPoint,
-      });
     });
-    await recordEvent('checkout_started', order);
-    return { checkoutUrl: preference.initPoint };
-  });
-  /** O webhook apenas notifica: valida assinatura, busca o pagamento e confere valor/referência. */
-  app.post('/api/v1/webhooks/mercado-pago', async (request, reply) => {
-    if (env.PAYMENT_PROVIDER !== 'mercadopago')
-      throw fail('Webhook indisponível para provider atual.', 404);
-    const secret = env.MERCADO_PAGO_WEBHOOK_SECRET;
-    if (!secret) throw fail('MERCADO_PAGO_WEBHOOK_SECRET não configurado.', 500);
-    const body = (request.body ?? {}) as {
-      type?: string;
-      topic?: string;
-      action?: string;
-      data?: { id?: string | number };
-    };
+    return justPaid;
+  };
+  /**
+   * Webhook AbacatePay (`POST /api/v1/webhooks/abacate-pay?webhookSecret=...`).
+   * Autentica pelo secret da URL, busca o billing na API e confere valor/referência.
+   * Eventos: `checkout.completed` paga; `EXPIRED`/`CANCELLED` rejeitam; resto ignora.
+   */
+  app.post('/api/v1/webhooks/abacate-pay', async (request, reply) => {
     const query = request.query as Record<string, string | undefined>;
-    const topic = body.type ?? body.topic ?? query.topic ?? query.type;
-    const dataId = String(body.data?.id ?? query['data.id'] ?? query.data_id ?? query.id ?? '');
-    if (!dataId || (topic && topic !== 'payment')) return reply.status(200).send({ ignored: true });
-    const signatureHeader = request.headers['x-signature'];
-    const requestId = request.headers['x-request-id'];
     if (
-      !verifyMercadoPagoSignature({
-        signatureHeader: typeof signatureHeader === 'string' ? signatureHeader : undefined,
-        requestId: typeof requestId === 'string' ? requestId : undefined,
-        dataId,
-        secret,
+      !verifyAbacatePaySecret({
+        received: query.webhookSecret,
+        expected: env.ABACATEPAY_WEBHOOK_SECRET,
       })
     )
-      throw fail('Assinatura do webhook inválida.', 401);
-    const mpPayment = await mercadoPago.getPayment(dataId);
-    const externalEventId = `${requestId ?? dataId}:${mpPayment.status}`.slice(0, 160);
-    const [event] = await db
+      throw fail('Secret do webhook inválido.', 401);
+    const body = (request.body ?? {}) as {
+      id?: string;
+      event?: string;
+      data?: { id?: string };
+    };
+    const event = body.event ?? '';
+    const billingId = body.data?.id ?? '';
+    if (!billingId || !['checkout.completed', 'checkout.refunded'].includes(event))
+      return reply.status(200).send({ ignored: true });
+    const [webhookEvent] = await db
       .insert(paymentWebhookEvents)
       .values({
-        provider: 'mercado-pago',
-        externalEventId,
-        payload: { action: body.action ?? topic ?? 'payment', status: mpPayment.status },
+        provider: 'abacate-pay',
+        externalEventId: `${billingId}:${event}`.slice(0, 160),
+        payload: { action: event, billingId },
       })
       .onConflictDoNothing()
       .returning();
-    if (!event) return reply.status(200).send({ duplicate: true });
+    if (!webhookEvent) return reply.status(200).send({ duplicate: true });
     try {
-      if (!mpPayment.externalReference) throw new Error('Payment has no external_reference.');
+      const billing = await abacatePay.getBilling(billingId);
+      if (!billing.externalReference) throw new Error('Billing has no externalId.');
       const [order] = await db
         .select()
         .from(orders)
-        .where(eq(orders.publicId, mpPayment.externalReference));
-      if (!order) throw new Error('Order not found for external_reference.');
+        .where(eq(orders.publicId, billing.externalReference));
+      if (!order) throw new Error('Order not found for externalId.');
       const [payment] = await db
         .select()
         .from(payments)
         .where(and(eq(payments.orderId, order.id), eq(payments.status, 'pending')));
       if (!payment) throw new Error('No pending payment for this order.');
-      if (mpPayment.status === 'approved') {
-        if (mpPayment.amountCents !== order.priceCents || mpPayment.currency !== 'BRL')
-          throw new Error('Payment amount or currency does not match the order.');
-        let justPaid = false;
-        await db.transaction(async (tx) => {
-          await tx
-            .update(payments)
-            .set({
-              status: 'approved',
-              externalPaymentId: mpPayment.id,
-              updatedAt: new Date(),
-            })
-            .where(eq(payments.id, payment.id));
-          const [freshOrder] = await tx.select().from(orders).where(eq(orders.id, order.id));
-          if (freshOrder?.status === 'payment_pending') {
-            assertTransition('payment_pending', 'paid');
-            assertTransition('paid', 'audio_queued');
-            await tx
-              .update(orders)
-              .set({ status: 'audio_queued', updatedAt: new Date() })
-              .where(eq(orders.id, order.id));
-            await tx
-              .insert(generationJobs)
-              .values({
-                type: 'generate_audio',
-                orderId: order.id,
-                payload: {},
-                idempotencyKey: `audio:${order.id}`,
-                maxAttempts: 6,
-              })
-              .onConflictDoNothing();
-            justPaid = true;
-          }
-        });
+      if (event === 'checkout.completed' && billing.status === 'PAID') {
+        if (billing.amountCents !== order.priceCents)
+          throw new Error('Billing amount does not match the order.');
+        const justPaid = await settleApprovedPayment(order, payment, billing.id);
         if (justPaid) await recordEvent('paid', order);
-      } else if (['rejected', 'cancelled'].includes(mpPayment.status)) {
+      } else if (['EXPIRED', 'CANCELLED', 'REFUNDED'].includes(billing.status)) {
         await db
           .update(payments)
-          .set({ status: 'rejected', externalPaymentId: mpPayment.id, updatedAt: new Date() })
+          .set({ status: 'rejected', externalPaymentId: billing.id, updatedAt: new Date() })
           .where(eq(payments.id, payment.id));
       }
       await db
         .update(paymentWebhookEvents)
         .set({ paymentId: payment.id, processedAt: new Date() })
-        .where(eq(paymentWebhookEvents.id, event.id));
+        .where(eq(paymentWebhookEvents.id, webhookEvent.id));
       return reply.status(200).send({ processed: true });
     } catch (error) {
       await db
         .update(paymentWebhookEvents)
         .set({ error: error instanceof Error ? error.message.slice(0, 500) : 'unknown' })
-        .where(eq(paymentWebhookEvents.id, event.id));
+        .where(eq(paymentWebhookEvents.id, webhookEvent.id));
       throw error;
     }
   });
-  /** Somente fora de produção: confirma um pagamento criado em modo dev (sem credenciais MP). */
+  /** Somente fora de produção: confirma um pagamento criado em modo dev (sem credencial). */
   app.post('/api/v1/orders/:publicId/dev-payment/approve', async (request) => {
     if (env.NODE_ENV === 'production') throw fail('Indisponível', 404);
     const publicId = (request.params as { publicId: string }).publicId;

@@ -25,7 +25,7 @@ const baseEnv: Env = {
   ADMIN_SESSION_TTL: 28_800,
   LYRICS_PROVIDER: 'openrouter',
   MUSIC_PROVIDER: 'openrouter',
-  PAYMENT_PROVIDER: 'mercadopago',
+  PAYMENT_PROVIDER: 'abacatepay',
   EMAIL_PROVIDER: 'resend',
   AUDIO_REVIEW_MODE: 'automatic',
   LOCAL_STORAGE_PATH: '',

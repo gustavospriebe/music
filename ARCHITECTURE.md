@@ -21,7 +21,7 @@ Uma `story_session` salva respostas progressivamente. A criação usa uma chave 
 ## Limites e decisões
 
 - PostgreSQL é fonte de verdade e fila durável; não há Redis, microserviços ou Kubernetes.
-- Providers são adapters reais selecionados por variáveis de ambiente (OpenRouter, Mercado Pago, Resend); fora de produção, a ausência de credencial de pagamento/e-mail cai em fallback local (pagamento dev, e-mail em `var/emails`) — em produção as chaves são obrigatórias.
+- Providers são adapters reais selecionados por variáveis de ambiente (OpenRouter, AbacatePay, Resend); fora de produção, a ausência de credencial de pagamento/e-mail cai em fallback local (pagamento dev, e-mail em `var/emails`) — em produção as chaves são obrigatórias.
 - O storage é privado: a API valida token antes de disponibilizar download local ou URL assinada.
 - Acesso de pedido e visualização usa cookies de capability assinados e `HttpOnly`; um link de entrega concede apenas visualização.
 - Respostas públicas carregam só referências públicas (`publicId`, número da versão de letra, variante do áudio); UUIDs internos ficam no admin autenticado. Logs HTTP usam template de rota e logs do worker omitem IDs internos. Mutações de cliente exigem o cookie assinado do pedido.

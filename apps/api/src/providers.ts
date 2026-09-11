@@ -1,4 +1,4 @@
-import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
+import { timingSafeEqual } from 'node:crypto';
 import { generatedLyricsSchema, type GeneratedLyrics, type Story } from '@resenha/contracts';
 import type { Env } from './env.js';
 
@@ -84,132 +84,128 @@ export const createOpenRouterLyricsProvider = (env: Env): LyricsProvider => ({
 });
 export const createLyricsProvider = (env: Env) => createOpenRouterLyricsProvider(env);
 
-export type MercadoPagoPreferenceInput = {
-  title: string;
+export { createLocalStorage } from '@resenha/providers';
+
+/**
+ * AbacatePay (https://docs.abacatepay.com, base `https://api.abacatepay.com/v2`).
+ * Cobrança hospedada: o valor vem do produto cadastrado no dashboard, então o
+ * adapter confere `data.amount` contra o total do pedido e recusa divergência.
+ * Webhook: autenticado pelo `?webhookSecret=` (comparação em tempo constante);
+ * a falsificação é contida pela consulta do billing na API antes de marcar pago.
+ */
+export type AbacatePayCheckoutInput = {
   priceCents: number;
   externalReference: string;
   backUrl: string;
 };
-export type MercadoPagoPayment = {
+export type AbacatePayBilling = {
   id: string;
   status: string;
   amountCents: number;
   currency: string;
   externalReference: string | null;
 };
-export type MercadoPagoProvider = {
-  createPreference: (
-    input: MercadoPagoPreferenceInput,
-  ) => Promise<{ id: string; initPoint: string }>;
-  getPayment: (paymentId: string) => Promise<MercadoPagoPayment>;
+export type AbacatePayProvider = {
+  createCheckout: (input: AbacatePayCheckoutInput) => Promise<{ id: string; initPoint: string }>;
+  getBilling: (billingId: string) => Promise<AbacatePayBilling>;
 };
 
-const requireMercadoPagoToken = (env: Env): string => {
-  if (!env.MERCADO_PAGO_ACCESS_TOKEN)
-    throw new Error('Defina MERCADO_PAGO_ACCESS_TOKEN para usar o Mercado Pago.');
-  return env.MERCADO_PAGO_ACCESS_TOKEN;
+type AbacatePayBillingPayload = {
+  id?: string;
+  status?: string;
+  amount?: number;
+  externalId?: string | null;
+  url?: string;
 };
 
-export const createMercadoPagoProvider = (env: Env): MercadoPagoProvider => ({
-  createPreference: async (input) => {
-    const token = requireMercadoPagoToken(env);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30_000);
-    try {
-      const response = await fetch('https://api.mercadopago.com/checkout/preferences', {
-        method: 'POST',
-        signal: controller.signal,
-        headers: {
-          authorization: `Bearer ${token}`,
-          'content-type': 'application/json',
-          'idempotency-key': randomUUID(),
-        },
-        body: JSON.stringify({
-          items: [
-            {
-              id: input.externalReference,
-              title: input.title,
-              quantity: 1,
-              currency_id: 'BRL',
-              unit_price: input.priceCents / 100,
-            },
-          ],
-          external_reference: input.externalReference,
-          notification_url: env.MERCADO_PAGO_WEBHOOK_URL,
-          back_urls: {
-            success: input.backUrl,
-            pending: input.backUrl,
-            failure: input.backUrl,
+const abacatePayEnvelope = (body: unknown): AbacatePayBillingPayload => {
+  const data = (body as { data?: AbacatePayBillingPayload; error?: string | null }).data;
+  if (!data || typeof data !== 'object') throw new Error('AbacatePay response has no data.');
+  return data;
+};
+
+export const createAbacatePayProvider = (env: Env): AbacatePayProvider => {
+  const requireKey = (): string => {
+    if (!env.ABACATEPAY_API_KEY)
+      throw new Error('Defina ABACATEPAY_API_KEY para usar o AbacatePay.');
+    return env.ABACATEPAY_API_KEY;
+  };
+  const requireProduct = (): string => {
+    if (!env.ABACATEPAY_PRODUCT_ID)
+      throw new Error('Defina ABACATEPAY_PRODUCT_ID para usar o AbacatePay.');
+    return env.ABACATEPAY_PRODUCT_ID;
+  };
+  return {
+    createCheckout: async (input) => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30_000);
+      try {
+        const response = await fetch('https://api.abacatepay.com/v2/checkouts/create', {
+          method: 'POST',
+          signal: controller.signal,
+          headers: {
+            authorization: `Bearer ${requireKey()}`,
+            'content-type': 'application/json',
           },
-          auto_return: 'approved',
-          statement_descriptor: 'MUSICARESENHA',
-        }),
-      });
-      if (!response.ok) throw new Error(`Mercado Pago preference failed (${response.status})`);
-      const body = (await response.json()) as { id?: string; init_point?: string };
-      if (!body.id || !body.init_point)
-        throw new Error('Mercado Pago preference response is missing init_point.');
-      return { id: body.id, initPoint: body.init_point };
-    } finally {
-      clearTimeout(timeout);
-    }
-  },
-  getPayment: async (paymentId) => {
-    const token = requireMercadoPagoToken(env);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30_000);
-    try {
-      const response = await fetch(
-        `https://api.mercadopago.com/v1/payments/${encodeURIComponent(paymentId)}`,
-        { method: 'GET', signal: controller.signal, headers: { authorization: `Bearer ${token}` } },
-      );
-      if (!response.ok) throw new Error(`Mercado Pago payment lookup failed (${response.status})`);
-      const body = (await response.json()) as {
-        id?: number | string;
-        status?: string;
-        transaction_amount?: number;
-        currency_id?: string;
-        external_reference?: string;
-      };
-      return {
-        id: String(body.id ?? paymentId),
-        status: body.status ?? 'unknown',
-        amountCents: Math.round((body.transaction_amount ?? 0) * 100),
-        currency: body.currency_id ?? 'BRL',
-        externalReference: body.external_reference ?? null,
-      };
-    } finally {
-      clearTimeout(timeout);
-    }
-  },
-});
-
-/** Mercado Pago assina `id:<dataId>;request-id:<requestId>;ts:<ts>;` com HMAC-SHA256 do secret. */
-export const verifyMercadoPagoSignature = (input: {
-  signatureHeader: string | undefined;
-  requestId: string | undefined;
-  dataId: string;
-  secret: string;
-}): boolean => {
-  const { signatureHeader, requestId, dataId, secret } = input;
-  if (!signatureHeader || !requestId) return false;
-  const parts = new Map(
-    signatureHeader.split(',').map((chunk) => {
-      const [key, ...rest] = chunk.trim().split('=');
-      return [key ?? '', rest.join('=')];
-    }),
-  );
-  const ts = parts.get('ts');
-  const v1 = parts.get('v1');
-  if (!ts || !v1) return false;
-  const manifest = `id:${dataId.toLowerCase()};request-id:${requestId.toLowerCase()};ts:${ts};`;
-  const expected = createHmac('sha256', secret).update(manifest).digest('hex');
-  const actual = Buffer.from(expected, 'utf8');
-  const received = Buffer.from(v1, 'utf8');
-  return actual.length === received.length && timingSafeEqual(actual, received);
+          body: JSON.stringify({
+            items: [{ id: requireProduct(), quantity: 1 }],
+            externalId: input.externalReference,
+            returnUrl: input.backUrl,
+            completionUrl: input.backUrl,
+            metadata: { order: input.externalReference },
+          }),
+        });
+        if (!response.ok) throw new Error(`AbacatePay checkout failed (${response.status})`);
+        const data = abacatePayEnvelope(await response.json());
+        if (!data.id || !data.url) throw new Error('AbacatePay checkout response is missing url.');
+        if (typeof data.amount !== 'number' || data.amount !== input.priceCents)
+          throw new Error('AbacatePay checkout amount does not match the order total.');
+        return { id: data.id, initPoint: data.url };
+      } finally {
+        clearTimeout(timeout);
+      }
+    },
+    getBilling: async (billingId) => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30_000);
+      try {
+        const response = await fetch(
+          `https://api.abacatepay.com/v2/checkouts/one?id=${encodeURIComponent(billingId)}`,
+          {
+            method: 'GET',
+            signal: controller.signal,
+            headers: { authorization: `Bearer ${requireKey()}` },
+          },
+        );
+        if (!response.ok) throw new Error(`AbacatePay billing lookup failed (${response.status})`);
+        const data = abacatePayEnvelope(await response.json());
+        return {
+          id: data.id ?? billingId,
+          status: data.status ?? 'unknown',
+          amountCents: typeof data.amount === 'number' ? data.amount : 0,
+          currency: 'BRL',
+          externalReference: data.externalId ?? null,
+        };
+      } finally {
+        clearTimeout(timeout);
+      }
+    },
+  };
 };
 
-export { createLocalStorage } from '@resenha/providers';
+/** Compara o `?webhookSecret=` com o secret cadastrado no dashboard, em tempo constante. */
+const hasSecretValue = (value: string | undefined): value is string =>
+  typeof value === 'string' && value.length > 0;
+
+export const verifyAbacatePaySecret = (input: {
+  received: string | undefined;
+  expected: string | undefined;
+}): boolean => {
+  if (!hasSecretValue(input.received) || !hasSecretValue(input.expected)) return false;
+  const actual = Buffer.from(input.received, 'utf8');
+  const expected = Buffer.from(input.expected, 'utf8');
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
+};
 
 export const MAX_REFERENCE_IMAGE_BYTES = 8 * 1024 * 1024;
 

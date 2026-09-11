@@ -7,7 +7,7 @@ flowchart LR
   A --> P[Adapters reais por ambiente]
   K[Worker] -->|claim SKIP LOCKED| D
   K --> M[Music provider]
-  K --> S[Storage local/S3]
+  K --> S[Storage local compartilhado]
   K --> E[E-mail local/Resend]
   W -->|cookies de acesso| A
 ```

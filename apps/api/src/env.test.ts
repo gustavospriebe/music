@@ -15,7 +15,7 @@ describe('environment validation', () => {
 
     expect(env.LYRICS_PROVIDER).toBe('openrouter');
     expect(env.MUSIC_PROVIDER).toBe('openrouter');
-    expect(env.PAYMENT_PROVIDER).toBe('mercadopago');
+    expect(env.PAYMENT_PROVIDER).toBe('abacatepay');
     expect(env.EMAIL_PROVIDER).toBe('resend');
     expect(env.API_PORT).toBe(3001);
   });
@@ -32,7 +32,7 @@ describe('environment validation', () => {
     );
   });
 
-  it('requires Mercado Pago settings in production once OpenRouter is configured', () => {
+  it('requires AbacatePay settings in production once OpenRouter is configured', () => {
     expect(() =>
       parseEnv({
         ...localEnv,
@@ -41,18 +41,19 @@ describe('environment validation', () => {
         OPENROUTER_TEXT_MODEL: 'text-model',
         OPENROUTER_MUSIC_MODEL: 'music-model',
       }),
-    ).toThrow('Mercado Pago production configuration is required');
+    ).toThrow('AbacatePay production configuration is required');
   });
 
-  it('requires cover models and managed private storage in production', () => {
+  it('requires cover models and an absolute local storage path in production', () => {
     const providers = {
       ...localEnv,
       NODE_ENV: 'production',
       OPENROUTER_API_KEY: 'key',
       OPENROUTER_TEXT_MODEL: 'text-model',
       OPENROUTER_MUSIC_MODEL: 'music-model',
-      MERCADO_PAGO_ACCESS_TOKEN: 'mp-token',
-      MERCADO_PAGO_WEBHOOK_SECRET: 'mp-secret',
+      ABACATEPAY_API_KEY: 'ab-key',
+      ABACATEPAY_PRODUCT_ID: 'prod_1',
+      ABACATEPAY_WEBHOOK_SECRET: 'wh-secret',
     };
     expect(() => parseEnv(providers)).toThrow(
       'OpenRouter cover production configuration is required',
@@ -63,16 +64,14 @@ describe('environment validation', () => {
         OPENROUTER_COVER_TEXT_MODEL: 'cover-text',
         OPENROUTER_COVER_REFERENCE_MODEL: 'cover-reference',
       }),
-    ).toThrow('STORAGE_PROVIDER=s3 is required in production');
+    ).toThrow('LOCAL_STORAGE_PATH must be absolute in production');
     expect(
       parseEnv({
         ...providers,
         OPENROUTER_COVER_TEXT_MODEL: 'cover-text',
         OPENROUTER_COVER_REFERENCE_MODEL: 'cover-reference',
-        STORAGE_PROVIDER: 's3',
-        STORAGE_S3_BUCKET: 'private-bucket',
-        STORAGE_S3_REGION: 'us-east-1',
-      }).STORAGE_PROVIDER,
-    ).toBe('s3');
+        LOCAL_STORAGE_PATH: '/data/resenha-storage',
+      }).LOCAL_STORAGE_PATH,
+    ).toBe('/data/resenha-storage');
   });
 });

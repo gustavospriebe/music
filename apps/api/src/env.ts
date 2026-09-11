@@ -1,9 +1,5 @@
 import { z } from 'zod';
 import { readStorageConfig } from '@resenha/providers';
-const optionalUrl = z.preprocess(
-  (value) => (value === '' ? undefined : value),
-  z.string().url().optional(),
-);
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   API_PORT: z.coerce.number().default(3001),
@@ -16,25 +12,20 @@ const envSchema = z.object({
   ADMIN_SESSION_TTL: z.coerce.number().int().positive().default(28800),
   LYRICS_PROVIDER: z.enum(['openrouter']).default('openrouter'),
   MUSIC_PROVIDER: z.enum(['openrouter']).default('openrouter'),
-  PAYMENT_PROVIDER: z.enum(['mercadopago']).default('mercadopago'),
+  PAYMENT_PROVIDER: z.enum(['abacatepay']).default('abacatepay'),
   EMAIL_PROVIDER: z.enum(['resend']).default('resend'),
   AUDIO_REVIEW_MODE: z.enum(['automatic', 'manual']).default('automatic'),
   LOCAL_STORAGE_PATH: z.string().default('./var/storage'),
-  STORAGE_PROVIDER: z.enum(['local', 's3']).optional(),
-  STORAGE_S3_BUCKET: z.string().optional(),
-  STORAGE_S3_REGION: z.string().optional(),
-  STORAGE_S3_ENDPOINT: optionalUrl,
-  STORAGE_S3_FORCE_PATH_STYLE: z.enum(['true', 'false']).optional(),
-  STORAGE_S3_ACCESS_KEY_ID: z.string().optional(),
-  STORAGE_S3_SECRET_ACCESS_KEY: z.string().optional(),
+  STORAGE_PROVIDER: z.enum(['local']).optional(),
   OPENROUTER_API_KEY: z.string().optional(),
   OPENROUTER_TEXT_MODEL: z.string().optional(),
   OPENROUTER_MUSIC_MODEL: z.string().optional(),
   OPENROUTER_COVER_TEXT_MODEL: z.string().optional(),
   OPENROUTER_COVER_REFERENCE_MODEL: z.string().optional(),
-  MERCADO_PAGO_ACCESS_TOKEN: z.string().optional(),
-  MERCADO_PAGO_WEBHOOK_SECRET: z.string().optional(),
-  MERCADO_PAGO_WEBHOOK_URL: z.string().optional(),
+  ABACATEPAY_API_KEY: z.string().optional(),
+  ABACATEPAY_PRODUCT_ID: z.string().optional(),
+  ABACATEPAY_WEBHOOK_SECRET: z.string().optional(),
+  ABACATEPAY_WEBHOOK_URL: z.string().optional(),
 });
 export type Env = z.infer<typeof envSchema>;
 export const parseEnv = (source: NodeJS.ProcessEnv = process.env): Env => {
@@ -48,8 +39,8 @@ export const parseEnv = (source: NodeJS.ProcessEnv = process.env): Env => {
   if (env.NODE_ENV === 'production') {
     if (!env.OPENROUTER_API_KEY || !env.OPENROUTER_TEXT_MODEL || !env.OPENROUTER_MUSIC_MODEL)
       throw new Error('OpenRouter production configuration is required');
-    if (!env.MERCADO_PAGO_ACCESS_TOKEN || !env.MERCADO_PAGO_WEBHOOK_SECRET)
-      throw new Error('Mercado Pago production configuration is required');
+    if (!env.ABACATEPAY_API_KEY || !env.ABACATEPAY_PRODUCT_ID || !env.ABACATEPAY_WEBHOOK_SECRET)
+      throw new Error('AbacatePay production configuration is required');
     if (!env.OPENROUTER_COVER_TEXT_MODEL || !env.OPENROUTER_COVER_REFERENCE_MODEL)
       throw new Error('OpenRouter cover production configuration is required');
   }

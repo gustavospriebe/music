@@ -1,10 +1,10 @@
 # Configuração de providers
 
-Os adapters são reais e selecionados por variáveis (`.env.example` lista tudo). OpenRouter de letra e música foi validado anteriormente; capa, Mercado Pago, Resend e S3 continuam **EXTERNAL BLOCKED** até execução autorizada do [runbook de ativação](external-activation-runbook.md). Fora de produção valem os fallbacks locais abaixo; produção falha rápido sem toda a configuração obrigatória.
+Os adapters são reais e selecionados por variáveis (`.env.example` lista tudo). OpenRouter de letra e música foi validado anteriormente; capa, AbacatePay e Resend continuam **EXTERNAL BLOCKED** até execução autorizada do [runbook de ativação](external-activation-runbook.md). Fora de produção valem os fallbacks locais abaixo; produção falha rápido sem toda a configuração obrigatória.
 
 ## Fallbacks de desenvolvimento (sem chave)
 
-- Pagamento: `MERCADO_PAGO_ACCESS_TOKEN` ausente => checkout cria pagamento local e o próprio front confirma via endpoint dev (removido em produção); o fluxo segue até a entrega da música.
+- Pagamento: `ABACATEPAY_API_KEY` ausente => checkout cria pagamento local e o próprio front confirma via endpoint dev (removido em produção); o fluxo segue até a entrega da música.
 - E-mail: `RESEND_API_KEY` ausente => e-mail de entrega é gravado em `var/emails` com o link privado real e registrado em `email_deliveries` como `local-log`.
 
 ## OpenRouter (letra, música e capa)
@@ -15,9 +15,11 @@ Para capa, defina `OPENROUTER_COVER_TEXT_MODEL=google/gemini-3.1-flash-lite-imag
 
 Não use uma chave Gemini como chave OpenRouter. Qualquer chave compartilhada em conversa deve ser tratada como exposta e rotacionada; nunca a registre em logs ou repositório.
 
-## Mercado Pago
+## AbacatePay
 
-Defina `PAYMENT_PROVIDER=mercadopago`, `MERCADO_PAGO_ACCESS_TOKEN`, `MERCADO_PAGO_WEBHOOK_SECRET` e `MERCADO_PAGO_WEBHOOK_URL` (URL pública que aponta para `POST /api/v1/webhooks/mercado-pago`; em desenvolvimento use um túnel). O checkout cria preferência no Checkout Pro com `external_reference` igual ao `publicId` do pedido. O retorno do navegador nunca confirma pagamento: o webhook valida assinatura `x-signature`/`x-request-id`, consulta o pagamento na API e confere moeda, total e referência antes de marcar pago. Eventos são armazenados sanitizados e deduplicados em `payment_webhook_events`. Use credenciais de teste/sandbox durante homologação.
+Defina `PAYMENT_PROVIDER=abacatepay`, `ABACATEPAY_API_KEY`, `ABACATEPAY_PRODUCT_ID`, `ABACATEPAY_WEBHOOK_SECRET` e `ABACATEPAY_WEBHOOK_URL` (URL pública que aponta para `POST /api/v1/webhooks/abacate-pay?webhookSecret=<secret>`; em desenvolvimento use um túnel). Passos no dashboard ([docs](https://docs.abacatepay.com)): criar o produto com preço fixo em centavos (R$ 49,90 → `price: 4990`, moeda BRL sempre), anotar o `prod_*`; gerar a API key (Bearer); criar o webhook com endpoint HTTPS, secret próprio e eventos `checkout.completed` + `checkout.refunded`.
+
+O checkout cria cobrança em `POST /v2/checkouts/create` com `items: [{id: produto, quantity: 1}]`, `externalId` igual ao `publicId` do pedido e `returnUrl`/`completionUrl` de volta ao pedido; o cliente paga na `url` retornada. O valor da cobrança vem do produto do dashboard: o adapter recusa qualquer `amount` divergente do total do pedido. O webhook autentica pelo `?webhookSecret=` (tempo constante), busca o billing em `GET /v2/checkouts/one?id=`, confere `externalId`, valor e status `PAID` antes de marcar pago. Eventos são deduplicados em `payment_webhook_events` (`abacate-pay:<billing>:<evento>`). Cobranças criadas em devMode servem de sandbox; o retorno do navegador nunca confirma pagamento. Referências: [criar checkout](https://docs.abacatepay.com/pages/payment/create), [webhooks](https://docs.abacatepay.com/pages/webhooks), [referência de webhooks](https://docs.abacatepay.com/pages/webhooks/reference).
 
 ## Resend
 
@@ -25,6 +27,6 @@ Defina `EMAIL_PROVIDER=resend`, `RESEND_API_KEY` e `EMAIL_FROM` usando domínio 
 
 ## Armazenamento
 
-Fora de produção use `STORAGE_PROVIDER=local` e `LOCAL_STORAGE_PATH` compartilhado. Em produção é obrigatório `STORAGE_PROVIDER=s3`, `STORAGE_S3_BUCKET` e `STORAGE_S3_REGION`; `STORAGE_S3_ENDPOINT`, force-path-style e credenciais explícitas existem para provedores compatíveis. Prefira identidade IAM do runtime. O bucket deve bloquear acesso público e ter backup/versionamento quando suportado; downloads passam pela API, nunca por URL pública. Railway Bucket requer export/backup separado porque atualmente não oferece versionamento ou lifecycle.
+Disco local em todos os ambientes (`STORAGE_PROVIDER=local`): API e worker precisam do mesmo `LOCAL_STORAGE_PATH` absoluto. No Railway, monte o mesmo volume nos dois serviços (ex.: `/data/resenha-storage`). Downloads passam pela API, nunca por URL pública; o diretório nunca é listado.
 
 Nenhuma integração real acima é declarada validada sem chamada autorizada e bem-sucedida. As referências oficiais e variáveis também estão em [providers.md](providers.md).

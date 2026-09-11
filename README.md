@@ -1,6 +1,6 @@
 # Música da Resenha
 
-MVP brasileiro para transformar histórias de amigos em música personalizada. A pessoa conta a resenha, revisa a letra, paga via Mercado Pago e recebe duas versões de áudio e uma capa opcional em página privada. Letra, áudio e capa são gerados via OpenRouter; a entrega é avisada por e-mail (Resend).
+MVP brasileiro para transformar histórias de amigos em música personalizada. A pessoa conta a resenha, revisa a letra, paga via AbacatePay e recebe duas versões de áudio e uma capa opcional em página privada. Letra, áudio e capa são gerados via OpenRouter; a entrega é avisada por e-mail (Resend).
 
 ## Stack e estrutura
 
@@ -15,16 +15,16 @@ Pré-requisitos: Node Active LTS, Corepack, Docker e Docker Compose.
 ```sh
 corepack enable
 corepack pnpm install
-cp .env.example .env   # OpenRouter é obrigatório; Mercado Pago e Resend têm fallback fora de produção
+cp .env.example .env   # OpenRouter é obrigatório; AbacatePay e Resend têm fallback fora de produção
 docker compose up -d
 pnpm db:migrate
 pnpm db:seed
 pnpm dev
 ```
 
-URLs locais: web `http://localhost:5175`, API `http://localhost:3001`, OpenAPI `http://localhost:3001/documentation`. O banco publicado localmente usa `localhost:5433`. Com `STORAGE_PROVIDER=local`, `LOCAL_STORAGE_PATH` deve ser absoluto para API e worker compartilharem os mesmos arquivos. Produção exige `STORAGE_PROVIDER=s3` e bucket privado.
+URLs locais: web `http://localhost:5175`, API `http://localhost:3001`, OpenAPI `http://localhost:3001/documentation`. O banco publicado localmente usa `localhost:5433`. Com `STORAGE_PROVIDER=local`, `LOCAL_STORAGE_PATH` deve ser absoluto para API e worker compartilharem os mesmos arquivos. Produção usa o mesmo disco local via volume compartilhado entre `api` e `worker`.
 
-Os adapters de rede são reais e selecionados por variáveis de ambiente (`LYRICS_PROVIDER`, `MUSIC_PROVIDER`, `PAYMENT_PROVIDER`, `EMAIL_PROVIDER`, `STORAGE_PROVIDER`); não existe modo fake de provider. OpenRouter é necessário para gerar letra, áudio e capa. Os modelos e custos estão registrados em [providers](docs/providers.md); o gate local atual usa providers controlados e não revalida a rede. Sem credenciais de Mercado Pago ou Resend fora de produção, o checkout usa confirmação local pelo pedido e o e-mail é gravado em `var/emails` com o link privado. Em produção, a API exige OpenRouter, Mercado Pago e S3; o worker exige OpenRouter, Resend e S3.
+Os adapters de rede são reais e selecionados por variáveis de ambiente (`LYRICS_PROVIDER`, `MUSIC_PROVIDER`, `PAYMENT_PROVIDER`, `EMAIL_PROVIDER`, `STORAGE_PROVIDER`); não existe modo fake de provider. OpenRouter é necessário para gerar letra, áudio e capa. Os modelos e custos estão registrados em [providers](docs/providers.md); o gate local atual usa providers controlados e não revalida a rede. Sem credenciais de AbacatePay ou Resend fora de produção, o checkout usa confirmação local pelo pedido e o e-mail é gravado em `var/emails` com o link privado. Em produção, a API exige OpenRouter, AbacatePay e `LOCAL_STORAGE_PATH` absoluto; o worker exige OpenRouter, Resend e o mesmo caminho.
 
 Modelos de áudio têm filtro de conteúdo probabilístico: uma letra pode ser bloqueada (`PROHIBITED_CONTENT`) mesmo passando nas regras locais. O worker tenta várias vezes, o job fica visível no painel e o admin pode editar a letra ou regenerar.
 
@@ -57,7 +57,7 @@ npx react-doctor@latest --verbose --scope changed
 
 ## Providers e produção
 
-OpenRouter, Mercado Pago, Resend e S3 são selecionados apenas por variáveis de ambiente. Configure-os seguindo [docs/provider-setup.md](docs/provider-setup.md) e execute o [runbook de ativação externa](docs/external-activation-runbook.md); integrações reais só são consideradas validadas após chamada autorizada e bem-sucedida. O webhook do Mercado Pago precisa de URL pública (ex.: túnel em desenvolvimento). Nenhuma chave Gemini é usada nem salva: uma chave previamente exposta em conversa deve ser rotacionada.
+OpenRouter, AbacatePay e Resend são selecionados apenas por variáveis de ambiente. Configure-os seguindo [docs/provider-setup.md](docs/provider-setup.md) e execute o [runbook de ativação externa](docs/external-activation-runbook.md); integrações reais só são consideradas validadas após chamada autorizada e bem-sucedida. O webhook do AbacatePay precisa de URL pública (ex.: túnel em desenvolvimento). Nenhuma chave Gemini é usada nem salva: uma chave previamente exposta em conversa deve ser rotacionada.
 
 Há imagens de produção multi-stage e não-root em `docker/api/Dockerfile`, `docker/worker/Dockerfile` e `docker/web/Dockerfile`. O projeto não faz deploy. Antes de publicar, siga [docs/production-checklist.md](docs/production-checklist.md).
 

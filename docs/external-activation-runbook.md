@@ -1,12 +1,12 @@
 # Ativação externa e restore
 
-Estado inicial de Mercado Pago, Resend, S3 e capa OpenRouter: **EXTERNAL BLOCKED**. Execute somente com autorização, credenciais de teste e orçamento. Nunca cole secrets, payload pessoal, foto, letra, token ou URL privada na evidência.
+Estado inicial de AbacatePay, Resend, volume de arquivos e capa OpenRouter: **EXTERNAL BLOCKED**. Execute somente com autorização, credenciais de teste e orçamento. Nunca cole secrets, payload pessoal, foto, letra, token ou URL privada na evidência.
 
-## Mercado Pago sandbox
+## AbacatePay sandbox
 
-- Comando: iniciar API/worker com credenciais de teste e expor `POST /api/v1/webhooks/mercado-pago` por HTTPS; criar um pedido sintético pela UI e pagar com comprador de teste.
-- Evidência esperada: preferência criada, webhook assinado aceito uma vez, consulta remota confirma BRL/valor/referência, duplicata não cria segundo pagamento/job.
-- Rollback: revogar credenciais/túnel, remover pedidos exclusivamente sintéticos pelo procedimento aprovado e restaurar fallback fora de produção.
+- Comando: criar o produto (R$ 49,90) e a API key no dashboard; cadastrar o webhook (`POST /api/v1/webhooks/abacate-pay?webhookSecret=<secret>` por HTTPS, eventos `checkout.completed` + `checkout.refunded`); iniciar API/worker com as credenciais e criar um pedido sintético pela UI, pagando a cobrança devMode.
+- Evidência esperada: checkout criado com `amount` igual ao total, webhook com secret aceito uma vez, consulta remota confirma `externalId`/valor/status `PAID`, duplicata não cria segundo pagamento/job.
+- Rollback: revogar key/webhook, remover pedidos exclusivamente sintéticos pelo procedimento aprovado e restaurar fallback fora de produção.
 - Aceite: `[ ] responsável`, `[ ] data UTC`, `[ ] ambiente`, `[ ] evidência sanitizada`, `[ ] rollback testado`.
 
 ## Resend
@@ -16,12 +16,12 @@ Estado inicial de Mercado Pago, Resend, S3 e capa OpenRouter: **EXTERNAL BLOCKED
 - Rollback: revogar key, remover DNS de teste se aplicável e voltar ao registro local somente fora de produção.
 - Aceite: `[ ] responsável`, `[ ] data UTC`, `[ ] domínio`, `[ ] entrega sanitizada`, `[ ] rollback testado`.
 
-## S3 compatível privado
+## Volume de arquivos compartilhado
 
-- Comando: configurar `STORAGE_PROVIDER=s3`, bucket/região e identidade IAM; executar `pnpm --filter @resenha/providers test` e um upload/download/exclusão sintético pelo fluxo da aplicação.
-- Evidência esperada: bloqueio público habilitado, objeto sem ACL pública, acesso direto negado, capability autenticada funciona, exclusão remove objeto.
-- Rollback: retirar permissão da identidade, remover apenas objetos do prefixo sintético e restaurar backup/configuração anterior.
-- Aceite: `[ ] responsável`, `[ ] data UTC`, `[ ] bucket sem segredo`, `[ ] políticas revisadas`, `[ ] backup externo/versionamento quando suportado`, `[ ] rollback testado`.
+- Comando: montar o mesmo volume em `api` e `worker` (`LOCAL_STORAGE_PATH` absoluto e idêntico); executar `pnpm --filter @resenha/providers test` e um upload/download/exclusão sintético pelo fluxo da aplicação.
+- Evidência esperada: arquivo escrito pelo worker legível pela API via capability autenticada, diretório nunca listado, exclusão remove objeto.
+- Rollback: desmontar o volume, remover apenas objetos do prefixo sintético e restaurar backup/configuração anterior.
+- Aceite: `[ ] responsável`, `[ ] data UTC`, `[ ] mesmo caminho nos dois serviços`, `[ ] backup/export separado avaliado`, `[ ] rollback testado`.
 
 ## Capa OpenRouter
 
@@ -41,7 +41,7 @@ RESTORE_DRILL_CONFIRM=ERASE_RESTORE_DRILL_DATABASE ./scripts/restore-drill.sh
 ```
 
 - Evidência esperada: dump criado em diretório temporário, restore termina, migrations e contagens essenciais são consultáveis; registrar duração, RPO/RTO observado e hash/identificador do backup, nunca conteúdo.
-- Objetos: restaurar uma versão do bucket em prefixo/bucket isolado, comparar inventário por quantidade/tamanho e baixar um áudio/capa sintéticos via API apontada ao ambiente isolado.
+- Objetos: copiar o diretório de storage para prefixo isolado, comparar inventário por quantidade/tamanho e baixar um áudio/capa sintéticos via API apontada ao ambiente isolado.
 - Rollback: destruir somente o banco e prefixo isolados pelo console/IaC autorizado; não apontar o script para produção.
 - Aceite: `[ ] responsável`, `[ ] data UTC`, `[ ] origem não produtiva`, `[ ] destino isolado`, `[ ] integridade`, `[ ] RPO/RTO`, `[ ] limpeza do drill`.
 

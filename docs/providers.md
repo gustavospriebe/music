@@ -1,13 +1,13 @@
 # Providers e variáveis
 
-| Provider  | Implementação                       | Produção                   | Status                                                  |
-| --------- | ----------------------------------- | -------------------------- | ------------------------------------------------------- |
-| Lyrics    | OpenRouter chat completions (JSON)  | `openrouter`               | validado com chamada real (gemini-3-flash-preview)      |
-| Música    | OpenRouter SSE áudio (2 versões)    | OpenRouter Lyria           | validado com chamada real (lyria-3-pro, US$ 0,08/faixa) |
-| Pagamento | Mercado Pago Checkout Pro + webhook | Mercado Pago Checkout Pro  | implementado, sem credenciais (dev usa fallback local)  |
-| E-mail    | Resend com link privado de entrega  | Resend                     | implementado, sem credenciais (dev usa fallback local)  |
-| Capa      | OpenRouter Images API               | Gemini Flash Image         | implementado; sem chamada paga de validação             |
-| Arquivos  | local dev / adapter S3 compatível   | bucket privado obrigatório | testado localmente; infraestrutura externa bloqueada    |
+| Provider  | Implementação                      | Produção                        | Status                                                            |
+| --------- | ---------------------------------- | ------------------------------- | ----------------------------------------------------------------- |
+| Lyrics    | OpenRouter chat completions (JSON) | `openrouter`                    | validado com chamada real (gemini-3-flash-preview)                |
+| Música    | OpenRouter SSE áudio (2 versões)   | OpenRouter Lyria                | validado com chamada real (lyria-3-pro, US$ 0,08/faixa)           |
+| Pagamento | AbacatePay Checkout + webhook      | AbacatePay Checkout             | implementado com testes, sem credenciais (dev usa fallback local) |
+| E-mail    | Resend com link privado de entrega | Resend                          | implementado, sem credenciais (dev usa fallback local)            |
+| Capa      | OpenRouter Images API              | Gemini Flash Image              | implementado; sem chamada paga de validação                       |
+| Arquivos  | disco local compartilhado          | volume compartilhado api+worker | testado localmente; volume de produção pendente                   |
 
 ## OpenRouter
 
@@ -17,12 +17,12 @@ Filtro de conteúdo de áudio é probabilístico: a mesma letra pode retornar `P
 
 Capas usam `POST https://openrouter.ai/api/v1/images`, 1K e proporção 1:1. Sem foto, `OPENROUTER_COVER_TEXT_MODEL` recomenda `google/gemini-3.1-flash-lite-image` (~US$ 0,0336 por saída 1K); com foto, `OPENROUTER_COVER_REFERENCE_MODEL` recomenda `google/gemini-3.1-flash-image` (~US$ 0,067). O pior caso incluído (duas capas com referência) é ~US$ 0,134 de saída, antes de entrada, impostos, câmbio e storage. Estes preços são públicos, consultados em 04/09/2026; nenhuma chamada paga de capa foi feita. Referências: [OpenRouter Images API](https://openrouter.ai/docs/api-reference/images/generate-images), [modelos de imagem](https://openrouter.ai/api/v1/images/models) e [preços Gemini](https://ai.google.dev/gemini-api/docs/pricing).
 
-## Mercado Pago
+## AbacatePay
 
-Checkout Pro cria preferência em `POST /checkout/preferences` com `external_reference`, item BRL, `back_urls` e `notification_url`. Webhook apenas notifica: validar assinatura `x-signature`/`x-request-id`, buscar o pagamento na API e conferir valor, moeda, pedido e status antes de marcar pago. A deduplicação é obrigatória. [Preferências](https://www.mercadopago.com.br/developers/pt/reference/online-payments/checkout-pro/preferences/create-preference/post), [webhooks](https://www.mercadopago.com.br/developers/pt/docs/your-integrations/notifications/webhooks).
+Checkout hospedado criado em `POST /v2/checkouts/create` com o produto do dashboard (`items: [{id, quantity: 1}]`), `externalId` igual ao `publicId` do pedido e `returnUrl`/`completionUrl` de volta ao pedido; o cliente paga na `url` retornada. Valores sempre em centavos BRL. O adapter recusa qualquer `amount` divergente do total do pedido. Webhook apenas notifica: autenticar pelo `?webhookSecret=`, buscar o billing em `GET /v2/checkouts/one?id=` e conferir `externalId`, valor e status `PAID` antes de marcar pago. A deduplicação é obrigatória. [Criar checkout](https://docs.abacatepay.com/pages/payment/create), [webhooks](https://docs.abacatepay.com/pages/webhooks).
 
-## Resend e S3
+## Resend e storage
 
-Resend envia `POST https://api.resend.com/emails` com `RESEND_API_KEY`, `EMAIL_FROM` e `Idempotency-Key`. O adapter S3 usa `PutObject`, `GetObject` e `DeleteObject`, sem ACL pública; downloads continuam mediados pelas capabilities da API. Endpoint e credenciais são opcionais quando a infraestrutura fornece IAM. [Resend](https://resend.com/docs/api-reference/emails/send-email), [AWS S3 SDK](https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/s3/).
+Resend envia `POST https://api.resend.com/emails` com `RESEND_API_KEY`, `EMAIL_FROM` (domínio verificado) e `Idempotency-Key`. [Resend](https://resend.com/docs/api-reference/emails/send-email). Storage é disco local em todos os ambientes: API e worker compartilham o mesmo `LOCAL_STORAGE_PATH` absoluto (no Railway, um volume montado nos dois serviços); downloads continuam mediados pelas capabilities da API e o diretório nunca é listado.
 
-As variáveis completas estão em `.env.example`; produção falha ao iniciar sem modelos de capa, Mercado Pago/Resend e storage S3 explícito. Estado externo atual: **EXTERNAL BLOCKED** até homologação com credenciais e infraestrutura autorizadas.
+As variáveis completas estão em `.env.example`; produção falha ao iniciar sem modelos de capa, AbacatePay/Resend e `LOCAL_STORAGE_PATH` absoluto. Estado externo atual: **EXTERNAL BLOCKED** até homologação com credenciais e infraestrutura autorizadas.

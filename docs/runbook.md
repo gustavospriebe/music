@@ -10,7 +10,7 @@ Nunca altere status com SQL em operação normal. Use apenas handlers que chamam
 
 ## Pagamento confirmado sem geração
 
-Valide pagamento junto ao Mercado Pago, confirme `externalPaymentId`, valor BRL e pedido. Na mesma transação, marque pago e insira `audio:<order-id>` com chave única. Se o job não existir, crie-o uma vez; não marque entrega manualmente.
+Valide pagamento junto ao AbacatePay, confirme `externalPaymentId`, valor BRL e pedido. Na mesma transação, marque pago e insira `audio:<order-id>` com chave única. Se o job não existir, crie-o uma vez; não marque entrega manualmente.
 
 ## Token de cliente
 
@@ -18,7 +18,7 @@ Revogue acesso, gere token forte novo, armazene apenas o hash e envie novo link.
 
 ## Armazenamento e backup
 
-Assets são privados. Em desenvolvimento, `var/storage` é descartável; produção exige S3 compatível privado. O worker remove referências ao encerrar cada tentativa e um safety net limpa órfãs com mais de sete dias. Não apague capas/áudios ou registros financeiros por esse processo. Faça backup versionado do PostgreSQL e do bucket, execute o restore drill isolado e aplique política de retenção/anonimização aprovada juridicamente.
+Assets são privados. Em desenvolvimento, `var/storage` é descartável; produção usa disco local via volume montado em `api` e `worker` no mesmo `LOCAL_STORAGE_PATH` absoluto. O worker remove referências ao encerrar cada tentativa e um safety net limpa órfãs com mais de sete dias. Não apague capas/áudios ou registros financeiros por esse processo. Faça backup versionado do PostgreSQL e do diretório de storage, execute o restore drill isolado e aplique política de retenção/anonimização aprovada juridicamente.
 
 Procedimentos externos e restore: [external-activation-runbook.md](external-activation-runbook.md). Sem evidência anexada, registre **EXTERNAL BLOCKED**; não transforme “adapter implementado” em “provider homologado”.
 
