@@ -82,7 +82,28 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
+export type PublicConfiguration = {
+  generation: { lyricsAvailable: boolean };
+  brandName: string;
+  supportEmail: string | null;
+  commercial: {
+    ready: boolean;
+    deliveryEstimate: string | null;
+    revisionPolicy: string | null;
+    refundPolicy: string | null;
+    usageLicense: string | null;
+    termsUrl: string | null;
+    privacyUrl: string | null;
+  };
+  payment: {
+    provider: 'abacatepay' | 'disabled';
+    label: string;
+    configured: boolean;
+    devFallback: boolean;
+  };
+};
 export const api = {
+  configuration: () => request<PublicConfiguration>('/configuration'),
   products: () => request<PublicProduct[]>('/products'),
   createOrder: (productType: ProductType, creationKey: string, visitorId?: string) =>
     request<{ publicId: string }>(`/orders`, {
@@ -122,8 +143,11 @@ export const api = {
       method: 'POST',
       ...(content ? { body: JSON.stringify({ content }) } : {}),
     }),
-  generateLyrics: (publicId: string) =>
-    request(`/orders/${publicId}/lyrics/generate`, { method: 'POST' }),
+  generateLyrics: (publicId: string, refinement?: { instructions: string; baseVersion: number }) =>
+    request(`/orders/${publicId}/lyrics/generate`, {
+      method: 'POST',
+      ...(refinement ? { body: JSON.stringify(refinement) } : {}),
+    }),
   checkout: (publicId: string) =>
     request<{ checkoutUrl: string; dev?: boolean }>(`/orders/${publicId}/checkout`, {
       method: 'POST',
@@ -160,6 +184,21 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     }),
+  adminGenerateLyrics: (id: string) =>
+    request<{ number: number }>(`/admin/orders/${id}/lyrics/generate`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+  adminRetryEmail: (id: string) =>
+    request<{ queued: true }>(`/admin/orders/${id}/email/retry`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+  adminRegenerateAudio: (id: string, audioId: string) =>
+    request<{ queued: true }>(`/admin/orders/${id}/audio/${audioId}/regenerate`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
   adminUpdateLyrics: (id: string, content: LyricsContent) =>
     request<{ id: string }>(`/admin/orders/${id}/lyrics`, {
       method: 'PATCH',
@@ -174,17 +213,38 @@ export const api = {
     ),
   adminLogout: () => request<void>('/admin/session', { method: 'DELETE' }),
   adminOrders: (filters = '') =>
-    request<{ items: AdminOrder[]; page: number }>(`/admin/orders${filters}`),
+    request<{ items: AdminOrder[]; page: number; total: number; pageSize: number }>(
+      `/admin/orders${filters}`,
+    ),
+  adminOverview: () =>
+    request<{
+      totals: { orders: number; paid: number; revenueCents: number };
+      attention: {
+        failed: number;
+        failedOperationalOrders?: number;
+        reviewRequired: number;
+        audioQueued: number;
+        lyricsGenerating: number;
+      };
+    }>('/admin/overview'),
   adminOrder: (id: string) => request<AdminOrderDetail>(`/admin/orders/${id}`),
   adminAssetStreamUrl: (orderId: string, assetId: string) =>
     url(`/admin/orders/${orderId}/assets/${assetId}/stream`),
-  retryJob: (id: string) =>
-    request<{ queued: true }>(`/admin/jobs/${id}/retry`, { method: 'POST' }),
+  retryJob: (id: string, reference?: { file: File; consent: boolean }) => {
+    const body = reference ? new FormData() : JSON.stringify({});
+    if (body instanceof FormData && reference) {
+      body.append('reference', reference.file);
+      body.append('consent', String(reference.consent));
+    }
+    return request<{ queued: true }>(`/admin/jobs/${id}/retry`, { method: 'POST', body });
+  },
   addAdminNote: (id: string, message: string) =>
     request<{ created: true }>(`/admin/orders/${id}/notes`, {
       method: 'POST',
       body: JSON.stringify({ message }),
     }),
+  revokeAccess: (id: string) =>
+    request<{ revoked: true }>(`/admin/orders/${id}/access/revoke`, { method: 'POST' }),
   rotateAccess: (id: string) =>
     request<{ accessToken: string }>(`/admin/orders/${id}/access/rotate`, { method: 'POST' }),
   aiUsageSummary: () => request<AiUsageSummary>('/admin/ai-usage/summary'),
@@ -216,6 +276,7 @@ export type AdminOrder = {
   status: string;
   priceCents: number;
   createdAt: string;
+  subjectName?: string | null;
 };
 /** Admin-authenticated lyric rows keep addressing internal versions directly. */
 export type AdminLyrics = Lyrics & { id: string };
@@ -224,9 +285,59 @@ export type AdminOrderDetail = {
   story?: Story;
   lyrics: AdminLyrics[];
   payments: { id: string; status: string; amountCents: number }[];
-  jobs: { id: string; status: string; type: string; lastError?: string | null }[];
-  audio: AdminAudio[];
+  jobs: {
+    id: string;
+    status: string;
+    type: string;
+    lastError?: string | null;
+    errorCode?: string | null;
+    attempts?: number;
+    maxAttempts?: number;
+    runAt?: string;
+    updatedAt?: string;
+    canRetry?: boolean;
+    retryBlockedReason?: string | null;
+    requiresReference?: boolean;
+  }[];
+  audio: (AdminAudio & { canRegenerate?: boolean; regenerateBlockedReason?: string | null })[];
+  recovery?: {
+    lyrics: {
+      canGenerate: boolean;
+      canEdit: boolean;
+      reason: string | null;
+      remainingGenerations?: number;
+      generateBlockedReason?: string | null;
+      editBlockedReason?: string | null;
+    };
+    audio: { canRebuild: boolean; reason: string | null };
+    cover: {
+      canRetry: boolean;
+      requiresReference: boolean;
+      jobId: string | null;
+      reason: string | null;
+    };
+    email: { canRetry: boolean; reason: string | null };
+  };
+  covers?: {
+    id: string;
+    attempt: number;
+    status: string;
+    hasReference: boolean;
+    referenceAvailable: boolean;
+    lastError: string | null;
+    errorCode?: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }[];
+  notifications?: {
+    id: string;
+    status: string;
+    provider: string;
+    createdAt: string;
+    updatedAt: string;
+  }[];
   notes: { id: string; message: string; createdAt: string }[];
+  revisionRequests?: { message: string; createdAt: string; status: string }[];
   aiUsage: AiUsageRow[];
   aiCost: AiCost;
 };
@@ -242,6 +353,7 @@ export type AiUsageRow = {
   latencyMs: number | null;
   status: string;
   error: string | null;
+  errorCode?: string | null;
   attempt: number;
   createdAt: string;
 };
@@ -257,5 +369,4 @@ export type AiCost = {
 export type AiUsageSummary = {
   month: AiCost & { blocked: number };
   byDay: { day: string; totalUsd: string; calls: number; blocked: number }[];
-  key: { usage: number; limit: number | null; remaining: number | null } | null;
 };

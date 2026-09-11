@@ -4,17 +4,17 @@
 
 ## 1. Decisões registradas (dono)
 
-| #   | Decisão                                                                                                                                                                                                          | Data               |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
-| 1   | Admin via `ADMIN_EMAIL`/`ADMIN_PASSWORD` em plaintext no `.env` (sem hash; não "consertar")                                                                                                                      | handoff 03/09/2026 |
-| 2   | Sem modo fake de providers (removido por decisão); fora de produção, fallback local: pagamento dev + e-mail em `var/emails`; produção exige chaves                                                               | handoff 03/09/2026 |
-| 3   | Contenção interna de gasto removida em 04/09/2026 (gastar com juízo, sem estourar); o limite do provider (US$ 25 na key, via `GET /key`) segue existindo e é monitorado no painel                                | 04/09/2026         |
-| 4   | GitHub criado pelo dono (`gustavospriebe/music`); commits por conta dele                                                                                                                                         | 04/09/2026         |
-| 5   | Pagamento (MP) e e-mail (Resend) reais **depois** do produto funcional; primeiro: funil, dados, admin                                                                                                            | 04/09/2026         |
-| 6   | Sem cadastro para criar música (zero fricção); acesso via navegador do usuário                                                                                                                                   | 04/09/2026         |
-| 7   | Correção excepcional 04/09: pedido `X6NUN8uFT8YpsPRm` voltou `delivered→audio_generating` via SQL direto para completar a prova de custo (sem caminho de domínio para isso; caminho correto seria rebuild admin) | 04/09/2026         |
+| #   | Decisão                                                                                                                                                                                                               | Data               |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| 1   | Admin via `ADMIN_EMAIL`/`ADMIN_PASSWORD` em plaintext no `.env` (sem hash; não "consertar")                                                                                                                           | handoff 03/09/2026 |
+| 2   | Sem modo fake de providers (removido por decisão); fora de produção, fallback local: pagamento dev + e-mail em `var/emails`; produção exige chaves                                                                    | handoff 03/09/2026 |
+| 3   | Contenção interna de gasto removida em 04/09/2026 (gastar com juízo, sem estourar); o limite configurado no provider segue existindo; valores de conta ficam fora da documentação pública                             | 04/09/2026         |
+| 4   | GitHub criado pelo dono (`gustavospriebe/music`); commits por conta dele                                                                                                                                              | 04/09/2026         |
+| 5   | Pagamento (MP) e e-mail (Resend) reais **depois** do produto funcional; primeiro: funil, dados, admin                                                                                                                 | 04/09/2026         |
+| 6   | Sem cadastro para criar música (zero fricção); acesso via navegador do usuário                                                                                                                                        | 04/09/2026         |
+| 7   | Correção excepcional 04/09: pedido `[pedido de validação]` voltou `delivered→audio_generating` via SQL direto para completar a prova de custo (sem caminho de domínio para isso; caminho correto seria rebuild admin) | 04/09/2026         |
 
-## 2. Custo real medido (pedido `X6NUN8uFT8YpsPRm`, 04/09/2026)
+## 2. Custo real medido (pedido `[pedido de validação]`, 04/09/2026)
 
 | Etapa                              | Modelo                          | Custo                                         |
 | ---------------------------------- | ------------------------------- | --------------------------------------------- |
@@ -23,7 +23,7 @@
 | Áudio v2                           | idem                            | US$ 0,08                                      |
 | **Total por venda**                |                                 | **US$ 0,163414 (~R$ 0,89 / R$ 49,90 ≈ 1,8%)** |
 
-Key em 04/09: US$ 21,59 usados de US$ 25. Prova controlada: 1 variante por execução (`variants` injetável), job com `maxAttempts: 1` e `run_at` futuro para o worker dev não reivindicar; execução parcial nunca entrega (só o par 1+2 fecha a venda — teste cobre).
+Prova controlada: 1 variante por execução (`variants` injetável), job com `maxAttempts: 1` e `run_at` futuro para o worker dev não reivindicar; execução parcial nunca entrega (só o par 1+2 fecha a venda — teste cobre).
 
 ## 3. Por que custos antigos zerados e fails de áudio
 

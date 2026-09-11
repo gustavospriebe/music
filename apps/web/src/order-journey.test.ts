@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { completedAudioCount, deriveOrderJourney, latestLyrics } from './order-journey';
+import {
+  completedAudioCount,
+  deriveOrderJourney,
+  latestLyrics,
+  resumeCustomerPath,
+} from './order-journey';
 
 describe('jornada fechada do pedido', () => {
   it.each([
@@ -30,8 +35,16 @@ describe('jornada fechada do pedido', () => {
       hasApprovedLyrics: true,
       completedAudio: 0,
     });
-    expect(paidFailure).toMatchObject({ valid: true, kind: 'production_failed', step: 4 });
-    expect(paidFailure.message).not.toMatch(/automatic|sem custo|vamos regerar/i);
+    expect(paidFailure).toMatchObject({
+      valid: true,
+      kind: 'production_failed',
+      step: 4,
+      action: 'view_orders',
+    });
+    if (paidFailure.valid) {
+      expect(paidFailure.message).not.toMatch(/automatic|sem custo|vamos regerar/i);
+      expect(paidFailure.message).toMatch(/pagamento permanece registrado/i);
+    }
   });
 
   it('só conclui entrega com as duas variantes e rejeita status ausente ou desconhecido', () => {
@@ -69,5 +82,21 @@ describe('jornada fechada do pedido', () => {
         { variant: 3, status: 'completed' },
       ]),
     ).toBe(2);
+  });
+});
+
+describe('retomada da jornada', () => {
+  it('manda letra e checkout só enquanto a etapa cabe; senão vai ao pedido', () => {
+    expect(resumeCustomerPath('lyrics_ready', 'abc', { hasApprovedLyrics: false })).toBe(
+      '/criar/letra?pedido=abc',
+    );
+    expect(resumeCustomerPath('lyrics_approved', 'abc', { hasApprovedLyrics: true })).toBe(
+      '/criar/checkout?pedido=abc',
+    );
+    expect(resumeCustomerPath('failed', 'abc', { hasApprovedLyrics: true })).toBe('/pedido/abc');
+    expect(resumeCustomerPath('audio_queued', 'abc', { hasApprovedLyrics: true })).toBe(
+      '/pedido/abc',
+    );
+    expect(resumeCustomerPath('draft', 'abc', { hasApprovedLyrics: false })).toBe('/criar');
   });
 });

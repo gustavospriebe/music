@@ -1,4 +1,4 @@
-export type ProductType = 'friend_roast' | 'team_anthem' | 'emotional_tribute';
+export type ProductType = 'friend_roast' | 'team_anthem' | 'emotional_tribute' | 'custom_song';
 export type Voice = 'male' | 'female' | 'duet' | 'either';
 export type Story = Record<string, unknown> & {
   productType: ProductType;
@@ -33,11 +33,21 @@ export type Order = {
   createdAt?: string;
 };
 export type OrderDetail = {
+  remainingGenerations?: number;
   order: Order;
   story?: Story;
   lyrics: Lyrics[];
   audio: Audio[];
   privateAccess: boolean;
+  /** Sinal legível de disponibilidade de pagamento; ausente em respostas antigas/mockadas. */
+  payment?: {
+    provider?: 'abacatepay' | 'disabled';
+    label?: string;
+    configured: boolean;
+    devFallback: boolean;
+    checkoutAllowed?: boolean;
+    unavailableReason?: string | null;
+  };
 };
 export type AlbumCover = {
   status: 'pending' | 'processing' | 'completed' | 'failed';
@@ -73,6 +83,13 @@ export const products: Record<
   ProductType,
   { title: string; eyebrow: string; description: string; accent: string; bullets: string[] }
 > = {
+  custom_song: {
+    title: 'Sua música original',
+    eyebrow: 'Qualquer história pode virar música',
+    description: 'Uma criação livre, com a sua história e o seu som.',
+    accent: 'laranja',
+    bullets: ['Criação livre', 'Letra revisável', 'Duas versões privadas'],
+  },
   friend_roast: {
     title: 'Música da Resenha',
     eyebrow: 'Pra quem faz a turma inteira rir',

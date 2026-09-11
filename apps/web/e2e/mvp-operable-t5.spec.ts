@@ -1,4 +1,18 @@
+import { publicConfiguration } from './public-configuration';
 import { expect, test } from '@playwright/test';
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/v1/configuration', (route) =>
+    route.fulfill({
+      json: {
+        generation: { lyricsAvailable: true },
+        commercial: { ready: false },
+        payment: { label: 'AbacatePay' },
+        supportEmail: null,
+      },
+    }),
+  );
+});
+import { finishStoryPreparation } from './studio-helpers';
 
 test('rascunho recarrega, erro recebe foco e retry remoto preserva a tentativa', async ({
   page,
@@ -28,39 +42,35 @@ test('rascunho recarrega, erro recebe foco e retry remoto preserva a tentativa',
           audio: [],
         },
       });
+    if (new URL(route.request().url()).pathname.endsWith('/configuration'))
+      return route.fulfill({ json: publicConfiguration });
     return route.fulfill({ status: 404, json: { error: { message: 'Rota não prevista' } } });
   });
 
   await page.goto('/criar');
-  const subject = page.getByLabel(/para quem é a música/i);
+  const subject = page.getByLabel(/quem ou o que inspira/i);
   await subject.fill('Bia');
   await expect(page.getByRole('status')).toContainText('Rascunho salvo');
   await page.reload();
   await expect(subject).toHaveValue('Bia');
 
-  await page.getByRole('button', { name: /gerar minha letra/i }).click();
-  const occasion = page.getByLabel(/qual é a ocasião/i);
-  await expect(occasion).toBeFocused();
-  await expect(occasion).toHaveAttribute('aria-invalid', 'true');
-  await occasion.fill('Aniversário');
-  await page.getByLabel(/^seu nome$/i).fill('Nina');
-  await page.getByLabel(/^seu e-mail$/i).fill('nina@example.test');
-  await page
-    .getByLabel(/histórias, apelidos/i)
-    .fill('Sempre chega cantando\nTodo churrasco vira show');
-  await page.getByLabel(/aceito os termos/i).check();
-  await page.getByRole('button', { name: /gerar minha letra/i }).click();
-  await expect(page.getByText('Rede instável')).toBeVisible();
-  await page.getByRole('button', { name: /gerar minha letra/i }).click();
+  await subject.fill('');
+  await page.getByRole('button', { name: /^continuar$/i }).click();
+  await expect(subject).toBeFocused();
+  await expect(subject).toHaveAttribute('aria-invalid', 'true');
+  await subject.fill('Bia');
+  await page.getByLabel(/qual é a ocasião/i).fill('Aniversário');
+  await finishStoryPreparation(page);
+  await page.getByRole('button', { name: /salvar história e continuar/i }).click();
+  await expect(page.getByRole('alert')).toContainText('Rede instável');
+  await page.getByRole('button', { name: /salvar história e continuar/i }).click();
   await expect(page).toHaveURL(/\/criar\/letra\?pedido=order-retry-123/);
   expect(creationKeys).toHaveLength(2);
   expect(creationKeys[0]).toMatch(/^[0-9a-f-]{36}$/i);
   expect(creationKeys[1]).toBe(creationKeys[0]);
 });
 
-test('landing e checkout exibem o mesmo preço público; falha não inventa valor', async ({
-  page,
-}) => {
+test('landing não antecipa preço e checkout usa o snapshot do pedido', async ({ page }) => {
   await page.route('**/api/v1/products', (route) =>
     route.fulfill({
       json: [{ type: 'friend_roast', name: 'Música da Resenha', priceCents: 6789, active: true }],
@@ -72,20 +82,29 @@ test('landing e checkout exibem o mesmo preço público; falha não inventa valo
         order: { publicId: 'order-price-123', status: 'lyrics_approved', priceCents: 6789 },
         lyrics: [],
         audio: [],
+        payment: {
+          label: 'AbacatePay',
+          checkoutAllowed: true,
+          configured: true,
+          devFallback: false,
+        },
       },
     }),
   );
   await page.goto('/');
-  await expect(page.getByText(/R\$\s*67,89/)).toBeVisible();
+  await expect(page.getByRole('main')).not.toContainText(/R\$/);
   await page.goto('/criar/checkout?pedido=order-price-123');
   await expect(page.getByText(/R\$\s*67,89/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: /resumo do pedido/i })).toBeVisible();
+  await expect(page.getByText(/redirecionado ao abacatepay/i)).toBeVisible();
+  await expect(page.getByText(/condições da sua música/i)).toHaveCount(0);
 
   await page.unroute('**/api/v1/products');
   await page.route('**/api/v1/products', (route) =>
     route.fulfill({ status: 503, json: { error: { message: 'Catálogo indisponível' } } }),
   );
   await page.goto('/');
-  await expect(page.getByText('Preço indisponível')).toBeVisible();
+  await expect(page.getByRole('heading', { name: /tem coisa que/i })).toBeVisible();
   await expect(page.getByRole('main')).not.toContainText(/R\$/);
 });
 
@@ -97,6 +116,12 @@ test('checkout dev confirma pelo pedido e anuncia a operação pendente', async 
         order: { publicId: 'order-dev-123', status: 'lyrics_approved', priceCents: 4990 },
         lyrics: [],
         audio: [],
+        payment: {
+          label: 'AbacatePay',
+          checkoutAllowed: true,
+          configured: false,
+          devFallback: true,
+        },
       },
     }),
   );
@@ -110,10 +135,32 @@ test('checkout dev confirma pelo pedido e anuncia a operação pendente', async 
   });
 
   await page.goto('/criar/checkout?pedido=order-dev-123');
-  const payment = page.getByRole('button', { name: /pagar com mercado pago/i });
+  const payment = page.getByRole('button', { name: /confirmar pagamento \(ambiente local\)/i });
   await payment.click();
   await expect(page.getByRole('status')).toHaveText('Confirmando pagamento');
   await expect(page.getByRole('button', { name: 'Confirmando pagamento' })).toBeDisabled();
   await expect(page).toHaveURL(/\/pedido\/order-dev-123/);
   expect(approvedPath).toBe('/api/v1/orders/order-dev-123/dev-payment/approve');
+});
+
+test('checkout sem provider nasce desabilitado com motivo antes do clique', async ({ page }) => {
+  await page.route('**/api/v1/orders/order-nopay-123', (route) =>
+    route.fulfill({
+      json: {
+        order: { publicId: 'order-nopay-123', status: 'lyrics_approved', priceCents: 4990 },
+        lyrics: [],
+        audio: [],
+        payment: {
+          label: 'AbacatePay',
+          checkoutAllowed: false,
+          configured: false,
+          devFallback: false,
+        },
+      },
+    }),
+  );
+  await page.goto('/criar/checkout?pedido=order-nopay-123');
+  const payment = page.getByRole('button', { name: /pagar com abacatepay/i });
+  await expect(payment).toBeDisabled();
+  await expect(page.getByRole('status')).toContainText(/pagamento indisponível/i);
 });

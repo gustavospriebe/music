@@ -18,6 +18,7 @@ export const productType = pgEnum('product_type', [
   'friend_roast',
   'team_anthem',
   'emotional_tribute',
+  'custom_song',
 ]);
 export const orderStatus = pgEnum('order_status', [
   'draft',
@@ -278,18 +279,35 @@ export const revisionRequests = pgTable('revision_requests', {
   message: text('message').notNull(),
   ...dates,
 });
-export const emailDeliveries = pgTable('email_deliveries', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  orderId: uuid('order_id')
-    .references(() => orders.id, { onDelete: 'cascade' })
-    .notNull(),
-  template: varchar('template', { length: 60 }).notNull(),
-  recipient: varchar('recipient', { length: 320 }).notNull(),
-  provider: varchar('provider', { length: 30 }).notNull(),
-  status: varchar('status', { length: 30 }).notNull(),
-  externalId: varchar('external_id', { length: 160 }),
-  ...dates,
-});
+export type EmailDeliveryMessage = {
+  deliveryId: string;
+  webUrl: string;
+  from: string;
+  subject: string;
+  textTemplate: string;
+  htmlTemplate: string;
+};
+export const emailDeliveries = pgTable(
+  'email_deliveries',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    orderId: uuid('order_id')
+      .references(() => orders.id, { onDelete: 'cascade' })
+      .notNull(),
+    template: varchar('template', { length: 60 }).notNull(),
+    message: jsonb('message').$type<EmailDeliveryMessage>(),
+    recipient: varchar('recipient', { length: 320 }).notNull(),
+    provider: varchar('provider', { length: 30 }).notNull(),
+    status: varchar('status', { length: 30 }).notNull(),
+    externalId: varchar('external_id', { length: 160 }),
+    ...dates,
+  },
+  (t) => [
+    uniqueIndex('email_delivery_intent_once')
+      .on(t.orderId, t.template)
+      .where(sql`${t.message} is not null`),
+  ],
+);
 export const analyticsEvents = pgTable('analytics_events', {
   id: uuid('id').defaultRandom().primaryKey(),
   event: varchar('event', { length: 80 }).notNull(),

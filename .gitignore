@@ -6,3 +6,7 @@ var/storage
 var/emails
 playwright-report
 test-results
+
+# Runtime logs and local QA evidence may contain private data.
+var/logs/
+output/

@@ -4,7 +4,8 @@ Fonte de verdade: [docs/mvp-spec-full.md](docs/mvp-spec-full.md).
 
 - [x] Fundação Turborepo/pnpm, domínio, contratos, Drizzle e fila PostgreSQL.
 - [x] Fluxo local de sessão, letra, pedido, pagamento, worker e entrega com providers controlados em teste.
-- [x] Infraestrutura de produção: Dockerfiles multi-stage não-root, health checks e CI.
+- [x] Preparação de infraestrutura: Dockerfiles multi-stage não-root, health checks e workflow de CI.
+- [ ] Infraestrutura externa: provisionar/validar Railway, migration, seed, bucket e restore.
 - [x] Pacotes de fronteira `providers`, `config`, `eslint-config` e `typescript-config` criados.
 - [x] Documentação operacional, providers e checklist de produção.
 - [x] Migração de nomenclatura de schema, reorganização por rotas e suíte de regressão/E2E.

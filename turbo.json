@@ -5,7 +5,17 @@
     "build": { "dependsOn": ["^build"], "outputs": ["dist/**"] },
     "lint": { "dependsOn": ["^lint"] },
     "typecheck": { "dependsOn": ["^typecheck"] },
-    "test": { "dependsOn": ["^build"], "outputs": ["coverage/**"] },
+    "test": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "env": [
+        "DATABASE_URL",
+        "DATABASE_URL_TEST",
+        "NODE_ENV",
+        "COOKIE_SECRET",
+        "CUSTOMER_ACCESS_TOKEN_PEPPER"
+      ]
+    },
     "test:unit": {},
     "test:integration": {}
   }

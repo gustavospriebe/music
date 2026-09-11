@@ -10,11 +10,11 @@ Nunca altere status com SQL em operação normal. Use apenas handlers que chamam
 
 ## Pagamento confirmado sem geração
 
-Valide pagamento junto ao Mercado Pago, confirme `externalPaymentId`, valor BRL e pedido. Na mesma transação, marque pago e insira `audio:<order-id>` com chave única. Se o job não existir, crie-o uma vez; não marque entrega manualmente.
+Valide o pagamento junto ao provider habilitado, conferindo referência, valor e moeda. Reenvie a notificação pelo mecanismo do provider ou investigue o evento falho: o webhook permite retry e confirma pagamento + job na mesma transação. Não marque pagamento por SQL nem use retorno do navegador como comprovante. Não repita checkout de pedido já pago.
 
 ## Token de cliente
 
-Revogue acesso, gere token forte novo, armazene apenas o hash e envie novo link. O endpoint de recuperação troca o token por cookie de visualização assinado e não concede acesso ao formulário nem a mutações. Nunca coloque token, cookie ou URL concreta de entrega em logs, analytics ou histórico administrativo.
+No detalhe administrativo, use a ação de revogar acesso e confirme seu efeito. Ela invalida cookies antigos e links de entrega antigos. Não prometa que o mesmo link volta a funcionar; uma nova entrega deve seguir o fluxo administrativo existente e sua revisão. O endpoint de recuperação troca o token por cookie de visualização assinado e não concede acesso ao formulário nem a mutações. Nunca coloque token, cookie ou URL concreta de entrega em logs, analytics ou histórico administrativo.
 
 ## Armazenamento e backup
 
@@ -24,4 +24,12 @@ Procedimentos externos e restore: [external-activation-runbook.md](external-acti
 
 ## Observabilidade mínima
 
-HTTP registra request ID, template de rota, status e duração. Worker registra tipo do job, status, tentativa e duração, sem UUID interno. O ledger de IA guarda provider/modelo e custo sob acesso administrativo. Nunca registre letra inteira, formulário, e-mail, token, cookie, senha ou chave. Alarmes: jobs falhos, backlog, pagamento sem job e falhas de e-mail.
+HTTP registra request ID, template de rota, status e duração. Worker registra tipo do job, status, tentativa e duração, sem UUID interno. O ledger de IA guarda provider/modelo e custo sob acesso administrativo. Nunca registre letra inteira, formulário, e-mail, token, cookie, senha ou chave. Sinais a monitorar: jobs falhos, backlog, pagamento sem job e falhas de e-mail. O repositório não provisiona alertas externos; configure-os na plataforma antes da ativação comercial.
+
+## E-mail pendente
+
+Uma intenção pending conserva provider, destinatário, remetente e URL. Corrija a configuração e reexecute o job pelo admin; não altere token ou snapshot para forçar envio. Se o provider foi trocado durante uma tentativa, restaure a configuração correspondente antes de retomar. Entrega legada sem confirmação de envio pode exigir revisão manual, pois o token antigo não pode ser recuperado do hash. Resend tem janela limitada de deduplicação; um retry tardio pode repetir o aviso, mas o link permanece consistente.
+
+## Restore local
+
+Use ferramentas PostgreSQL da mesma versão principal do servidor. O teste desta entrega executou o script dentro do container PostgreSQL 16, de music_launch_preview para music_launch_restore, com dados exclusivamente sintéticos. Isso não prova restore de bucket nem backup de produção.

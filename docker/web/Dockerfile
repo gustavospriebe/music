@@ -10,6 +10,7 @@ FROM dependencies AS build
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
 COPY apps/web apps/web
+RUN test -n "$VITE_API_URL" || (echo "VITE_API_URL is required for the production web image" >&2; exit 1)
 RUN pnpm --filter @resenha/web build
 
 FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime

@@ -1,12 +1,12 @@
 # Ativação externa e restore
 
-Estado inicial de Mercado Pago, Resend, S3 e capa OpenRouter: **EXTERNAL BLOCKED**. Execute somente com autorização, credenciais de teste e orçamento. Nunca cole secrets, payload pessoal, foto, letra, token ou URL privada na evidência.
+Estado inicial de AbacatePay, Resend, Bucket e capa OpenRouter: **EXTERNAL BLOCKED**. Execute somente com autorização, credenciais de teste e orçamento. Nunca cole secrets, payload pessoal, foto, letra, token ou URL privada na evidência.
 
-## Mercado Pago sandbox
+## AbacatePay (devMode)
 
-- Comando: iniciar API/worker com credenciais de teste e expor `POST /api/v1/webhooks/mercado-pago` por HTTPS; criar um pedido sintético pela UI e pagar com comprador de teste.
-- Evidência esperada: preferência criada, webhook assinado aceito uma vez, consulta remota confirma BRL/valor/referência, duplicata não cria segundo pagamento/job.
-- Rollback: revogar credenciais/túnel, remover pedidos exclusivamente sintéticos pelo procedimento aprovado e restaurar fallback fora de produção.
+- Comando: iniciar API/worker com credenciais de teste e expor `POST /api/v1/webhooks/abacate-pay?webhookSecret=...` por HTTPS; criar um pedido sintético pela UI e pagar em devMode.
+- Evidência esperada: checkout criado com o produto do dashboard, webhook com secret aceito uma vez, consulta remota confirma BRL/valor/`externalId`, duplicata não cria segundo pagamento/job.
+- Rollback: revogar credenciais, remover pedidos exclusivamente sintéticos pelo procedimento aprovado e restaurar fallback fora de produção.
 - Aceite: `[ ] responsável`, `[ ] data UTC`, `[ ] ambiente`, `[ ] evidência sanitizada`, `[ ] rollback testado`.
 
 ## Resend

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import Fastify, { LogController } from 'fastify';
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
@@ -7,7 +8,7 @@ import multipart from '@fastify/multipart';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { and, desc, eq, gt, inArray, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, getTableColumns, gt, inArray, lte, sql } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { ZodError } from 'zod';
 import {
@@ -18,7 +19,9 @@ import {
   createOrderSchema,
   deliveryAccessSchema,
   generatedLyricsSchema,
+  generateLyricsSchema,
   storySchema,
+  revisionRequestSchema,
   type GeneratedLyrics,
 } from '@resenha/contracts';
 import {
@@ -31,6 +34,7 @@ import {
   audioGenerations,
   createDb,
   deliveries,
+  emailDeliveries,
   generationJobs,
   lyricsVersions,
   orders,
@@ -44,6 +48,7 @@ import {
 import {
   assertTransition,
   createAccessToken,
+  stableDeliveryToken,
   evaluateContent,
   hashToken,
   sanitizeAiError,
@@ -54,44 +59,27 @@ import {
 } from '@resenha/domain';
 import { createStorage, readStorageConfig } from '@resenha/providers';
 import type { Env } from './env.js';
+import { createPaymentProvider, type PaymentProvider } from './payment.js';
+import { publicConfiguration, orderPaymentConfiguration } from './configuration.js';
 import {
   createLyricsProvider,
-  createMercadoPagoProvider,
   MAX_REFERENCE_IMAGE_BYTES,
   normalizeReferenceImage,
-  verifyMercadoPagoSignature,
+  verifyAbacatePaySecret,
   type LyricsProvider,
   type LyricsResult,
+  type LyricsRefinement,
 } from './providers.js';
-/** Saldo da key OpenRouter (`GET /key` documentado, gratuito); falha best-effort vira `null`. */
-export const fetchOpenRouterKeyUsage = async (
-  apiKey: string | undefined,
-): Promise<{ usage: number; limit: number | null; remaining: number | null } | null> => {
-  if (!apiKey) return null;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8_000);
-  try {
-    const response = await fetch('https://openrouter.ai/api/v1/key', {
-      signal: controller.signal,
-      headers: { authorization: `Bearer ${apiKey}` },
-    });
-    if (!response.ok) return null;
-    const body = (await response.json()) as {
-      data?: { usage?: number; limit?: number | null; limit_remaining?: number | null };
-    };
-    if (typeof body.data?.usage !== 'number') return null;
-    return {
-      usage: body.data.usage,
-      limit: typeof body.data.limit === 'number' ? body.data.limit : null,
-      remaining: typeof body.data.limit_remaining === 'number' ? body.data.limit_remaining : null,
-    };
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timeout);
-  }
-};
-
+import {
+  audioRecoveryReason,
+  failureCode,
+  coverAttempt,
+  jobRecovery,
+  publicFailure,
+  recoveryFor,
+  referenceRequired,
+  type RecoveryContext,
+} from './recovery.js';
 const ADMIN_TZ = 'America/Sao_Paulo';
 /** Offset (ms) de `ADMIN_TZ` num instante UTC, via Intl (vale para DST histórico). */
 export const tzOffsetMs = (timeZone: string, utcMs: number): number => {
@@ -130,7 +118,23 @@ export const httpLogContext = (route: string, statusCode: number, elapsedTime: n
 
 export const requestLogController = new LogController({ disableRequestLogging: true });
 
-export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } = {}) => {
+type AudioJobSelection = {
+  provider: 'openrouter' | 'google';
+  model: string;
+};
+
+const currentAudioJobSelection = (env: Env): AudioJobSelection => ({
+  provider: env.MUSIC_PROVIDER,
+  model:
+    env.MUSIC_PROVIDER === 'google'
+      ? env.GOOGLE_MUSIC_MODEL
+      : (env.OPENROUTER_MUSIC_MODEL?.trim() ?? ''),
+});
+
+export const buildApp = async (
+  env: Env,
+  overrides: { lyrics?: LyricsProvider; payment?: PaymentProvider } = {},
+) => {
   const app = Fastify({
     logger: {
       level: process.env.LOG_LEVEL ?? 'info',
@@ -155,7 +159,7 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
   const { db, pool } = createDb(env.DATABASE_URL);
   const lyrics = overrides.lyrics ?? createLyricsProvider(env);
   const storage = createStorage(readStorageConfig(env));
-  const mercadoPago = createMercadoPagoProvider(env);
+  const paymentProvider = overrides.payment ?? createPaymentProvider(env);
   /** POSTs sem corpo (ex.: gerar letra, aprovar) são válidos; JSON inválido segue 400. */
   app.addContentTypeParser('application/json', { parseAs: 'string' }, (_request, body, done) => {
     const text = (body as string).trim();
@@ -250,15 +254,23 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
       })
       .onConflictDoNothing();
   };
-  const setAccessCookie = (reply: FastifyReply, kind: 'order' | 'order_view', publicId: string) =>
-    reply.setCookie(`${kind}_${publicId}`, '1', {
+  const accessValue = (kind: 'order' | 'order_view', order: typeof orders.$inferSelect) =>
+    `${kind}:${order.publicId}:${hashToken(order.accessTokenHash, env.COOKIE_SECRET)}`;
+  const setAccessCookie = async (
+    reply: FastifyReply,
+    kind: 'order' | 'order_view',
+    publicId: string,
+  ) => {
+    const order = await orderFor(publicId);
+    reply.setCookie(`${kind}_${publicId}`, accessValue(kind, order), {
       httpOnly: true,
       sameSite: 'lax',
       secure: env.NODE_ENV === 'production',
       path: '/',
       signed: true,
     });
-  const hasSignedAccess = (
+  };
+  const hasSignedAccess = async (
     kind: 'order' | 'order_view',
     publicId: string,
     request: FastifyRequest,
@@ -266,16 +278,24 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
     const value = request.cookies[`${kind}_${publicId}`];
     if (!value) return false;
     const unsigned = request.unsignCookie(value);
-    return unsigned.valid && unsigned.value === '1';
+    if (!unsigned.valid) return false;
+    const [order] = await db.select().from(orders).where(eq(orders.publicId, publicId));
+    if (!order || order.accessRevokedAt || unsigned.value !== accessValue(kind, order))
+      return false;
+    if (kind === 'order_view') {
+      const [delivery] = await db.select().from(deliveries).where(eq(deliveries.orderId, order.id));
+      return Boolean(
+        delivery && !delivery.revokedAt && (!delivery.expiresAt || delivery.expiresAt > new Date()),
+      );
+    }
+    return true;
   };
   const hasAccess = (publicId: string, request: FastifyRequest) =>
     hasSignedAccess('order', publicId, request);
-  /**
-   * Sessão limitada de recovery (link de entrega compartilhável): só leitura do
-   * status/letra/áudio, sem `story` (PII) e sem mutações. Mutações exigem `hasAccess`.
-   */
-  const hasViewAccess = (publicId: string, request: FastifyRequest) =>
-    hasAccess(publicId, request) || hasSignedAccess('order_view', publicId, request);
+  /** Recovery cookies permit reading only, and follow the live delivery revocation/expiry. */
+  const hasViewAccess = async (publicId: string, request: FastifyRequest) =>
+    (await hasAccess(publicId, request)) ||
+    (await hasSignedAccess('order_view', publicId, request));
   const coverAvailable = Boolean(
     env.OPENROUTER_API_KEY &&
     env.OPENROUTER_COVER_TEXT_MODEL &&
@@ -353,6 +373,7 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
     await db.execute(sql`select 1`);
     return { status: 'ok' };
   });
+  app.get('/api/v1/configuration', async () => publicConfiguration(env));
   app.get('/api/v1/products', async () =>
     db
       .select({
@@ -392,7 +413,7 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
       .from(orders)
       .where(eq(orders.creationKeyHash, creationKeyHash));
     if (existing) {
-      setAccessCookie(reply, 'order', existing.publicId);
+      await setAccessCookie(reply, 'order', existing.publicId);
       return reply.status(201).send({ publicId: existing.publicId });
     }
     const [product] = await db
@@ -417,13 +438,13 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
       order ??
       (await db.select().from(orders).where(eq(orders.creationKeyHash, creationKeyHash)))[0];
     if (!resolved) throw fail('Não foi possível criar o pedido.', 503);
-    setAccessCookie(reply, 'order', resolved.publicId);
+    await setAccessCookie(reply, 'order', resolved.publicId);
     if (created) await recordEvent('order_created', resolved, input.visitorId);
     return reply.status(201).send({ publicId: resolved.publicId });
   });
   app.patch('/api/v1/orders/:publicId/story', async (request) => {
     const storyPublicId = (request.params as { publicId: string }).publicId;
-    if (!hasAccess(storyPublicId, request)) throw fail('Acesso privado necessário', 401);
+    if (!(await hasAccess(storyPublicId, request))) throw fail('Acesso privado necessário', 401);
     const order = await orderFor(storyPublicId);
     if (!['draft', 'story_completed'].includes(order.status))
       throw fail('O formulário não pode mais ser alterado.');
@@ -451,169 +472,270 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
     if (isFirstSave) await recordEvent('story_saved', order);
     return { saved: true };
   });
-  app.post(
-    '/api/v1/orders/:publicId/lyrics/generate',
-    { config: { rateLimit: { max: 5, timeWindow: '1 hour' } } },
-    async (request) => {
-      const generatePublicId = (request.params as { publicId: string }).publicId;
-      if (!hasAccess(generatePublicId, request)) throw fail('Acesso privado necessário', 401);
-      const order = await orderFor(generatePublicId);
-      if (order.status === 'draft') throw fail('Preencha o formulário antes de gerar a letra.');
+  const generateOrderLyrics = async (
+    order: typeof orders.$inferSelect,
+    body: unknown,
+    administrative = false,
+  ) => {
+    const input = generateLyricsSchema.parse(body ?? {});
+    if ('instructions' in input) {
+      if (order.status !== 'lyrics_ready')
+        throw fail('O refinamento exige uma letra pronta e salva.', 409);
+      const assessment = evaluateContent(input.instructions);
+      if (!assessment.allowed) throw fail(assessment.reason);
+    }
+    if (order.status === 'draft') throw fail('Preencha o formulário antes de gerar a letra.');
+    if (!['story_completed', 'lyrics_ready', 'failed', 'lyrics_generating'].includes(order.status))
+      throw fail('Este pedido não aceita mais geração de letra.');
+    const [submission] = await db
+      .select()
+      .from(storySubmissions)
+      .where(eq(storySubmissions.orderId, order.id));
+    if (!submission) throw fail('Formulário ausente');
+    const story = storySchema.parse(submission.data);
+    if (!overrides.lyrics && !publicConfiguration(env).generation.lyricsAvailable)
+      throw fail('Criação da letra temporariamente indisponível. Sua história está salva.', 503);
+    const { claim, refinement } = await db.transaction(async (tx) => {
+      const [current] = await tx.select().from(orders).where(eq(orders.id, order.id)).for('update');
+      if (!current) throw fail('Pedido não encontrado', 404);
+      const context = await recoveryContext(current, tx);
       if (
-        !['story_completed', 'lyrics_ready', 'failed', 'lyrics_generating'].includes(order.status)
+        context.paid ||
+        context.jobs.some((job) => ['pending', 'processing'].includes(job.status))
       )
-        throw fail('Este pedido não aceita mais geração de letra.');
-      const [submission] = await db
-        .select()
-        .from(storySubmissions)
-        .where(eq(storySubmissions.orderId, order.id));
-      if (!submission) throw fail('Formulário ausente');
-      const story = storySchema.parse(submission.data);
-      const [generated] = await db
+        throw fail('Este pedido já está em produção ou aguardando processamento.', 409);
+      if (administrative) {
+        if (!recoveryFor(context).lyrics.canGenerate)
+          throw fail(
+            recoveryFor(context).lyrics.generateBlockedReason ??
+              'A letra não pode ser gerada nesta etapa.',
+            409,
+          );
+      }
+      let refinement: LyricsRefinement | undefined;
+      if ('instructions' in input) {
+        if (current.status !== 'lyrics_ready')
+          throw fail('O refinamento exige uma letra pronta e salva.', 409);
+        const [base] = await tx
+          .select()
+          .from(lyricsVersions)
+          .where(
+            and(eq(lyricsVersions.orderId, order.id), eq(lyricsVersions.number, input.baseVersion)),
+          );
+        if (!base) throw fail('Versão não encontrada.', 404);
+        const [latest] = await tx
+          .select({ number: lyricsVersions.number })
+          .from(lyricsVersions)
+          .where(eq(lyricsVersions.orderId, order.id))
+          .orderBy(desc(lyricsVersions.number))
+          .limit(1);
+        if (latest?.number !== input.baseVersion)
+          throw fail('A letra foi atualizada. Use a versão salva mais recente.', 409);
+        const saved = generatedLyricsSchema.parse(base.content);
+        const canonical = {
+          title: saved.title,
+          fullLyrics: saved.fullLyrics,
+          musicalDirection: saved.musicalDirection,
+        };
+        const assessment = evaluateContent(JSON.stringify(canonical));
+        if (!assessment.allowed) throw fail(assessment.reason);
+        refinement = { instructions: input.instructions, lyrics: canonical };
+      }
+      const [generated] = await tx
         .select({ count: sql<number>`count(*)::int` })
         .from(lyricsVersions)
         .where(and(eq(lyricsVersions.orderId, order.id), eq(lyricsVersions.kind, 'generated')));
       if (generated && generated.count >= 4)
         throw fail('O limite de três novas gerações foi atingido.');
+      if (
+        !['story_completed', 'lyrics_ready', 'failed', 'lyrics_generating'].includes(current.status)
+      )
+        throw fail('Este pedido não aceita mais geração de letra.');
       const claimStartedAt = new Date();
       const staleBefore = new Date(claimStartedAt.getTime() - 5 * 60 * 1_000);
-      if (order.status !== 'lyrics_generating') assertTransition(order.status, 'lyrics_generating');
-      const [claim] = await db
+      if (current.status !== 'lyrics_generating')
+        assertTransition(current.status, 'lyrics_generating');
+      const [claim] = await tx
         .update(orders)
         .set({ status: 'lyrics_generating', updatedAt: claimStartedAt })
         .where(
           and(
             eq(orders.id, order.id),
-            eq(orders.status, order.status),
-            ...(order.status === 'lyrics_generating' ? [lte(orders.updatedAt, staleBefore)] : []),
+            eq(orders.status, current.status),
+            ...(current.status === 'lyrics_generating' ? [lte(orders.updatedAt, staleBefore)] : []),
           ),
         )
         .returning({ updatedAt: orders.updatedAt });
       if (!claim)
         throw fail('A letra já está sendo criada. Aguarde a conclusão desta tentativa.', 409);
-      try {
-        let feedback: string | undefined;
-        let content: GeneratedLyrics | undefined;
-        let errors: string[] = [];
-        for (let attempt = 1; attempt <= 3; attempt += 1) {
-          let result: LyricsResult;
-          const startedAt = Date.now();
-          try {
-            result = await lyrics.generate(story, feedback);
-          } catch (error) {
-            await recordLyricsUsage(
-              order.id,
-              {
-                requestId: null,
-                model: env.OPENROUTER_TEXT_MODEL ?? 'unknown',
-                inputTokens: 0,
-                outputTokens: 0,
-                costUsd: null,
-                latencyMs: Date.now() - startedAt,
-              },
-              'error',
-              sanitizeAiError(error),
-              attempt,
-            );
-            throw error;
-          }
-          errors = validateLyrics(result.lyrics, story);
-          if (!errors.length) {
-            await recordLyricsUsage(order.id, result.usage, 'ok', null, attempt);
-            content = result.lyrics;
-            break;
-          }
-          feedback = errors.join(' ');
+      return { claim, refinement };
+    });
+    try {
+      let feedback: string | undefined;
+      let content: GeneratedLyrics | undefined;
+      let errors: string[] = [];
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        let result: LyricsResult;
+        const startedAt = Date.now();
+        try {
+          result = await lyrics.generate(story, feedback, refinement);
+        } catch (error) {
           await recordLyricsUsage(
             order.id,
-            result.usage,
-            'rejected',
-            `Letra reprovada na validação: ${feedback}`.slice(0, 500),
+            {
+              requestId: null,
+              model: env.OPENROUTER_TEXT_MODEL ?? 'unknown',
+              inputTokens: 0,
+              outputTokens: 0,
+              costUsd: null,
+              latencyMs: Date.now() - startedAt,
+            },
+            'error',
+            sanitizeAiError(error),
             attempt,
           );
-          content = undefined;
+          throw error;
         }
-        if (!content) throw fail(`${errors.join(' ')} Tente novamente.`);
-        const version = await db.transaction(async (tx) => {
-          assertTransition('lyrics_generating', 'lyrics_ready');
-          const [transitioned] = await tx
-            .update(orders)
-            .set({ status: 'lyrics_ready', updatedAt: new Date() })
-            .where(
-              and(
-                eq(orders.id, order.id),
-                eq(orders.status, 'lyrics_generating'),
-                eq(orders.updatedAt, claim.updatedAt),
-              ),
-            )
-            .returning({ id: orders.id });
-          if (!transitioned) throw fail('Esta tentativa de geração expirou.', 409);
-          const [countRow = { count: 0 }] = await tx
-            .select({ count: sql<number>`count(*)::int` })
-            .from(lyricsVersions)
-            .where(eq(lyricsVersions.orderId, order.id));
-          const [inserted] = await tx
-            .insert(lyricsVersions)
-            .values({ orderId: order.id, number: countRow.count + 1, kind: 'generated', content })
-            .returning({ number: lyricsVersions.number, kind: lyricsVersions.kind });
-          return inserted;
-        });
-        await recordEvent('lyrics_generated', order);
-        return version;
-      } catch (error) {
-        assertTransition('lyrics_generating', 'failed');
-        await db
+        errors = validateLyrics(result.lyrics, story);
+        if (!errors.length) {
+          await recordLyricsUsage(order.id, result.usage, 'ok', null, attempt);
+          content = result.lyrics;
+          break;
+        }
+        feedback = errors.join(' ');
+        await recordLyricsUsage(
+          order.id,
+          result.usage,
+          'rejected',
+          `Letra reprovada na validação: ${feedback}`.slice(0, 500),
+          attempt,
+        );
+        content = undefined;
+      }
+      if (!content) throw fail(`${errors.join(' ')} Tente novamente.`);
+      const version = await db.transaction(async (tx) => {
+        assertTransition('lyrics_generating', 'lyrics_ready');
+        const [transitioned] = await tx
           .update(orders)
-          .set({ status: 'failed', updatedAt: new Date() })
+          .set({ status: 'lyrics_ready', updatedAt: new Date() })
           .where(
             and(
               eq(orders.id, order.id),
               eq(orders.status, 'lyrics_generating'),
               eq(orders.updatedAt, claim.updatedAt),
             ),
-          );
-        if ((error as { statusCode?: number }).statusCode) throw error;
-        throw fail('Não foi possível gerar a letra agora. Tente novamente.', 500);
-      }
+          )
+          .returning({ id: orders.id });
+        if (!transitioned) throw fail('Esta tentativa de geração expirou.', 409);
+        const [countRow = { count: 0 }] = await tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(lyricsVersions)
+          .where(eq(lyricsVersions.orderId, order.id));
+        const [inserted] = await tx
+          .insert(lyricsVersions)
+          .values({ orderId: order.id, number: countRow.count + 1, kind: 'generated', content })
+          .returning({ number: lyricsVersions.number, kind: lyricsVersions.kind });
+        return inserted;
+      });
+      await recordEvent('lyrics_generated', order);
+      return version;
+    } catch (error) {
+      const restoredStatus = refinement ? 'lyrics_ready' : 'failed';
+      assertTransition('lyrics_generating', restoredStatus);
+      await db
+        .update(orders)
+        .set({ status: restoredStatus, updatedAt: new Date() })
+        .where(
+          and(
+            eq(orders.id, order.id),
+            eq(orders.status, 'lyrics_generating'),
+            eq(orders.updatedAt, claim.updatedAt),
+          ),
+        );
+      if ((error as { statusCode?: number }).statusCode) throw error;
+      throw fail('Não foi possível gerar a letra agora. Tente novamente.', 500);
+    }
+  };
+  app.post(
+    '/api/v1/orders/:publicId/lyrics/generate',
+    { config: { rateLimit: { max: 5, timeWindow: '1 hour' } } },
+    async (request) => {
+      const publicId = (request.params as { publicId: string }).publicId;
+      if (!(await hasAccess(publicId, request))) throw fail('Acesso privado necessário', 401);
+      return generateOrderLyrics(await orderFor(publicId), request.body);
     },
   );
+  app.post('/api/v1/admin/orders/:id/lyrics/generate', async (request) => {
+    const session = await requireAdmin(request);
+    const [order] = await db
+      .select()
+      .from(orders)
+      .where(eq(orders.id, (request.params as { id: string }).id));
+    if (!order) throw fail('Pedido não encontrado', 404);
+    const outcome = await generateOrderLyrics(order, request.body, true).then(
+      (value) => ({ ok: true as const, value }),
+      (error: unknown) => ({ ok: false as const, error }),
+    );
+    await db.insert(adminNotes).values({
+      orderId: order.id,
+      adminUserId: session.userId,
+      message: outcome.ok
+        ? 'Geração de letra solicitada pela administração e concluída.'
+        : 'Geração de letra solicitada pela administração não concluída. ' +
+          publicFailure(outcome.error instanceof Error ? outcome.error.message : null),
+    });
+    if (!outcome.ok) throw outcome.error;
+    return outcome.value;
+  });
   app.patch('/api/v1/orders/:publicId/lyrics/:versionNumber', async (request) => {
     const editPublicId = (request.params as { publicId: string }).publicId;
-    if (!hasAccess(editPublicId, request)) throw fail('Acesso privado necessário', 401);
-    const order = await orderFor(editPublicId);
-    if (order.status !== 'lyrics_ready') throw fail('A letra está bloqueada.');
+    if (!(await hasAccess(editPublicId, request))) throw fail('Acesso privado necessário', 401);
     const versionNumber = Number((request.params as { versionNumber: string }).versionNumber);
     if (!Number.isInteger(versionNumber) || versionNumber < 1) throw fail('Versão inválida.', 404);
-    const [base] = await db
-      .select({ number: lyricsVersions.number })
-      .from(lyricsVersions)
-      .where(and(eq(lyricsVersions.orderId, order.id), eq(lyricsVersions.number, versionNumber)));
-    if (!base) throw fail('Versão não encontrada.', 404);
     const content = generatedLyricsSchema.parse(request.body);
-    const [countRow = { count: 0 }] = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(lyricsVersions)
-      .where(eq(lyricsVersions.orderId, order.id));
-    const [version] = await db
-      .insert(lyricsVersions)
-      .values({ orderId: order.id, number: countRow.count + 1, kind: 'edited', content })
-      .returning({ number: lyricsVersions.number, kind: lyricsVersions.kind });
-    return version;
+    return db.transaction(async (tx) => {
+      const [order] = await tx
+        .select()
+        .from(orders)
+        .where(eq(orders.publicId, editPublicId))
+        .for('update');
+      if (!order) throw fail('Pedido não encontrado', 404);
+      if (order.status !== 'lyrics_ready') throw fail('A letra está bloqueada.');
+      const [base] = await tx
+        .select({ number: lyricsVersions.number })
+        .from(lyricsVersions)
+        .where(and(eq(lyricsVersions.orderId, order.id), eq(lyricsVersions.number, versionNumber)));
+      if (!base) throw fail('Versão não encontrada.', 404);
+      const [countRow = { count: 0 }] = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(lyricsVersions)
+        .where(eq(lyricsVersions.orderId, order.id));
+      const [version] = await tx
+        .insert(lyricsVersions)
+        .values({ orderId: order.id, number: countRow.count + 1, kind: 'edited', content })
+        .returning({ number: lyricsVersions.number, kind: lyricsVersions.kind });
+      return version;
+    });
   });
   app.post('/api/v1/orders/:publicId/lyrics/:versionNumber/approve', async (request) => {
     const approvePublicId = (request.params as { publicId: string }).publicId;
-    if (!hasAccess(approvePublicId, request)) throw fail('Acesso privado necessário', 401);
-    const order = await orderFor(approvePublicId);
-    if (order.status !== 'lyrics_ready') throw fail('A letra não está disponível.');
+    if (!(await hasAccess(approvePublicId, request))) throw fail('Acesso privado necessário', 401);
     const versionNumber = Number((request.params as { versionNumber: string }).versionNumber);
     if (!Number.isInteger(versionNumber) || versionNumber < 1) throw fail('Versão inválida.', 404);
-    const [version] = await db
-      .select({ content: lyricsVersions.content })
-      .from(lyricsVersions)
-      .where(and(eq(lyricsVersions.orderId, order.id), eq(lyricsVersions.number, versionNumber)));
-    if (!version) throw fail('Versão não encontrada.', 404);
     const { content } = approveLyricsSchema.parse(request.body ?? {});
-    await db.transaction(async (tx) => {
+    const order = await db.transaction(async (tx) => {
+      const [order] = await tx
+        .select()
+        .from(orders)
+        .where(eq(orders.publicId, approvePublicId))
+        .for('update');
+      if (!order) throw fail('Pedido não encontrado', 404);
+      if (order.status !== 'lyrics_ready') throw fail('A letra não está disponível.');
+      const [version] = await tx
+        .select({ content: lyricsVersions.content })
+        .from(lyricsVersions)
+        .where(and(eq(lyricsVersions.orderId, order.id), eq(lyricsVersions.number, versionNumber)));
+      if (!version) throw fail('Versão não encontrada.', 404);
       const [countRow = { count: 0 }] = await tx
         .select({ count: sql<number>`count(*)::int` })
         .from(lyricsVersions)
@@ -630,57 +752,69 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
         .update(orders)
         .set({ status: 'lyrics_approved', updatedAt: new Date() })
         .where(eq(orders.id, order.id));
+      return order;
     });
     await recordEvent('lyrics_approved', order);
     return { approved: true };
   });
   app.post('/api/v1/orders/:publicId/checkout', async (request) => {
-    const checkoutPublicId = (request.params as { publicId: string }).publicId;
-    if (!hasAccess(checkoutPublicId, request)) throw fail('Acesso privado necessário', 401);
-    const order = await orderFor(checkoutPublicId);
-    if (!['lyrics_approved', 'payment_pending'].includes(order.status))
-      throw fail('Aprove a letra antes do pagamento.');
-    const [existing] = await db
-      .select()
-      .from(payments)
-      .where(and(eq(payments.orderId, order.id), eq(payments.status, 'pending')));
-    if (existing?.provider === 'dev')
-      return { checkoutUrl: `${env.WEB_URL}/pedido/${order.publicId}`, dev: true as const };
-    if (existing?.checkoutUrl) return { checkoutUrl: existing.checkoutUrl };
-    const [product] = await db.select().from(products).where(eq(products.type, order.productType));
-    if (!env.MERCADO_PAGO_ACCESS_TOKEN) {
-      if (env.NODE_ENV === 'production') throw fail('Provider de pagamento não configurado.', 501);
-      await db.transaction(async (tx) => {
-        if (order.status === 'lyrics_approved') {
-          assertTransition('lyrics_approved', 'payment_pending');
-          await tx
-            .update(orders)
-            .set({ status: 'payment_pending', updatedAt: new Date() })
-            .where(eq(orders.id, order.id));
-        }
-        await tx.insert(payments).values({
-          orderId: order.id,
-          provider: 'dev',
-          status: 'pending',
-          amountCents: order.priceCents,
-          checkoutUrl: `${env.WEB_URL}/pedido/${order.publicId}`,
-        });
-      });
-      await recordEvent('checkout_started', order);
-      return {
-        checkoutUrl: `${env.WEB_URL}/pedido/${order.publicId}`,
-        dev: true,
-      };
-    }
-    const preference = await mercadoPago.createPreference({
-      title: product?.name ?? 'Música da Resenha',
-      priceCents: order.priceCents,
-      externalReference: order.publicId,
-      backUrl: `${env.WEB_URL}/pedido/${order.publicId}`,
-    });
-    await db.transaction(async (tx) => {
+    const publicId = (request.params as { publicId: string }).publicId;
+    if (!(await hasAccess(publicId, request))) throw fail('Acesso privado necessário', 401);
+    const result = await db.transaction(async (tx) => {
+      const [order] = await tx
+        .select()
+        .from(orders)
+        .where(eq(orders.publicId, publicId))
+        .for('update');
+      if (!order) throw fail('Pedido não encontrado', 404);
+      if (!['lyrics_approved', 'payment_pending'].includes(order.status)) {
+        if (
+          [
+            'paid',
+            'audio_queued',
+            'audio_generating',
+            'review_required',
+            'revision_requested',
+            'delivered',
+          ].includes(order.status)
+        )
+          throw fail('Este pedido já foi pago. Acompanhe a produção na página do pedido.');
+        if (['failed', 'refunded', 'cancelled'].includes(order.status))
+          throw fail('Este pedido não está disponível para pagamento. Abra a página do pedido.');
+        throw fail('Aprove a letra antes do pagamento.');
+      }
+      const config = orderPaymentConfiguration(env, order.priceCents);
+      if (!config.checkoutAllowed)
+        throw fail(config.unavailableReason ?? 'Pagamento indisponível.', 409);
+      const [existing] = await tx
+        .select()
+        .from(payments)
+        .where(and(eq(payments.orderId, order.id), eq(payments.status, 'pending')));
+      if (existing?.provider === 'dev')
+        return { checkoutUrl: `${env.WEB_URL}/pedido/${order.publicId}`, dev: true as const };
+      if (existing?.checkoutUrl) return { checkoutUrl: existing.checkoutUrl };
+      const [product] = await tx
+        .select()
+        .from(products)
+        .where(eq(products.type, order.productType));
+      // The order lock serializes checkout. The key is stable across network/transaction retry;
+      // a rejected attempt changes the count and intentionally starts a new checkout.
+      const [attempts] = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(payments)
+        .where(eq(payments.orderId, order.id));
+      const preference = config.devFallback
+        ? null
+        : await paymentProvider.createCheckout({
+            title: product?.name ?? 'Sua música',
+            priceCents: order.priceCents,
+            externalReference: order.publicId,
+            backUrl: `${env.WEB_URL}/pedido/${order.publicId}`,
+            idempotencyKey: `checkout:${order.publicId}:${attempts?.count ?? 0}`,
+          });
+      const checkoutUrl = preference?.checkoutUrl ?? `${env.WEB_URL}/pedido/${order.publicId}`;
       if (order.status === 'lyrics_approved') {
-        assertTransition('lyrics_approved', 'payment_pending');
+        assertTransition(order.status, 'payment_pending');
         await tx
           .update(orders)
           .set({ status: 'payment_pending', updatedAt: new Date() })
@@ -688,125 +822,134 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
       }
       await tx.insert(payments).values({
         orderId: order.id,
-        provider: 'mercado-pago',
+        provider: config.devFallback ? 'dev' : 'abacate-pay',
         status: 'pending',
         amountCents: order.priceCents,
-        checkoutUrl: preference.initPoint,
+        checkoutUrl,
       });
+      return config.devFallback ? { checkoutUrl, dev: true as const } : { checkoutUrl };
     });
-    await recordEvent('checkout_started', order);
-    return { checkoutUrl: preference.initPoint };
+    await recordEvent('checkout_started', await orderFor(publicId));
+    return result;
   });
-  /** O webhook apenas notifica: valida assinatura, busca o pagamento e confere valor/referência. */
-  app.post('/api/v1/webhooks/mercado-pago', async (request, reply) => {
-    if (env.PAYMENT_PROVIDER !== 'mercadopago')
+  /** O webhook apenas notifica: valida o secret, busca o billing e confere valor/referência. */
+  app.post('/api/v1/webhooks/abacate-pay', async (request, reply) => {
+    if (env.PAYMENT_PROVIDER !== 'abacatepay')
       throw fail('Webhook indisponível para provider atual.', 404);
-    const secret = env.MERCADO_PAGO_WEBHOOK_SECRET;
-    if (!secret) throw fail('MERCADO_PAGO_WEBHOOK_SECRET não configurado.', 500);
-    const body = (request.body ?? {}) as {
-      type?: string;
-      topic?: string;
-      action?: string;
-      data?: { id?: string | number };
-    };
     const query = request.query as Record<string, string | undefined>;
-    const topic = body.type ?? body.topic ?? query.topic ?? query.type;
-    const dataId = String(body.data?.id ?? query['data.id'] ?? query.data_id ?? query.id ?? '');
-    if (!dataId || (topic && topic !== 'payment')) return reply.status(200).send({ ignored: true });
-    const signatureHeader = request.headers['x-signature'];
-    const requestId = request.headers['x-request-id'];
     if (
-      !verifyMercadoPagoSignature({
-        signatureHeader: typeof signatureHeader === 'string' ? signatureHeader : undefined,
-        requestId: typeof requestId === 'string' ? requestId : undefined,
-        dataId,
-        secret,
+      !verifyAbacatePaySecret({
+        received: query.webhookSecret,
+        expected: env.ABACATEPAY_WEBHOOK_SECRET,
       })
     )
-      throw fail('Assinatura do webhook inválida.', 401);
-    const mpPayment = await mercadoPago.getPayment(dataId);
-    const externalEventId = `${requestId ?? dataId}:${mpPayment.status}`.slice(0, 160);
-    const [event] = await db
-      .insert(paymentWebhookEvents)
-      .values({
-        provider: 'mercado-pago',
-        externalEventId,
-        payload: { action: body.action ?? topic ?? 'payment', status: mpPayment.status },
-      })
-      .onConflictDoNothing()
-      .returning();
-    if (!event) return reply.status(200).send({ duplicate: true });
-    try {
-      if (!mpPayment.externalReference) throw new Error('Payment has no external_reference.');
-      const [order] = await db
+      throw fail('Secret do webhook inválido.', 401);
+    const body = (request.body ?? {}) as {
+      event?: string;
+      data?: { id?: string };
+    };
+    const eventName = body.event ?? '';
+    const billingId = String(body.data?.id ?? '');
+    if (!billingId || !['checkout.completed', 'checkout.refunded'].includes(eventName))
+      return reply.status(200).send({ ignored: true });
+    const billing = await paymentProvider.getPayment(billingId);
+    const externalEventId = `${billing.id}:${billing.status}`.slice(0, 160);
+    const result = await db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`payment:${billing.id}`}))`);
+      const [event] = await tx
+        .insert(paymentWebhookEvents)
+        .values({
+          provider: 'abacate-pay',
+          externalEventId,
+          payload: { action: eventName, status: billing.status },
+        })
+        .onConflictDoNothing()
+        .returning();
+      if (!event) return { duplicate: true as const };
+      if (!billing.externalReference) throw fail('Pagamento sem referência de pedido.');
+      const [order] = await tx
         .select()
         .from(orders)
-        .where(eq(orders.publicId, mpPayment.externalReference));
-      if (!order) throw new Error('Order not found for external_reference.');
-      const [payment] = await db
+        .where(eq(orders.publicId, billing.externalReference))
+        .for('update');
+      if (!order) throw fail('Pedido do pagamento não encontrado.', 404);
+      const [alreadyApproved] = await tx
         .select()
         .from(payments)
-        .where(and(eq(payments.orderId, order.id), eq(payments.status, 'pending')));
-      if (!payment) throw new Error('No pending payment for this order.');
-      if (mpPayment.status === 'approved') {
-        if (mpPayment.amountCents !== order.priceCents || mpPayment.currency !== 'BRL')
-          throw new Error('Payment amount or currency does not match the order.');
-        let justPaid = false;
-        await db.transaction(async (tx) => {
-          await tx
-            .update(payments)
-            .set({
-              status: 'approved',
-              externalPaymentId: mpPayment.id,
-              updatedAt: new Date(),
-            })
-            .where(eq(payments.id, payment.id));
-          const [freshOrder] = await tx.select().from(orders).where(eq(orders.id, order.id));
-          if (freshOrder?.status === 'payment_pending') {
-            assertTransition('payment_pending', 'paid');
-            assertTransition('paid', 'audio_queued');
-            await tx
-              .update(orders)
-              .set({ status: 'audio_queued', updatedAt: new Date() })
-              .where(eq(orders.id, order.id));
-            await tx
-              .insert(generationJobs)
-              .values({
-                type: 'generate_audio',
-                orderId: order.id,
-                payload: {},
-                idempotencyKey: `audio:${order.id}`,
-                maxAttempts: 6,
-              })
-              .onConflictDoNothing();
-            justPaid = true;
-          }
-        });
-        if (justPaid) await recordEvent('paid', order);
-      } else if (['rejected', 'cancelled'].includes(mpPayment.status)) {
-        await db
+        .where(and(eq(payments.orderId, order.id), eq(payments.status, 'approved')));
+      if (alreadyApproved) {
+        if (alreadyApproved.externalPaymentId !== billing.id)
+          throw fail('Pedido já confirmado por outro pagamento.');
+        await tx
+          .update(paymentWebhookEvents)
+          .set({ paymentId: alreadyApproved.id, processedAt: new Date() })
+          .where(eq(paymentWebhookEvents.id, event.id));
+        return { duplicate: true as const };
+      }
+      const [payment] = await tx
+        .select()
+        .from(payments)
+        .where(
+          and(
+            eq(payments.orderId, order.id),
+            eq(payments.provider, 'abacate-pay'),
+            eq(payments.status, 'pending'),
+          ),
+        );
+      if (!payment) throw fail('Nenhum pagamento pendente para este pedido.');
+      let justPaid = false;
+      if (eventName === 'checkout.completed' && billing.status === 'approved') {
+        if (
+          billing.amountCents !== order.priceCents ||
+          billing.amountCents !== payment.amountCents ||
+          billing.currency !== 'BRL'
+        )
+          throw fail('Valor ou moeda do pagamento diverge do pedido.');
+        if (order.status !== 'payment_pending')
+          throw fail('Pedido indisponível para confirmação de pagamento.');
+        await tx
           .update(payments)
-          .set({ status: 'rejected', externalPaymentId: mpPayment.id, updatedAt: new Date() })
+          .set({ status: 'approved', externalPaymentId: billing.id, updatedAt: new Date() })
+          .where(eq(payments.id, payment.id));
+        assertTransition(order.status, 'paid');
+        assertTransition('paid', 'audio_queued');
+        await tx
+          .update(orders)
+          .set({ status: 'audio_queued', updatedAt: new Date() })
+          .where(eq(orders.id, order.id));
+        await tx
+          .insert(generationJobs)
+          .values({
+            type: 'generate_audio',
+            orderId: order.id,
+            payload: currentAudioJobSelection(env),
+            idempotencyKey: `audio:${order.id}`,
+            maxAttempts: 6,
+          })
+          .onConflictDoNothing();
+        justPaid = true;
+      } else if (['rejected', 'cancelled'].includes(billing.status)) {
+        await tx
+          .update(payments)
+          .set({ status: 'rejected', externalPaymentId: billing.id, updatedAt: new Date() })
           .where(eq(payments.id, payment.id));
       }
-      await db
+      await tx
         .update(paymentWebhookEvents)
         .set({ paymentId: payment.id, processedAt: new Date() })
         .where(eq(paymentWebhookEvents.id, event.id));
-      return reply.status(200).send({ processed: true });
-    } catch (error) {
-      await db
-        .update(paymentWebhookEvents)
-        .set({ error: error instanceof Error ? error.message.slice(0, 500) : 'unknown' })
-        .where(eq(paymentWebhookEvents.id, event.id));
-      throw error;
-    }
+      return { processed: true as const, paidOrder: justPaid ? order : null };
+    });
+    if ('paidOrder' in result && result.paidOrder) await recordEvent('paid', result.paidOrder);
+    return reply
+      .status(200)
+      .send('duplicate' in result ? { duplicate: true } : { processed: true });
   });
-  /** Somente fora de produção: confirma um pagamento criado em modo dev (sem credenciais MP). */
+  /** Somente fora de produção: confirma um pagamento criado em modo dev (sem credenciais). */
   app.post('/api/v1/orders/:publicId/dev-payment/approve', async (request) => {
     if (env.NODE_ENV === 'production') throw fail('Indisponível', 404);
     const publicId = (request.params as { publicId: string }).publicId;
-    if (!hasAccess(publicId, request)) throw fail('Acesso privado necessário', 401);
+    if (!(await hasAccess(publicId, request))) throw fail('Acesso privado necessário', 401);
     const order = await orderFor(publicId);
     const [payment] = await db
       .select()
@@ -839,7 +982,7 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
           .values({
             type: 'generate_audio',
             orderId: currentOrder.id,
-            payload: {},
+            payload: currentAudioJobSelection(env),
             idempotencyKey: `audio:${currentOrder.id}`,
             maxAttempts: 6,
           })
@@ -859,13 +1002,13 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
       !verifyToken(token, order.accessTokenHash, env.CUSTOMER_ACCESS_TOKEN_PEPPER)
     )
       throw fail('Link de acesso inválido', 401);
-    setAccessCookie(reply, 'order', order.publicId);
+    await setAccessCookie(reply, 'order', order.publicId);
     return { ok: true };
   });
   app.get('/api/v1/orders/:publicId', async (request) => {
     const publicId = (request.params as { publicId: string }).publicId;
-    if (!hasViewAccess(publicId, request)) throw fail('Acesso privado necessário', 401);
-    const full = hasAccess(publicId, request);
+    if (!(await hasViewAccess(publicId, request))) throw fail('Acesso privado necessário', 401);
+    const full = await hasAccess(publicId, request);
     const order = await orderFor(publicId);
     const [story] = full
       ? await db.select().from(storySubmissions).where(eq(storySubmissions.orderId, order.id))
@@ -896,20 +1039,25 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
       order: publicOrder,
       story: story?.data,
       lyrics: publicLyrics,
+      remainingGenerations: Math.max(
+        0,
+        4 - versions.filter((version) => version.kind === 'generated').length,
+      ),
       audio,
       privateAccess: full,
+      payment: orderPaymentConfiguration(env, order.priceCents),
     };
   });
   app.get('/api/v1/orders/:publicId/cover', async (request) => {
     const publicId = (request.params as { publicId: string }).publicId;
-    if (!hasViewAccess(publicId, request)) throw fail('Acesso privado necessário', 401);
+    if (!(await hasViewAccess(publicId, request))) throw fail('Acesso privado necessário', 401);
     const order = await orderFor(publicId);
     const cover = await latestCover(order.id);
     return {
       available: coverAvailable,
       cover: cover
         ? {
-            ...publicCover(cover, hasAccess(publicId, request)),
+            ...publicCover(cover, await hasAccess(publicId, request)),
             ...(cover.status === 'completed' && cover.coverAssetId
               ? { downloadUrl: `/api/v1/orders/${publicId}/cover/download` }
               : {}),
@@ -925,7 +1073,7 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
     },
     async (request, reply) => {
       const publicId = (request.params as { publicId: string }).publicId;
-      if (!hasAccess(publicId, request)) throw fail('Acesso privado necessário', 401);
+      if (!(await hasAccess(publicId, request))) throw fail('Acesso privado necessário', 401);
       if (!coverAvailable) throw fail('Geração de capa indisponível neste ambiente.', 503);
       const order = await orderFor(publicId);
 
@@ -1018,7 +1166,7 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
   );
   app.get('/api/v1/orders/:publicId/cover/download', async (request, reply) => {
     const publicId = (request.params as { publicId: string }).publicId;
-    if (!hasViewAccess(publicId, request)) throw fail('Acesso privado necessário', 401);
+    if (!(await hasViewAccess(publicId, request))) throw fail('Acesso privado necessário', 401);
     const order = await orderFor(publicId);
     const result = await pool.query<{ storage_key: string; mime_type: string }>(
       `select f.storage_key,f.mime_type from album_covers c
@@ -1038,7 +1186,7 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
   });
   app.get('/api/v1/orders/:publicId/assets/:variant/download', async (request, reply) => {
     const { publicId, variant } = request.params as { publicId: string; variant: string };
-    if (!hasViewAccess(publicId, request)) throw fail('Acesso privado necessário', 401);
+    if (!(await hasViewAccess(publicId, request))) throw fail('Acesso privado necessário', 401);
     const order = await orderFor(publicId);
     if (order.status !== 'delivered') throw fail('Entrega indisponível.', 404);
     const variantNumber = Number(variant);
@@ -1076,9 +1224,7 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
       .from(deliveries)
       .where(
         and(
-          deliveries.tokenHash
-            ? eq(deliveries.tokenHash, hashToken(token, env.CUSTOMER_ACCESS_TOKEN_PEPPER))
-            : undefined,
+          eq(deliveries.tokenHash, hashToken(token, env.CUSTOMER_ACCESS_TOKEN_PEPPER)),
           sql`${deliveries.revokedAt} is null`,
         ),
       );
@@ -1116,6 +1262,8 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
       );
     if (!delivery || (delivery.expiresAt && delivery.expiresAt <= new Date()))
       throw fail('Link de entrega inválido ou expirado.', 404);
+    const [order] = await db.select().from(orders).where(eq(orders.id, delivery.orderId));
+    if (!order || order.status !== 'delivered') throw fail('Entrega indisponível.', 404);
     const variantNumber = Number(variant);
     if (!Number.isInteger(variantNumber) || variantNumber < 1)
       throw fail('Arquivo não encontrado', 404);
@@ -1197,12 +1345,26 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
     return storage.get(asset.storage_key);
   });
   app.post('/api/v1/orders/:publicId/revision-requests', async (request) => {
-    const order = await orderFor((request.params as { publicId: string }).publicId);
-    if (!hasAccess(order.publicId, request)) throw fail('Acesso privado necessário', 401);
-    const body = (request.body ?? {}) as { message?: string };
-    if (!body.message || body.message.length > 1000)
-      throw fail('Informe uma solicitação de até 1000 caracteres.');
-    await db.insert(revisionRequests).values({ orderId: order.id, message: body.message });
+    const publicId = (request.params as { publicId: string }).publicId;
+    if (!(await hasAccess(publicId, request))) throw fail('Acesso privado necessário', 401);
+    const { message } = revisionRequestSchema.parse(request.body);
+    await db.transaction(async (tx) => {
+      const [order] = await tx
+        .select()
+        .from(orders)
+        .where(eq(orders.publicId, publicId))
+        .for('update');
+      if (!order) throw fail('Pedido não encontrado', 404);
+      if (order.status === 'revision_requested') return;
+      if (order.status !== 'delivered')
+        throw fail('Ajustes ficam disponíveis após a entrega.', 409);
+      assertTransition(order.status, 'revision_requested');
+      await tx.insert(revisionRequests).values({ orderId: order.id, message });
+      await tx
+        .update(orders)
+        .set({ status: 'revision_requested', updatedAt: new Date() })
+        .where(eq(orders.id, order.id));
+    });
     return { received: true };
   });
   /**
@@ -1229,7 +1391,7 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
         throw fail('Link de entrega inválido ou expirado.', 404);
       const [order] = await db.select().from(orders).where(eq(orders.id, delivery.orderId));
       if (!order || order.status !== 'delivered') throw fail('Entrega indisponível.', 404);
-      setAccessCookie(reply, 'order_view', order.publicId);
+      await setAccessCookie(reply, 'order_view', order.publicId);
       return { publicId: order.publicId };
     },
   );
@@ -1240,7 +1402,14 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
       const body = (request.body ?? {}) as { email?: string; password?: string };
       if (!body.email || !body.password) throw fail('E-mail e senha são obrigatórios.', 401);
       const email = body.email.trim().toLowerCase();
-      if (email !== env.ADMIN_EMAIL.toLowerCase() || body.password !== env.ADMIN_PASSWORD)
+      if (
+        email !== env.ADMIN_EMAIL.toLowerCase() ||
+        !verifyToken(
+          body.password,
+          hashToken(env.ADMIN_PASSWORD, env.COOKIE_SECRET),
+          env.COOKIE_SECRET,
+        )
+      )
         throw fail('Credenciais inválidas.', 401);
       const [user] = await db
         .insert(adminUsers)
@@ -1274,6 +1443,12 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
     reply.clearCookie('admin_session', { path: '/' });
     return reply.status(204).send();
   });
+  const operationalFailure = sql`${orders.status} not in ('cancelled','refunded') and (
+    ${orders.status} = 'failed'
+    or exists (select 1 from album_covers c where c.order_id=${orders.id} and c.attempt=(select max(c2.attempt) from album_covers c2 where c2.order_id=${orders.id}) and (c.status='failed' or (c.status='processing' and (select j.status from generation_jobs j where j.order_id=${orders.id} and j.type='generate_cover' order by j.created_at desc,j.id desc limit 1)='failed')))
+    or (${orders.status}='delivered' and not exists(select 1 from email_deliveries e where e.order_id=${orders.id} and e.status='sent') and (select j.status from generation_jobs j where j.order_id=${orders.id} and j.type in ('deliver-notify','generate_audio') order by j.created_at desc,j.id desc limit 1)='failed')
+    or (${orders.status} not in ('delivered','cancelled','refunded') and (select j.status from generation_jobs j where j.order_id=${orders.id} and j.type='generate_audio' order by j.created_at desc,j.id desc limit 1)='failed')
+  )`;
   app.get('/api/v1/admin/orders', async (request) => {
     await requireAdmin(request);
     const query = adminOrdersQuerySchema.parse(request.query ?? {});
@@ -1283,20 +1458,136 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
     const toUtc = query.to ? spDayStartUtc(nextUtcDate(query.to)) : undefined;
     const filters = [
       query.status ? eq(orders.status, query.status) : undefined,
+      query.attention === 'failures' ? operationalFailure : undefined,
       query.productType ? eq(orders.productType, query.productType) : undefined,
       query.q ? sql`${orders.publicId} ilike ${`%${query.q}%`}` : undefined,
       fromUtc ? sql`${orders.createdAt} >= ${fromUtc}` : undefined,
       toUtc ? sql`${orders.createdAt} < ${toUtc}` : undefined,
     ].filter(Boolean);
+    const where = filters.length ? and(...filters) : undefined;
+    const pageSize = 30;
     const rows = await db
-      .select()
+      .select({
+        id: orders.id,
+        publicId: orders.publicId,
+        productType: orders.productType,
+        status: orders.status,
+        priceCents: orders.priceCents,
+        createdAt: orders.createdAt,
+        subjectName: sql<string | null>`${storySubmissions.data} ->> 'subjectName'`,
+      })
       .from(orders)
-      .where(filters.length ? and(...filters) : undefined)
+      .leftJoin(storySubmissions, eq(storySubmissions.orderId, orders.id))
+      .where(where)
       .orderBy(desc(orders.createdAt))
-      .limit(30)
-      .offset((query.page - 1) * 30);
-    return { items: rows, page: query.page };
+      .limit(pageSize)
+      .offset((query.page - 1) * pageSize);
+    const [countRow] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(orders)
+      .where(where);
+    return { items: rows, page: query.page, total: countRow?.count ?? 0, pageSize };
   });
+  /** Agregados operacionais do cockpit admin: totais via SQL, sem paginar tudo no cliente. */
+  app.get('/api/v1/admin/overview', async (request) => {
+    await requireAdmin(request);
+    const [totals] = await db
+      .select({
+        orders: sql<number>`count(*)::int`,
+        paid: sql<number>`count(*) filter (where ${orders.status} in ('paid','audio_queued','audio_generating','review_required','revision_requested','delivered'))::int`,
+        revenueCents: sql<number>`coalesce(sum(${orders.priceCents}) filter (where ${orders.status} in ('paid','audio_queued','audio_generating','review_required','revision_requested','delivered')), 0)::int`,
+      })
+      .from(orders);
+    const [attention] = await db
+      .select({
+        failedOperationalOrders: sql<number>`count(*) filter (where ${operationalFailure})::int`,
+        failed: sql<number>`count(*) filter (where ${orders.status} = 'failed')::int`,
+        reviewRequired: sql<number>`count(*) filter (where ${orders.status} = 'review_required')::int`,
+        audioQueued: sql<number>`count(*) filter (where ${orders.status} = 'audio_queued')::int`,
+        lyricsGenerating: sql<number>`count(*) filter (where ${orders.status} = 'lyrics_generating')::int`,
+      })
+      .from(orders);
+    return {
+      totals: {
+        orders: totals?.orders ?? 0,
+        paid: totals?.paid ?? 0,
+        revenueCents: totals?.revenueCents ?? 0,
+      },
+      attention: {
+        failedOperationalOrders: attention?.failedOperationalOrders ?? 0,
+        failed: attention?.failed ?? 0,
+        reviewRequired: attention?.reviewRequired ?? 0,
+        audioQueued: attention?.audioQueued ?? 0,
+        lyricsGenerating: attention?.lyricsGenerating ?? 0,
+      },
+    };
+  });
+  type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+  const recoveryContext = async (
+    order: typeof orders.$inferSelect,
+    source: Transaction | typeof db = db,
+  ): Promise<RecoveryContext> => {
+    const [paymentRows, versions, submissions, jobs, covers, emails, links, audioRows] =
+      await Promise.all([
+        source.select().from(payments).where(eq(payments.orderId, order.id)),
+        source.select().from(lyricsVersions).where(eq(lyricsVersions.orderId, order.id)),
+        source
+          .select({ id: storySubmissions.id })
+          .from(storySubmissions)
+          .where(eq(storySubmissions.orderId, order.id)),
+        source
+          .select()
+          .from(generationJobs)
+          .where(eq(generationJobs.orderId, order.id))
+          .orderBy(generationJobs.createdAt),
+        source
+          .select({ ...getTableColumns(albumCovers), referenceCreatedAt: storedAssets.createdAt })
+          .from(albumCovers)
+          .leftJoin(storedAssets, eq(storedAssets.id, albumCovers.referenceAssetId))
+          .where(eq(albumCovers.orderId, order.id)),
+        source
+          .select({ status: emailDeliveries.status })
+          .from(emailDeliveries)
+          .where(eq(emailDeliveries.orderId, order.id)),
+        source.select().from(deliveries).where(eq(deliveries.orderId, order.id)),
+        source
+          .select({ variant: audioGenerations.variant })
+          .from(audioGenerations)
+          .where(
+            and(
+              eq(audioGenerations.orderId, order.id),
+              eq(audioGenerations.status, 'completed'),
+              sql`${audioGenerations.assetId} is not null`,
+            ),
+          ),
+      ]);
+    const link = links[0];
+    return {
+      status: order.status,
+      audioReady: [1, 2].every((variant) => audioRows.some((row) => row.variant === variant)),
+      paid: paymentRows.some((item) => item.status === 'approved'),
+      approvedLyrics: versions.some((item) => item.approvedAt),
+      hasStory: Boolean(submissions.length),
+      generatedCount: versions.filter((item) => item.kind === 'generated').length,
+      lyricsAvailable: Boolean(
+        overrides.lyrics || publicConfiguration(env).generation.lyricsAvailable,
+      ),
+      jobs,
+      covers,
+      emailSent: emails.some((item) => item.status === 'sent'),
+      deliveryBlocked: Boolean(
+        order.accessRevokedAt ||
+        (link &&
+          (link.revokedAt ||
+            (link.expiresAt && link.expiresAt <= new Date()) ||
+            link.tokenHash !==
+              hashToken(
+                stableDeliveryToken(link.id, env.CUSTOMER_ACCESS_TOKEN_PEPPER),
+                env.CUSTOMER_ACCESS_TOKEN_PEPPER,
+              ))),
+      ),
+    };
+  };
   app.get('/api/v1/admin/orders/:id', async (request) => {
     await requireAdmin(request);
     const id = (request.params as { id: string }).id;
@@ -1315,6 +1606,11 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
     const jobs = await db.select().from(generationJobs).where(eq(generationJobs.orderId, id));
     const audio = await db.select().from(audioGenerations).where(eq(audioGenerations.orderId, id));
     const notes = await db.select().from(adminNotes).where(eq(adminNotes.orderId, id));
+    const revisionRows = await db
+      .select({ message: revisionRequests.message, createdAt: revisionRequests.createdAt })
+      .from(revisionRequests)
+      .where(eq(revisionRequests.orderId, id))
+      .orderBy(desc(revisionRequests.createdAt));
     const usageRows = await db.select().from(aiUsage).where(eq(aiUsage.orderId, id));
     const [sums] = await db
       .select({
@@ -1339,19 +1635,69 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
       outputTokens: sums?.outputTokens ?? 0,
       calls: sums?.calls ?? 0,
     };
+    const context = await recoveryContext(order);
+    const notifications = await db
+      .select({
+        id: emailDeliveries.id,
+        status: emailDeliveries.status,
+        provider: emailDeliveries.provider,
+        createdAt: emailDeliveries.createdAt,
+        updatedAt: emailDeliveries.updatedAt,
+      })
+      .from(emailDeliveries)
+      .where(eq(emailDeliveries.orderId, id));
     return {
-      order,
+      recovery: recoveryFor(context),
+      covers: context.covers.map((cover) => ({
+        id: cover.id,
+        attempt: cover.attempt,
+        status: cover.status,
+        hasReference: cover.hadReference,
+        referenceAvailable: Boolean(cover.referenceAssetId) && !referenceRequired(cover),
+        createdAt: cover.createdAt,
+        updatedAt: cover.updatedAt,
+        lastError: publicFailure(cover.lastError),
+        errorCode: failureCode(cover.lastError),
+      })),
+      notifications,
+      order: {
+        id: order.id,
+        publicId: order.publicId,
+        productType: order.productType,
+        status: order.status,
+        priceCents: order.priceCents,
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt,
+        accessRevokedAt: order.accessRevokedAt,
+      },
+      revisionRequests: revisionRows.map((revision, index) => ({
+        ...revision,
+        status: index === 0 && order.status === 'revision_requested' ? 'pending' : 'processed',
+      })),
       story: story?.data,
       lyrics,
       payments: paymentRows,
-      jobs,
-      audio,
+      jobs: jobs.map((job) => ({
+        ...job,
+        lastError: publicFailure(job.lastError),
+        errorCode: failureCode(job.lastError),
+        ...jobRecovery(job, context),
+      })),
+      audio: audio.map((item) => ({
+        ...item,
+        canRegenerate: !audioRecoveryReason(context),
+        regenerateBlockedReason: audioRecoveryReason(context),
+      })),
       notes,
-      aiUsage: usageRows,
+      aiUsage: usageRows.map((usage) => ({
+        ...usage,
+        error: publicFailure(usage.error),
+        errorCode: failureCode(usage.error),
+      })),
       aiCost,
     };
   });
-  /** Custo de IA agregado para o painel admin (mês corrente + últimos 30 dias + key). */
+  /** Custo de IA agregado para o painel admin (mês corrente + últimos 30 dias). */
   app.get('/api/v1/admin/ai-usage/summary', async (request) => {
     await requireAdmin(request);
     const zero = '0';
@@ -1394,7 +1740,6 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
         calls: row.calls,
         blocked: row.blocked,
       })),
-      key: await fetchOpenRouterKeyUsage(env.OPENROUTER_API_KEY),
     };
   });
   /** Funil de conversão por etapa (pedidos distintos) + custo médio por entrega. */
@@ -1477,21 +1822,172 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
     reply.type(asset.mimeType).header('content-disposition', 'inline');
     return storage.get(asset.storageKey);
   });
-  app.post('/api/v1/admin/jobs/:id/retry', async (request) => {
-    await requireAdmin(request);
+  app.post(
+    '/api/v1/admin/jobs/:id/retry',
+    { bodyLimit: MAX_REFERENCE_IMAGE_BYTES + 64 * 1024 },
+    async (request) => {
+      const session = await requireAdmin(request);
+      const id = (request.params as { id: string }).id;
+      let reference: Buffer | undefined;
+      if (request.isMultipart()) {
+        const upload = await request.file();
+        if (!upload || upload.fieldname !== 'reference')
+          throw fail('Envie a foto e confirme o consentimento.');
+        const bytes = await upload.toBuffer();
+        if ((upload.fields.consent as { value?: unknown } | undefined)?.value !== 'true')
+          throw fail('Confirme o consentimento para a foto.');
+        if (upload.file.truncated) throw fail('A foto deve ter no máximo 8 MB.', 413);
+        reference = await normalizeReferenceImage(bytes, upload.mimetype).catch(() => {
+          throw fail('Envie uma foto JPEG, PNG ou WebP válida.');
+        });
+      } else createAlbumCoverSchema.parse(request.body ?? {});
+      const [initial] = await db.select().from(generationJobs).where(eq(generationJobs.id, id));
+      if (!initial) throw fail('Trabalho não encontrado.', 404);
+      let referenceKey: string | undefined;
+      let oldReferenceKey: string | undefined;
+      try {
+        await db.transaction(async (tx) => {
+          const [order] = await tx
+            .select()
+            .from(orders)
+            .where(eq(orders.id, initial.orderId))
+            .for('update');
+          if (!order) throw fail('Pedido não encontrado.', 404);
+          const [job] = await tx
+            .select()
+            .from(generationJobs)
+            .where(eq(generationJobs.id, id))
+            .for('update');
+          if (!job) throw fail('Trabalho não encontrado.', 404);
+          const context = await recoveryContext(order, tx);
+          const capability = jobRecovery(job, context);
+          if (!capability.canRetry)
+            throw fail(capability.retryBlockedReason ?? 'Trabalho indisponível.', 409);
+          if (reference && job.type !== 'generate_cover')
+            throw fail('Este trabalho não aceita foto.', 400);
+          if (job.type === 'generate_cover') {
+            const cover = context.covers.find(
+              (item) => item.attempt === coverAttempt(job.payload),
+            )!;
+            if (capability.requiresReference && !reference)
+              throw fail(
+                'A referência original foi removida. Envie uma nova foto com consentimento.',
+                409,
+              );
+            let assetId = cover.referenceAssetId;
+            if (reference) {
+              referenceKey = `orders/${order.publicId}/references/${nanoid(24)}.jpg`;
+              await storage.put(referenceKey, reference, 'image/jpeg');
+              const [asset] = await tx
+                .insert(storedAssets)
+                .values({
+                  orderId: order.id,
+                  storageKey: referenceKey,
+                  mimeType: 'image/jpeg',
+                  sizeBytes: reference.length,
+                })
+                .returning({ id: storedAssets.id });
+              assetId = asset!.id;
+              if (cover.referenceAssetId) {
+                const [old] = await tx
+                  .select({ key: storedAssets.storageKey })
+                  .from(storedAssets)
+                  .where(eq(storedAssets.id, cover.referenceAssetId));
+                oldReferenceKey = old?.key;
+              }
+            }
+            await tx
+              .update(albumCovers)
+              .set({
+                status: 'pending',
+                referenceAssetId: assetId,
+                hadReference: cover.hadReference || Boolean(reference),
+                lastError: null,
+                updatedAt: new Date(),
+              })
+              .where(eq(albumCovers.id, cover.id));
+            if (reference && cover.referenceAssetId)
+              await tx.delete(storedAssets).where(eq(storedAssets.id, cover.referenceAssetId));
+          }
+          const type =
+            job.type === 'generate_audio' && order.status === 'delivered'
+              ? 'deliver-notify'
+              : job.type;
+          await tx
+            .update(generationJobs)
+            .set({
+              type,
+              status: 'pending',
+              maxAttempts: sql`greatest(${generationJobs.maxAttempts}, ${generationJobs.attempts} + 1)`,
+              runAt: new Date(),
+              lockedAt: null,
+              lockedBy: null,
+              lastError: null,
+              updatedAt: new Date(),
+            })
+            .where(eq(generationJobs.id, id));
+          await tx.insert(adminNotes).values({
+            orderId: order.id,
+            adminUserId: session.userId,
+            message: `Retomada solicitada: ${type === 'generate_cover' ? 'capa' : type === 'deliver-notify' ? 'aviso de entrega' : 'áudios faltantes'}. Diagnóstico anterior: ${publicFailure(job.lastError) ?? 'Falha sem diagnóstico disponível.'}`,
+          });
+        });
+      } catch (error) {
+        if (referenceKey) await storage.delete(referenceKey).catch(() => undefined);
+        throw error;
+      }
+      if (oldReferenceKey) await storage.delete(oldReferenceKey).catch(() => undefined);
+      return { queued: true };
+    },
+  );
+  app.post('/api/v1/admin/orders/:id/email/retry', async (request) => {
+    const session = await requireAdmin(request);
+    createAlbumCoverSchema.parse(request.body ?? {});
     const id = (request.params as { id: string }).id;
-    await db
-      .update(generationJobs)
-      .set({
-        status: 'pending',
-        runAt: new Date(),
-        lockedAt: null,
-        lockedBy: null,
-        lastError: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(generationJobs.id, id));
-    return { queued: true };
+    return db.transaction(async (tx) => {
+      const [order] = await tx.select().from(orders).where(eq(orders.id, id)).for('update');
+      if (!order) throw fail('Pedido não encontrado.', 404);
+      const context = await recoveryContext(order, tx);
+      if (context.deliveryBlocked || order.status !== 'delivered' || !context.audioReady)
+        throw fail(recoveryFor(context).email.reason ?? 'Entrega indisponível.', 409);
+      if (context.emailSent) return { queued: false, alreadySent: true };
+      const capability = recoveryFor(context).email;
+      if (!capability.canRetry) throw fail(capability.reason ?? 'Aviso indisponível.', 409);
+      const [existing] = await tx
+        .select()
+        .from(generationJobs)
+        .where(and(eq(generationJobs.orderId, id), eq(generationJobs.type, 'deliver-notify')))
+        .orderBy(desc(generationJobs.createdAt))
+        .limit(1)
+        .for('update');
+      if (existing)
+        await tx
+          .update(generationJobs)
+          .set({
+            status: 'pending',
+            maxAttempts: sql`greatest(${generationJobs.maxAttempts}, ${generationJobs.attempts} + 1)`,
+            runAt: new Date(),
+            lockedAt: null,
+            lockedBy: null,
+            lastError: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(generationJobs.id, existing.id));
+      else
+        await tx.insert(generationJobs).values({
+          orderId: id,
+          type: 'deliver-notify',
+          payload: {},
+          idempotencyKey: `notification:${id}`,
+          maxAttempts: 1,
+        });
+      await tx.insert(adminNotes).values({
+        orderId: id,
+        adminUserId: session.userId,
+        message: `Retomada do aviso de entrega solicitada. ${publicFailure(existing?.lastError ?? null) ?? 'A mensagem existente será reutilizada.'}`,
+      });
+      return { queued: true };
+    });
   });
   app.post('/api/v1/admin/orders/:id/notes', async (request) => {
     const session = await requireAdmin(request);
@@ -1503,22 +1999,51 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
       .values({ orderId: id, adminUserId: session.userId, message: body.message });
     return { created: true };
   });
-  app.post('/api/v1/admin/orders/:id/access/rotate', async (request) => {
-    await requireAdmin(request);
-    const id = (request.params as { id: string }).id;
+  const revokeOrderAccess = async (id: string, rotate: boolean, adminUserId: string) => {
     const token = createAccessToken();
-    await db
-      .update(orders)
-      .set({
-        accessTokenHash: hashToken(token, env.CUSTOMER_ACCESS_TOKEN_PEPPER),
-        accessRevokedAt: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(orders.id, id));
-    return { accessToken: token };
+    await db.transaction(async (tx) => {
+      const [order] = await tx.select().from(orders).where(eq(orders.id, id)).for('update');
+      if (!order) throw fail('Pedido não encontrado', 404);
+      await tx
+        .update(orders)
+        .set({
+          accessTokenHash: hashToken(token, env.CUSTOMER_ACCESS_TOKEN_PEPPER),
+          creationKeyHash: null,
+          accessRevokedAt: rotate ? null : new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(orders.id, id));
+      await tx
+        .update(deliveries)
+        .set({ revokedAt: new Date(), updatedAt: new Date() })
+        .where(eq(deliveries.orderId, id));
+      await tx.insert(adminNotes).values({
+        orderId: id,
+        adminUserId,
+        message: rotate
+          ? 'Link de acesso do cliente substituído; acessos anteriores revogados.'
+          : 'Acessos privados do pedido revogados pela administração.',
+      });
+    });
+    return token;
+  };
+  app.post('/api/v1/admin/orders/:id/access/rotate', async (request) => {
+    const session = await requireAdmin(request);
+    return {
+      accessToken: await revokeOrderAccess(
+        (request.params as { id: string }).id,
+        true,
+        session.userId,
+      ),
+    };
+  });
+  app.post('/api/v1/admin/orders/:id/access/revoke', async (request) => {
+    const session = await requireAdmin(request);
+    await revokeOrderAccess((request.params as { id: string }).id, false, session.userId);
+    return { revoked: true };
   });
   app.post('/api/v1/admin/orders/:id/audio/:audioId/approve', async (request) => {
-    await requireAdmin(request);
+    const session = await requireAdmin(request);
     const { id, audioId } = request.params as { id: string; audioId: string };
     const [audio] = await db
       .select()
@@ -1541,8 +2066,23 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
     if (!readyVariants.has(1) || !readyVariants.has(2))
       throw fail('Ambas as versões precisam estar prontas com áudio.', 400);
     assertTransition('review_required', 'delivered');
-    const token = createAccessToken();
+    let token: string;
     await db.transaction(async (tx) => {
+      const [current] = await tx.select().from(orders).where(eq(orders.id, id)).for('update');
+      if (current?.status !== 'review_required') throw fail('Pedido não está em revisão.', 400);
+      const [existingDelivery] = await tx
+        .select()
+        .from(deliveries)
+        .where(eq(deliveries.orderId, id));
+      const deliveryId = existingDelivery?.id ?? randomUUID();
+      token = stableDeliveryToken(deliveryId, env.CUSTOMER_ACCESS_TOKEN_PEPPER);
+      if (
+        existingDelivery &&
+        (existingDelivery.revokedAt ||
+          (existingDelivery.expiresAt && existingDelivery.expiresAt <= new Date()) ||
+          existingDelivery.tokenHash !== hashToken(token, env.CUSTOMER_ACCESS_TOKEN_PEPPER))
+      )
+        throw fail('Acesso de entrega requer revisão administrativa.', 409);
       await tx
         .update(orders)
         .set({ status: 'delivered', updatedAt: new Date() })
@@ -1550,124 +2090,187 @@ export const buildApp = async (env: Env, overrides: { lyrics?: LyricsProvider } 
       await tx
         .insert(deliveries)
         .values({
+          id: deliveryId,
           orderId: id,
           tokenHash: hashToken(token, env.CUSTOMER_ACCESS_TOKEN_PEPPER),
           deliveredAt: new Date(),
         })
         .onConflictDoNothing();
+      await tx.insert(adminNotes).values({
+        orderId: id,
+        adminUserId: session.userId,
+        message: 'As duas versões de áudio foram aprovadas para entrega.',
+      });
       // O worker conclui este job pelo caminho já entregue (par pronto + delivered)
       // e dispara o e-mail com o link privado; reexecutável via email_deliveries.
       await tx
         .insert(generationJobs)
         .values({
-          type: 'generate_audio',
+          type: 'deliver-notify',
           orderId: id,
           payload: {},
-          idempotencyKey: `audio:${id}:deliver-notify:${Date.now()}`,
+          idempotencyKey: `notification:${id}`,
           maxAttempts: 6,
         })
         .onConflictDoNothing();
     });
     await recordEvent('delivered', order);
-    return { delivered: true, deliveryToken: token };
+    return { delivered: true, deliveryToken: token! };
   });
-  app.post('/api/v1/admin/orders/:id/audio/:audioId/regenerate', async (request) => {
-    await requireAdmin(request);
-    const { id, audioId } = request.params as { id: string; audioId: string };
-    const [audio] = await db
-      .select()
-      .from(audioGenerations)
-      .where(and(eq(audioGenerations.id, audioId), eq(audioGenerations.orderId, id)));
-    if (!audio) throw fail('Áudio não encontrado.', 404);
-    await db.insert(generationJobs).values({
-      type: 'generate_audio',
-      orderId: id,
-      payload: { variant: audio.variant },
-      idempotencyKey: `audio:${id}:variant:${audio.variant}:${Date.now()}`,
-      maxAttempts: 6,
+  const enqueueAudioReplacement = async (id: string, adminUserId: string, audioId?: string) =>
+    db.transaction(async (tx) => {
+      const [order] = await tx.select().from(orders).where(eq(orders.id, id)).for('update');
+      if (!order) throw fail('Pedido não encontrado.', 404);
+      let variant: number | undefined;
+      let selection = currentAudioJobSelection(env);
+      if (audioId) {
+        const audioRows = await tx
+          .select()
+          .from(audioGenerations)
+          .where(and(eq(audioGenerations.id, audioId), eq(audioGenerations.orderId, id)));
+        const audio = audioRows[0];
+        if (!audio) throw fail('Áudio não encontrado.', 404);
+        variant = audio.variant;
+        const allAudio = await tx
+          .select({
+            variant: audioGenerations.variant,
+            provider: audioGenerations.provider,
+            model: audioGenerations.model,
+          })
+          .from(audioGenerations)
+          .where(eq(audioGenerations.orderId, id));
+        const existingSelection =
+          allAudio.find(
+            (row) =>
+              row.variant === variant &&
+              (row.provider === 'openrouter' || row.provider === 'google') &&
+              Boolean(row.model?.trim()),
+          ) ??
+          allAudio.find(
+            (row) =>
+              (row.provider === 'openrouter' || row.provider === 'google') &&
+              Boolean(row.model?.trim()),
+          );
+        if (
+          existingSelection &&
+          (existingSelection.provider === 'openrouter' ||
+            existingSelection.provider === 'google') &&
+          existingSelection.model
+        )
+          selection = {
+            provider: existingSelection.provider,
+            model: existingSelection.model.trim(),
+          };
+      }
+      const context = await recoveryContext(order, tx);
+      const reason = audioRecoveryReason(context);
+      if (reason) throw fail(reason, 409);
+      let status = order.status;
+      if (status === 'delivered') {
+        assertTransition(status, 'revision_requested');
+        status = 'revision_requested';
+      }
+      if (status === 'review_required') {
+        assertTransition(status, 'failed');
+        status = 'failed';
+      }
+      if (status !== 'audio_queued') assertTransition(status, 'audio_queued');
+      await tx
+        .update(orders)
+        .set({ status: 'audio_queued', updatedAt: new Date() })
+        .where(eq(orders.id, id));
+      await tx
+        .delete(audioGenerations)
+        .where(
+          variant
+            ? and(eq(audioGenerations.orderId, id), eq(audioGenerations.variant, variant))
+            : eq(audioGenerations.orderId, id),
+        );
+      await tx.insert(generationJobs).values({
+        type: 'generate_audio',
+        orderId: id,
+        payload: variant ? { variant, ...selection } : selection,
+        idempotencyKey: `audio:${id}:replace:${randomUUID()}`,
+        maxAttempts: 1,
+      });
+      await tx.insert(adminNotes).values({
+        orderId: id,
+        adminUserId,
+        message: variant
+          ? `Regeneração da versão de áudio ${variant} solicitada; a outra versão será preservada.`
+          : 'Regeneração das duas versões de áudio solicitada.',
+      });
+      return { queued: true };
     });
-    return { queued: true };
+  app.post('/api/v1/admin/orders/:id/audio/:audioId/regenerate', async (request) => {
+    const session = await requireAdmin(request);
+    const { id, audioId } = request.params as { id: string; audioId: string };
+    return enqueueAudioReplacement(id, session.userId, audioId);
   });
-  /** Novo conteúdo aprovado após o pagamento, para correção editorial (ex.: filtro do provedor). */
   app.patch('/api/v1/admin/orders/:id/lyrics', async (request) => {
     const session = await requireAdmin(request);
     const id = (request.params as { id: string }).id;
     const content = generatedLyricsSchema.parse(request.body);
-    const [order] = await db.select().from(orders).where(eq(orders.id, id));
-    if (!order) throw fail('Pedido não encontrado', 404);
-    const [submission] = await db
-      .select()
-      .from(storySubmissions)
-      .where(eq(storySubmissions.orderId, id));
-    if (!submission) throw fail('Formulário ausente');
-    const errors = validateLyrics(content, storySchema.parse(submission.data));
-    if (errors.length) throw fail(errors.join(' '));
-    const [countRow = { count: 0 }] = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(lyricsVersions)
-      .where(eq(lyricsVersions.orderId, id));
-    const [version] = await db
-      .insert(lyricsVersions)
-      .values({
-        orderId: id,
-        number: countRow.count + 1,
-        kind: 'edited',
-        content,
-        approvedAt: new Date(),
-      })
-      .returning();
-    await db
-      .insert(adminNotes)
-      .values({
-        orderId: id,
-        adminUserId: session.userId,
-        message: 'Letra revisada pela administração e marcada como aprovada.',
-      })
-      .onConflictDoNothing();
-    return version;
-  });
-  /** Reproduz as duas versões do zero, usando a letra aprovada mais recente. */
-  app.post('/api/v1/admin/orders/:id/audio/rebuild', async (request) => {
-    await requireAdmin(request);
-    const id = (request.params as { id: string }).id;
-    const [order] = await db.select().from(orders).where(eq(orders.id, id));
-    if (!order) throw fail('Pedido não encontrado', 404);
-    const start: typeof order.status =
-      order.status === 'delivered'
-        ? 'revision_requested'
-        : order.status === 'review_required'
-          ? 'failed'
-          : order.status;
-    if (!['failed', 'revision_requested', 'audio_queued'].includes(start))
-      throw fail('Este pedido não pode ser reproduzido agora.', 400);
-    await db.transaction(async (tx) => {
-      if (start !== 'audio_queued') {
-        if (order.status !== start) {
-          assertTransition(order.status, start);
-          await tx
-            .update(orders)
-            .set({ status: start, updatedAt: new Date() })
-            .where(eq(orders.id, id));
-        }
-        assertTransition(start, 'audio_queued');
+    const assessment = evaluateContent(
+      JSON.stringify({
+        title: content.title,
+        fullLyrics: content.fullLyrics,
+        musicalDirection: content.musicalDirection,
+      }),
+    );
+    if (!assessment.allowed) throw fail(assessment.reason);
+    return db.transaction(async (tx) => {
+      const [order] = await tx.select().from(orders).where(eq(orders.id, id)).for('update');
+      if (!order) throw fail('Pedido não encontrado.', 404);
+      const context = await recoveryContext(order, tx);
+      if (!recoveryFor(context).lyrics.canEdit)
+        throw fail(
+          recoveryFor(context).lyrics.reason ?? 'Esta etapa não permite editar a letra.',
+          409,
+        );
+      const [submission] = await tx
+        .select()
+        .from(storySubmissions)
+        .where(eq(storySubmissions.orderId, id));
+      if (!submission) throw fail('Formulário ausente.');
+      const errors = validateLyrics(content, storySchema.parse(submission.data));
+      if (errors.length) throw fail(errors.join(' '));
+      const [latest] = await tx
+        .select({ number: lyricsVersions.number })
+        .from(lyricsVersions)
+        .where(eq(lyricsVersions.orderId, id))
+        .orderBy(desc(lyricsVersions.number))
+        .limit(1);
+      const [version] = await tx
+        .insert(lyricsVersions)
+        .values({
+          orderId: id,
+          number: (latest?.number ?? 0) + 1,
+          kind: 'edited',
+          content,
+          approvedAt: context.paid ? new Date() : null,
+        })
+        .returning();
+      if (!context.paid && order.status !== 'lyrics_ready') {
+        assertTransition(order.status, 'lyrics_ready');
         await tx
           .update(orders)
-          .set({ status: 'audio_queued', updatedAt: new Date() })
+          .set({ status: 'lyrics_ready', updatedAt: new Date() })
           .where(eq(orders.id, id));
       }
-      await tx.delete(audioGenerations).where(eq(audioGenerations.orderId, id));
-      await tx
-        .insert(generationJobs)
-        .values({
-          type: 'generate_audio',
-          orderId: id,
-          payload: {},
-          idempotencyKey: `audio:${id}:rebuild:${Date.now()}`,
-          maxAttempts: 6,
-        })
-        .onConflictDoNothing();
+      await tx.insert(adminNotes).values({
+        orderId: id,
+        adminUserId: session.userId,
+        message: context.paid
+          ? 'Letra corrigida pela administração para a próxima produção.'
+          : 'Letra recuperada pela administração e disponível para aprovação do cliente.',
+      });
+      return version;
     });
-    return { queued: true };
+  });
+  app.post('/api/v1/admin/orders/:id/audio/rebuild', async (request) => {
+    const session = await requireAdmin(request);
+    return enqueueAudioReplacement((request.params as { id: string }).id, session.userId);
   });
   return app;
 };

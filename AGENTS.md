@@ -1,5 +1,7 @@
 # Instruções para agentes
 
+Comece por `docs/project-context.md` e reconcilie `.specs/STATE.md` com Git, CI e Railway ao vivo antes de agir.
+
 ## Arquitetura e convenções
 
 - Monólito modular: web, API e worker compartilham PostgreSQL, domínio e contratos.

@@ -5,7 +5,8 @@ const key = 'resenha:v1:story-draft';
 
 export function readDraft(): Draft {
   try {
-    return JSON.parse(localStorage.getItem(key) ?? '{}') as Draft;
+    const value: unknown = JSON.parse(localStorage.getItem(key) ?? '{}');
+    return value && typeof value === 'object' && !Array.isArray(value) ? (value as Draft) : {};
   } catch {
     return {};
   }
@@ -20,9 +21,14 @@ export function clearDraft() {
 }
 
 /** Local recovery is intentional until an opaque story-session token is available from the API. */
-export function useDraft(values: Draft) {
+export function useDraft(values: Draft, enabled = true) {
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   useEffect(() => {
+    if (!enabled) {
+      clearDraft();
+      setStatus('idle');
+      return;
+    }
     setStatus('saving');
     const timer = window.setTimeout(() => {
       try {
@@ -33,6 +39,6 @@ export function useDraft(values: Draft) {
       }
     }, 500);
     return () => window.clearTimeout(timer);
-  }, [values]);
+  }, [values, enabled]);
   return status;
 }

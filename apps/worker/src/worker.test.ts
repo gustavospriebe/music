@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  createGoogleMusicProvider,
   generateCoverOnce,
+  generateGoogleMusicOnce,
   generateMusicOnce,
   jobLogContext,
   readWorkerConfig,
@@ -9,6 +11,7 @@ import {
 
 const fullEnv = {
   DATABASE_URL: 'postgresql://local/test',
+  EMAIL_FROM: 'test@example.test',
   CUSTOMER_ACCESS_TOKEN_PEPPER: 'a-local-token-pepper-with-more-than-32-chars',
   OPENROUTER_API_KEY: 'openrouter-key',
   OPENROUTER_MUSIC_MODEL: 'google/lyria-3-pro-preview',
@@ -16,20 +19,37 @@ const fullEnv = {
 
 describe('worker config', () => {
   it('uses safe defaults and validates numeric settings', () => {
-    expect(readWorkerConfig(fullEnv).concurrency).toBe(1);
-    expect(readWorkerConfig(fullEnv).reviewMode).toBe('manual');
-    expect(readWorkerConfig(fullEnv).resendApiKey).toBeUndefined();
+    expect(readWorkerConfig(fullEnv)).toMatchObject({
+      concurrency: 1,
+      reviewMode: 'manual',
+      musicProvider: 'openrouter',
+      musicModel: 'google/lyria-3-pro-preview',
+    });
+    expect(readWorkerConfig(fullEnv).email.kind).toBe('local-log');
     expect(() => readWorkerConfig({ ...fullEnv, WORKER_CONCURRENCY: '0' })).toThrow();
     expect(sanitizeError(new Error('first\nsecond'))).toBe('first second');
   });
 
-  it('requires the OpenRouter credentials to start', () => {
+  it('allows unconfigured local AI but requires credentials at production startup', () => {
     expect(() => readWorkerConfig({ DATABASE_URL: 'postgresql://local/test' })).toThrow(
       'CUSTOMER_ACCESS_TOKEN_PEPPER is required',
     );
-    expect(() => readWorkerConfig({ ...fullEnv, OPENROUTER_API_KEY: '' })).toThrow(
-      'OPENROUTER_API_KEY is required',
-    );
+    expect(
+      readWorkerConfig({ ...fullEnv, OPENROUTER_API_KEY: '', OPENROUTER_MUSIC_MODEL: '' }),
+    ).toMatchObject({ openRouterApiKey: '', openRouterMusicModel: '' });
+    expect(() =>
+      readWorkerConfig({
+        ...fullEnv,
+        NODE_ENV: 'production',
+        OPENROUTER_API_KEY: '',
+        RESEND_API_KEY: 'key',
+        OPENROUTER_COVER_TEXT_MODEL: 'cover',
+        OPENROUTER_COVER_REFERENCE_MODEL: 'reference',
+        STORAGE_PROVIDER: 's3',
+        STORAGE_S3_BUCKET: 'bucket',
+        STORAGE_S3_REGION: 'region',
+      }),
+    ).toThrow('OPENROUTER_API_KEY is required');
   });
 
   it('requires the Resend key only in production', () => {
@@ -62,7 +82,45 @@ describe('worker config', () => {
       STORAGE_S3_REGION: 'us-east-1',
     });
     expect(config.storage).toMatchObject({ kind: 's3', bucket: 'private-bucket' });
-    expect(config.resendApiKey).toBe('resend-key');
+    expect(config.email).toMatchObject({ kind: 'resend', apiKey: 'resend-key' });
+  });
+
+  it('selects Google Lyria with its default model without requiring OpenRouter locally', () => {
+    const config = readWorkerConfig({
+      ...fullEnv,
+      MUSIC_PROVIDER: 'google',
+      OPENROUTER_API_KEY: '',
+      OPENROUTER_MUSIC_MODEL: '',
+      GOOGLE_API_KEY: 'google-key',
+    });
+    expect(config).toMatchObject({
+      musicProvider: 'google',
+      musicModel: 'lyria-3.5',
+      googleApiKey: 'google-key',
+      googleMusicModel: 'lyria-3.5',
+      openRouterApiKey: '',
+      openRouterMusicModel: '',
+    });
+  });
+
+  it('requires the selected Google credential in production and rejects unknown providers', () => {
+    expect(() =>
+      readWorkerConfig({
+        ...fullEnv,
+        NODE_ENV: 'production',
+        MUSIC_PROVIDER: 'google',
+        GOOGLE_API_KEY: '',
+        RESEND_API_KEY: 'resend-key',
+        OPENROUTER_COVER_TEXT_MODEL: 'cover',
+        OPENROUTER_COVER_REFERENCE_MODEL: 'reference',
+        STORAGE_PROVIDER: 's3',
+        STORAGE_S3_BUCKET: 'bucket',
+        STORAGE_S3_REGION: 'region',
+      }),
+    ).toThrow('GOOGLE_API_KEY is required');
+    expect(() => readWorkerConfig({ ...fullEnv, MUSIC_PROVIDER: 'mureka' })).toThrow(
+      'MUSIC_PROVIDER must be openrouter or google',
+    );
   });
 });
 
@@ -169,6 +227,72 @@ describe('music sing parsing', () => {
     expect((failure as { attempts?: unknown[] }).attempts).toHaveLength(2);
   });
 
+  it.each([400, 401, 402, 403, 404, 422])(
+    'marks HTTP %i as terminal after one call and hides provider metadata',
+    async (status) => {
+      const fetch = vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              error: {
+                message: 'private-provider-detail',
+                metadata: { limit_source: 'openrouter_key_limit' },
+              },
+            }),
+            { status },
+          ),
+      );
+      vi.stubGlobal('fetch', fetch);
+      const provider = (await import('./worker.js')).createOpenRouterMusicProvider(config);
+      const failure = await provider.generate('prompt').then(
+        () => null,
+        (error: unknown) => error,
+      );
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(failure).toMatchObject({ terminal: true });
+      expect((failure as { attempts: unknown[] }).attempts).toHaveLength(1);
+      expect(sanitizeError(failure)).not.toContain('private-provider-detail');
+      expect(sanitizeError(failure)).not.toContain('openrouter_key_limit');
+      if (status === 402) expect(sanitizeError(failure)).toContain('limite do provedor');
+    },
+  );
+
+  it('does not retry HTTP 402 when its body also contains a content-filter marker', async () => {
+    const fetch = vi.fn(
+      async () => new Response('PROHIBITED_CONTENT private-limit-detail', { status: 402 }),
+    );
+    vi.stubGlobal('fetch', fetch);
+    const provider = (await import('./worker.js')).createOpenRouterMusicProvider(config);
+    const failure = await provider.generate('prompt').then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(failure).toMatchObject({ terminal: true });
+    expect(sanitizeError(failure)).toContain('limite do provedor');
+    expect(sanitizeError(failure)).not.toContain('PROHIBITED_CONTENT');
+  });
+
+  it.each([408, 429, 500, 503])('preserves retry behavior for HTTP %i', async (status) => {
+    vi.useFakeTimers();
+    const fetch = vi.fn(async () => new Response('private-transient-detail', { status }));
+    vi.stubGlobal('fetch', fetch);
+    try {
+      const provider = (await import('./worker.js')).createOpenRouterMusicProvider(config);
+      const result = provider.generate('prompt').then(
+        () => null,
+        (error: unknown) => error,
+      );
+      await vi.runAllTimersAsync();
+      const failure = await result;
+      expect(fetch).toHaveBeenCalledTimes(5);
+      expect(failure).not.toHaveProperty('terminal', true);
+      expect((failure as { attempts: unknown[] }).attempts).toHaveLength(5);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('converts transport failures into error outcomes', async () => {
     vi.stubGlobal(
       'fetch',
@@ -181,6 +305,151 @@ describe('music sing parsing', () => {
     if (outcome.ok) return;
     expect(outcome.error.message).toContain('fetch failed');
     expect(outcome.usage.requestId).toBeNull();
+  });
+});
+
+describe('Google Lyria music adapter', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const config = { apiKey: 'google-secret', model: 'lyria-3.5' };
+  const mp3 = Buffer.from([0x49, 0x44, 0x33, 0x04, 0x00, 0x00]).toString('base64');
+  const wav = Buffer.from([
+    0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x41, 0x56, 0x45,
+  ]).toString('base64');
+
+  it('sends the Interactions contract and parses output_audio as MP3', async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+      Response.json({ id: 'google-interaction-1', output_audio: { data: mp3 } }),
+    );
+    vi.stubGlobal('fetch', fetch);
+    const outcome = await generateGoogleMusicOnce(config, 'common music prompt');
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledWith(
+      'https://generativelanguage.googleapis.com/v1beta/interactions',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'x-goog-api-key': 'google-secret', 'content-type': 'application/json' },
+      }),
+    );
+    const request = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
+    expect(request).toEqual({ model: 'lyria-3.5', input: 'common music prompt', store: false });
+    expect(JSON.stringify(request)).not.toContain('google-secret');
+    expect(outcome).toMatchObject({
+      ok: true,
+      bytes: Buffer.from(mp3, 'base64'),
+      mime: 'audio/mpeg',
+      externalId: 'google-interaction-1',
+      usage: { requestId: 'google-interaction-1', model: 'lyria-3.5', costUsd: '0.08' },
+    });
+  });
+
+  it('parses audio in steps content and detects WAV', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof globalThis.fetch>(async () =>
+        Response.json({
+          id: 'google-interaction-wav',
+          steps: [{ content: [{ type: 'audio', data: wav }] }],
+        }),
+      ),
+    );
+    const outcome = await generateGoogleMusicOnce(config, 'prompt');
+    expect(outcome).toMatchObject({
+      ok: true,
+      bytes: Buffer.from(wav, 'base64'),
+      mime: 'audio/wav',
+      externalId: 'google-interaction-wav',
+    });
+  });
+
+  it.each([408, 429, 500, 503])(
+    'keeps Google HTTP %i retryable without an internal retry',
+    async (status) => {
+      const fetch = vi.fn<typeof globalThis.fetch>(
+        async () => new Response('private-google-detail', { status }),
+      );
+      vi.stubGlobal('fetch', fetch);
+      const failure = await createGoogleMusicProvider(config)
+        .generate('prompt')
+        .then(
+          () => null,
+          (error: unknown) => error,
+        );
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(failure).not.toHaveProperty('terminal', true);
+      expect(
+        (failure as { attempts: Array<{ sample: { costUsd: string | null } }> }).attempts[0]?.sample
+          .costUsd,
+      ).toBeNull();
+      expect(sanitizeError(failure)).not.toContain('private-google-detail');
+    },
+  );
+
+  it.each([400, 401, 403, 404, 422])(
+    'marks Google HTTP %i terminal and sanitizes the result',
+    async (status) => {
+      const fetch = vi.fn<typeof globalThis.fetch>(
+        async () =>
+          new Response(JSON.stringify({ error: { message: 'private-google-payload' } }), {
+            status,
+          }),
+      );
+      vi.stubGlobal('fetch', fetch);
+      const failure = await createGoogleMusicProvider(config)
+        .generate('prompt')
+        .then(
+          () => null,
+          (error: unknown) => error,
+        );
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(failure).toMatchObject({ terminal: true });
+      expect(sanitizeError(failure)).not.toContain('private-google-payload');
+      expect(sanitizeError(failure)).not.toContain('google-secret');
+    },
+  );
+
+  it('treats safety refusal, no audio, and unsupported containers as terminal with unknown cost', async () => {
+    const cases = [
+      { body: { id: 'safety-1', error: { message: 'SAFETY_REFUSAL' } }, error: 'safety' },
+      {
+        body: { id: 'no-audio-1', steps: [{ content: [{ type: 'text', data: 'not audio' }] }] },
+        error: 'no audio',
+      },
+      {
+        body: {
+          id: 'bad-container-1',
+          output_audio: { data: Buffer.from('not audio').toString('base64') },
+        },
+        error: 'unsupported audio',
+      },
+    ];
+    for (const testCase of cases) {
+      const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json(testCase.body));
+      vi.stubGlobal('fetch', fetch);
+      const failure = await createGoogleMusicProvider(config)
+        .generate('prompt')
+        .then(
+          () => null,
+          (error: unknown) => error,
+        );
+      expect(failure).toMatchObject({ terminal: true });
+      expect(sanitizeError(failure)).toContain(testCase.error);
+      expect(
+        (failure as { attempts: Array<{ sample: { costUsd: string | null } }> }).attempts[0]?.sample
+          .costUsd,
+      ).toBeNull();
+    }
+  });
+
+  it('fails before fetch when Google configuration is incomplete', async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    await expect(
+      createGoogleMusicProvider({ apiKey: '', model: 'lyria-3.5' }).generate('prompt'),
+    ).rejects.toMatchObject({
+      terminal: true,
+      message: 'Google music is unavailable: configure API key and model',
+    });
+    expect(fetch).not.toHaveBeenCalled();
   });
 });
 
@@ -252,5 +521,34 @@ describe('cover image parsing', () => {
         { model: 'model', prompt: 'cover' },
       ),
     ).rejects.toMatchObject({ terminal: true });
+  });
+});
+
+describe('unconfigured AI transport', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it('refuses music and cover jobs before any network request', async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    for (const config of [
+      { apiKey: '', model: 'model' },
+      { apiKey: 'key', model: '' },
+    ]) {
+      await expect(
+        generateMusicOnce({ ...config, webUrl: 'http://local' }, 'prompt'),
+      ).rejects.toMatchObject({
+        terminal: true,
+        message: 'OpenRouter music is unavailable: configure API key and model',
+      });
+      await expect(
+        generateCoverOnce(
+          { apiKey: config.apiKey, webUrl: 'http://local' },
+          { model: config.model, prompt: 'prompt' },
+        ),
+      ).rejects.toMatchObject({
+        terminal: true,
+        message: 'OpenRouter cover is unavailable: configure API key and model',
+      });
+    }
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

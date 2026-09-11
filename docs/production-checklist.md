@@ -4,12 +4,12 @@
 
 - [ ] Rotacionar qualquer segredo que tenha sido exposto e inserir segredos somente no gestor de ambiente.
 - [ ] Usar PostgreSQL gerenciado ou isolado, backups testados e retenção definida.
-- [ ] Aplicar migrations em ambiente controlado e testar restauração.
+- [ ] Aplicar migrations pelo pre-deploy único da API, executar o seed inicial de produtos uma vez e testar restauração.
 - [ ] Configurar domínio, HTTPS, CORS restrito, `WEB_URL`, cookies `Secure` e proxy confiável.
 - [ ] Configurar bucket S3 privado, bloqueio público, backup/versionamento quando suportado e provar download apenas pela capability da API. Railway Bucket exige export/backup separado porque não oferece versionamento.
-- [ ] Homologar Mercado Pago sandbox: assinatura, consulta, duplicação e estados não aprovados.
+- [ ] Homologar AbacatePay em devMode: secret do webhook, consulta do billing, duplicação e estados não pagos.
 - [ ] Validar OpenRouter/Resend apenas com autorização, limites de custo e alertas configurados.
-- [ ] Criar admin com `pnpm admin:create <email> <senha-de-12-ou-mais-caracteres>`, sem senha padrão; registrar o acesso em local seguro.
+- [ ] Definir `ADMIN_EMAIL` e `ADMIN_PASSWORD` no gestor de segredos, reiniciar a API e validar o login sem registrar a senha.
 - [ ] Revisar termos, privacidade, consentimento de marketing, prazo comercial e política de ajustes com jurídico/comercial.
 - [ ] Confirmar que textos/demo não alegam depoimentos, números ou áudio reais.
 
@@ -23,6 +23,6 @@
 - [ ] Executar `RESTORE_DRILL_CONFIRM=ERASE_RESTORE_DRILL_DATABASE ./scripts/restore-drill.sh` contra banco isolado e anexar evidência sem PII.
 - [ ] Confirmar limpeza de referências de capa encerradas e órfãs com mais de sete dias.
 
-Alternativas documentadas: (A) web em Vercel/Netlify, API+worker em Railway e PostgreSQL/S3 gerenciados; (B) VPS com Docker Compose, reverse proxy HTTPS, PostgreSQL isolado, volumes e backups. Este repositório não executa deploy.
+A topologia escolhida é um único projeto Railway com `web`, `api`, `worker`, `Postgres` e `Bucket`. A estrutura pode ser provisionada antes da promoção, mas nenhum serviço de aplicação recebe tráfego comercial até este checklist e o runbook externo passarem.
 
 Use [external-activation-runbook.md](external-activation-runbook.md) para comandos, evidências, rollback e aceite. Até preencher todos os aceites, o estado é **EXTERNAL BLOCKED**.

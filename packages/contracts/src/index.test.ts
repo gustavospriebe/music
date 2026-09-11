@@ -4,6 +4,7 @@ import {
   checkoutResponseSchema,
   createOrderResponseSchema,
   createOrderSchema,
+  generateLyricsSchema,
   orderStatusSchema,
   publicOrderSchema,
   publicProductSchema,
@@ -167,5 +168,98 @@ describe('album cover contract', () => {
         cover: { ...response.cover, attempt: 3 },
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('custom song intake', () => {
+  it('accepts a single creative anchor without invented roast fields', () => {
+    const input = {
+      ...common,
+      productType: 'custom_song',
+      brief: 'Uma canção sobre viajar pelo mundo',
+      facts: ['Um trem cruza a serra'],
+      safetyConfirmed: true,
+    };
+    const story = storySchema.parse(input);
+    expect(story).toMatchObject({
+      productType: 'custom_song',
+      brief: input.brief,
+      facts: input.facts,
+    });
+    expect(story).not.toHaveProperty('relationship');
+    expect(storySchema.safeParse({ ...input, brief: 'curto' }).success).toBe(false);
+    expect(storySchema.safeParse({ ...input, brief: 'a'.repeat(3001) }).success).toBe(false);
+    expect(storySchema.parse({ ...input, facts: [] }).facts).toEqual([]);
+    expect(storySchema.safeParse({ ...input, safetyConfirmed: false }).success).toBe(false);
+  });
+});
+
+const freeIdea = {
+  buyerEmail: 'cliente@example.test',
+  subjectName: 'Uma viagem',
+  genre: 'MPB',
+  voice: 'either',
+  mood: 'Calmo',
+  productType: 'custom_song',
+  brief: 'Uma canção sobre encontros pelo caminho',
+  safetyConfirmed: true,
+  termsAccepted: true,
+};
+
+describe('intention and optional occasion are independent', () => {
+  it.each(['amizade', 'amor', 'presente', 'homenagem', 'livre'])(
+    'keeps %s without manufacturing an occasion',
+    (intention) => {
+      const parsed = storySchema.parse({ ...freeIdea, intention });
+      expect(parsed).toMatchObject({ intention, occasion: '', brief: freeIdea.brief });
+    },
+  );
+  it('defaults legacy custom drafts to a free intention and permits a blank occasion', () => {
+    expect(storySchema.parse({ ...freeIdea, occasion: '  ' })).toMatchObject({
+      intention: 'livre',
+      occasion: '',
+    });
+    expect(
+      storySchema.parse({
+        ...freeIdea,
+        intention: 'amizade',
+        occasion: '  Aniversário de 30 anos  ',
+      }),
+    ).toMatchObject({ intention: 'amizade', occasion: 'Aniversário de 30 anos' });
+    expect(storySchema.safeParse({ ...freeIdea, occasion: 'x'.repeat(241) }).success).toBe(false);
+    expect(storySchema.safeParse({ ...freeIdea, intention: 'unsupported' }).success).toBe(false);
+  });
+  it('keeps occasion required for the legacy friend-roast product', () => {
+    const legacy = {
+      ...common,
+      productType: 'friend_roast',
+      relationship: 'Amiga',
+      traits: ['Engraçada'],
+      biggestStory: 'A viagem para a praia',
+      roastLevel: 'light',
+      safetyConfirmed: true,
+    };
+    expect(storySchema.safeParse({ ...legacy, occasion: '' }).success).toBe(false);
+    expect(storySchema.safeParse({ ...legacy, occasion: undefined }).success).toBe(false);
+    expect(storySchema.parse(legacy).occasion).toBe('Aniversário');
+  });
+});
+
+describe('generateLyricsSchema', () => {
+  it('preserves bodyless generation and requires a complete explicit refinement', () => {
+    expect(generateLyricsSchema.parse(undefined)).toEqual({});
+    expect(generateLyricsSchema.parse({})).toEqual({});
+    expect(generateLyricsSchema.parse({ instructions: '  Mais emoção  ', baseVersion: 2 })).toEqual(
+      { instructions: 'Mais emoção', baseVersion: 2 },
+    );
+    for (const invalid of [
+      { instructions: 'ab', baseVersion: 1 },
+      { instructions: 'x'.repeat(1001), baseVersion: 1 },
+      { instructions: 'Mais emoção' },
+      { baseVersion: 1 },
+      { instructions: 'Mais emoção', baseVersion: 1.5 },
+      { unrelated: true },
+    ])
+      expect(generateLyricsSchema.safeParse(invalid).success).toBe(false);
   });
 });

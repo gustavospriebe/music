@@ -50,6 +50,20 @@
       "when": 1788567300000,
       "tag": "0006_album_cover_reference_flag",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788780000000,
+      "tag": "0007_custom_song",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788780000001,
+      "tag": "0008_email_delivery_intent",
+      "breakpoints": true
     }
   ]
 }

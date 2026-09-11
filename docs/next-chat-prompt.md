@@ -1,4 +1,6 @@
-# Handoff — Música da Resenha (sessão de 04/09/2026)
+# Handoff histórico — Música da Resenha (sessão de 04/09/2026)
+
+> Este snapshot não representa o estado atual. Comece por [project-context.md](project-context.md) e `.specs/STATE.md`; confronte ambos com `git status`, `git log` e CI/Railway ao vivo.
 
 > Substitui o handoff de 03/09/2026. Sessão atual: auditoria + segurança da borda + custo de IA + funil analytics, tudo verde.
 

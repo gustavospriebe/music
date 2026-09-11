@@ -18,7 +18,13 @@ export const orderStatuses = [
 
 export type OrderStatus = (typeof orderStatuses)[number];
 type JourneyAction =
-  'continue_story' | 'open_lyrics' | 'review_lyrics' | 'retry_lyrics' | 'checkout' | 'listen';
+  | 'continue_story'
+  | 'open_lyrics'
+  | 'review_lyrics'
+  | 'retry_lyrics'
+  | 'checkout'
+  | 'listen'
+  | 'view_orders';
 type JourneyKind =
   | 'story'
   | 'lyrics'
@@ -81,7 +87,8 @@ export function deriveOrderJourney(
           kind: 'production_failed',
           heading: 'Tivemos um problema na produção',
           message:
-            'A produção não foi concluída. Acompanhe este pedido sem nenhum custo extra; o acompanhamento não inicia outra geração.',
+            'A produção do áudio não foi concluída. Sua história e letra estão salvas, e seu pagamento permanece registrado. A geração foi interrompida e precisa ser revisada antes de uma nova tentativa.',
+          action: 'view_orders',
           complete: false,
         }
       : {
@@ -148,6 +155,26 @@ export function deriveOrderJourney(
       message: 'Este pedido foi encerrado e não seguirá para produção.',
       complete: false,
     };
+  if (status === 'review_required')
+    return {
+      valid: true,
+      status,
+      step: 4,
+      kind: 'production',
+      heading: 'Sua música está em revisão',
+      message: 'As versões de áudio passam pela conferência final antes da entrega.',
+      complete: false,
+    };
+  if (status === 'revision_requested')
+    return {
+      valid: true,
+      status,
+      step: 4,
+      kind: 'production',
+      heading: 'Seu pedido de ajuste está em avaliação',
+      message: 'A equipe recebeu sua solicitação e vai avaliar o próximo passo.',
+      complete: false,
+    };
   return {
     valid: true,
     status,
@@ -158,6 +185,30 @@ export function deriveOrderJourney(
     complete: false,
   };
 }
+
+export const isLyricsWorkspaceStatus = (status: unknown, hasApprovedLyrics: boolean): boolean => {
+  if (!isOrderStatus(status)) return false;
+  if (status === 'story_completed' || status === 'lyrics_generating' || status === 'lyrics_ready')
+    return true;
+  return status === 'failed' && !hasApprovedLyrics;
+};
+
+export const isCheckoutStatus = (status: unknown): boolean =>
+  status === 'lyrics_approved' || status === 'payment_pending';
+
+export const resumeCustomerPath = (
+  status: unknown,
+  publicId: string,
+  context: { hasApprovedLyrics: boolean },
+): string => {
+  if (!publicId) return '/criar';
+  const pedido = encodeURIComponent(publicId);
+  if (isLyricsWorkspaceStatus(status, context.hasApprovedLyrics))
+    return `/criar/letra?pedido=${pedido}`;
+  if (isCheckoutStatus(status)) return `/criar/checkout?pedido=${pedido}`;
+  if (isOrderStatus(status) && status === 'draft') return '/criar';
+  return `/pedido/${pedido}`;
+};
 
 export const latestLyrics = <T extends { number: number }>(versions: T[]): T | undefined =>
   versions.reduce<T | undefined>(

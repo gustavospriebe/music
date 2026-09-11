@@ -8,9 +8,9 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
-    "test": "vitest run --passWithNoTests",
-    "test:unit": "vitest run --passWithNoTests",
-    "test:integration": "vitest run --passWithNoTests"
+    "test": "vitest run --fileParallelism=false --passWithNoTests",
+    "test:unit": "vitest run --fileParallelism=false --passWithNoTests",
+    "test:integration": "vitest run --fileParallelism=false --passWithNoTests"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",

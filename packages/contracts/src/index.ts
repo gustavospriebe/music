@@ -4,7 +4,12 @@ const conciseText = (minimum: number, maximum: number) =>
   z.string().trim().min(minimum).max(maximum);
 const optionalText = (maximum: number) => conciseText(1, maximum).optional();
 
-export const productTypeSchema = z.enum(['friend_roast', 'team_anthem', 'emotional_tribute']);
+export const productTypeSchema = z.enum([
+  'friend_roast',
+  'team_anthem',
+  'emotional_tribute',
+  'custom_song',
+]);
 export type ProductType = z.infer<typeof productTypeSchema>;
 
 export const orderStatusSchema = z.enum([
@@ -82,10 +87,22 @@ export const emotionalTributeStorySchema = commonStorySchema.extend({
   desiredFeeling: conciseText(2, 120),
 });
 
+export const customSongStorySchema = commonStorySchema.extend({
+  productType: z.literal('custom_song'),
+  intention: z.enum(['amizade', 'amor', 'presente', 'homenagem', 'livre']).default('livre'),
+  occasion: z.string().trim().max(240).default(''),
+  brief: conciseText(10, 3_000),
+  facts: z.array(conciseText(2, 500)).max(5).default([]),
+  safetyConfirmed: z.literal(true),
+});
+
+export const revisionRequestSchema = z.object({ message: conciseText(1, 1_000) }).strict();
+
 export const storySchema = z.discriminatedUnion('productType', [
   friendRoastStorySchema,
   teamAnthemStorySchema,
   emotionalTributeStorySchema,
+  customSongStorySchema,
 ]);
 export type Story = z.infer<typeof storySchema>;
 
@@ -154,6 +171,15 @@ export const beaconEventSchema = z.object({
   productType: productTypeSchema.optional(),
 });
 export const updateStorySchema = storySchema;
+export const lyricsRefinementSchema = z
+  .object({
+    instructions: conciseText(3, 1_000),
+    baseVersion: z.number().int().positive(),
+  })
+  .strict();
+export const generateLyricsSchema = z
+  .union([z.object({}).strict(), lyricsRefinementSchema])
+  .default({});
 export const editLyricsSchema = generatedLyricsSchema;
 export const approveLyricsSchema = z.object({ content: generatedLyricsSchema.optional() }).strict();
 export const checkoutSchema = z.object({
@@ -183,6 +209,7 @@ export const paginationSchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
 });
 export const adminOrdersQuerySchema = z.object({
+  attention: z.literal('failures').optional(),
   status: orderStatusSchema.optional(),
   productType: productTypeSchema.optional(),
   page: z.coerce.number().int().min(1).default(1),

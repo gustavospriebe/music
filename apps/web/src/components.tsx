@@ -1,9 +1,6 @@
 import {
   ArrowRight,
   Check,
-  CheckCircle2,
-  Circle,
-  CircleDot,
   CircleHelp,
   Menu,
   Music2,
@@ -18,25 +15,54 @@ import { products } from './types';
 
 export function Header({ hidePrimaryAction = false }: { hidePrimaryAction?: boolean }) {
   const [open, setOpen] = useState(false);
+  const headerRef = useRef<HTMLElement>(null);
   const menuButton = useRef<HTMLButtonElement>(null);
   const closeMenu = () => setOpen(false);
   useEffect(() => {
     if (!open) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      setOpen(false);
-      menuButton.current?.focus();
+    const background = [...document.querySelectorAll('main, footer')];
+    background.forEach((element) => {
+      element.setAttribute('inert', '');
+      element.setAttribute('aria-hidden', 'true');
+    });
+    const focusables = (): HTMLElement[] => [
+      ...(headerRef.current?.querySelectorAll<HTMLElement>('a[href], button:not([disabled])') ??
+        []),
+    ];
+    headerRef.current?.querySelector<HTMLElement>('#primary-navigation a[href]')?.focus();
+    const trapFocus = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+        menuButton.current?.focus();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const items = focusables();
+      if (items.length === 0) return;
+      const first = items[0] as HTMLElement;
+      const last = items[items.length - 1] as HTMLElement;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
-    document.addEventListener('keydown', closeOnEscape);
+    document.addEventListener('keydown', trapFocus);
     return () => {
       document.body.style.overflow = previousOverflow;
-      document.removeEventListener('keydown', closeOnEscape);
+      document.removeEventListener('keydown', trapFocus);
+      background.forEach((element) => {
+        element.removeAttribute('inert');
+        element.removeAttribute('aria-hidden');
+      });
     };
   }, [open]);
   return (
-    <header className="site-header">
+    <header className="site-header" ref={headerRef}>
       <Link className="brand" to="/">
         <Music2 aria-hidden="true" /> música da <strong>resenha</strong>
       </Link>
@@ -51,22 +77,43 @@ export function Header({ hidePrimaryAction = false }: { hidePrimaryAction?: bool
       >
         {open ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
       </button>
-      <nav id="primary-navigation" aria-label="Navegação principal" className={open ? 'open' : ''}>
-        <NavLink to="/" onClick={closeMenu}>
-          Como funciona
-        </NavLink>
-        <NavLink to="/criar" onClick={closeMenu}>
-          Criar
-        </NavLink>
-        <NavLink to="/minhas-musicas" onClick={closeMenu}>
-          Minhas músicas
-        </NavLink>
-        {!hidePrimaryAction && (
-          <Link className="nav-cta" to="/criar" onClick={closeMenu}>
-            Criar minha música <ArrowRight size={16} />
-          </Link>
-        )}
-      </nav>
+      {open ? (
+        <div role="dialog" aria-modal="true" aria-label="Menu" className="menu-dialog">
+          <nav id="primary-navigation" aria-label="Navegação principal" className="open">
+            <NavLink to="/" onClick={closeMenu}>
+              Como funciona
+            </NavLink>
+            <NavLink to="/criar" onClick={closeMenu}>
+              Criar
+            </NavLink>
+            <NavLink to="/minhas-musicas" onClick={closeMenu}>
+              Minhas músicas
+            </NavLink>
+            {!hidePrimaryAction && (
+              <Link className="nav-cta" to="/criar" onClick={closeMenu}>
+                Criar minha música <ArrowRight size={16} />
+              </Link>
+            )}
+          </nav>
+        </div>
+      ) : (
+        <nav id="primary-navigation" aria-label="Navegação principal">
+          <NavLink to="/" onClick={closeMenu}>
+            Como funciona
+          </NavLink>
+          <NavLink to="/criar" onClick={closeMenu}>
+            Criar
+          </NavLink>
+          <NavLink to="/minhas-musicas" onClick={closeMenu}>
+            Minhas músicas
+          </NavLink>
+          {!hidePrimaryAction && (
+            <Link className="nav-cta" to="/criar" onClick={closeMenu}>
+              Criar minha música <ArrowRight size={16} />
+            </Link>
+          )}
+        </nav>
+      )}
     </header>
   );
 }
@@ -123,26 +170,73 @@ export function Loading({ label = 'Preparando...' }: { label?: string }) {
   );
 }
 
-const productionSteps = ['História', 'Letra', 'Pagamento', 'Produção do áudio', 'Entrega'];
-export function ProductionRail({ step, complete }: { step: number; complete: boolean }) {
+const journeyLabels = ['História', 'Letra', 'Pagamento', 'Produção', 'Entrega'] as const;
+export function JourneySteps({
+  step,
+  complete = false,
+}: {
+  step: 1 | 2 | 3 | 4 | 5;
+  complete?: boolean;
+}) {
   return (
-    <ol className="steps production-rail" aria-label="Produção da música">
-      {productionSteps.map((label, index) => {
-        const number = index + 1;
-        const state =
-          complete || number < step ? 'Concluído' : number === step ? 'Etapa atual' : 'Aguardando';
-        const Marker =
-          state === 'Concluído' ? CheckCircle2 : state === 'Etapa atual' ? CircleDot : Circle;
-        return (
-          <li key={label} data-state={state.toLowerCase().replace(' ', '-')}>
-            <Marker className="rail-marker" aria-hidden="true" />
-            <b aria-current={!complete && number === step ? 'step' : undefined}>
-              {number}. {label}
-            </b>
-            <span>{state}</span>
-          </li>
-        );
-      })}
+    <ol className="journey-names" aria-label="Jornada da música">
+      {journeyLabels.map((label, index) => (
+        <li
+          key={label}
+          data-state={
+            complete || index + 1 < step ? 'complete' : index + 1 === step ? 'current' : 'waiting'
+          }
+          aria-label={`${label}: ${complete || index + 1 < step ? 'Concluído' : index + 1 === step ? 'Etapa atual' : 'Aguardando'}`}
+        >
+          <span className="journey-dot" aria-hidden="true">
+            {complete || index + 1 < step ? <Check size={12} /> : null}
+          </span>
+          <span aria-current={index + 1 === step ? 'step' : undefined}>{label}</span>
+        </li>
+      ))}
     </ol>
+  );
+}
+export function CustomerWorkspace({
+  step,
+  complete = false,
+  className,
+  children,
+}: {
+  step: 1 | 2 | 3 | 4 | 5;
+  complete?: boolean;
+  className: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <>
+      <Header hidePrimaryAction />
+      <main className="studio-page customer-workspace">
+        <div className="studio-topline">
+          <Link to="/minhas-musicas" className="studio-back">
+            ← Minhas músicas
+          </Link>
+          <span>
+            <ShieldCheck size={15} aria-hidden="true" /> Seu espaço privado de criação
+          </span>
+        </div>
+        <div className="studio-layout">
+          <aside className="studio-sidebar">
+            <p className="eyebrow">SEU PEQUENO ESTÚDIO</p>
+            <h2>
+              Uma música.
+              <br />
+              <em>Do seu jeito.</em>
+            </h2>
+            <JourneySteps step={step} complete={complete} />
+            <p className="workspace-sidebar-note">
+              Sua história continua aqui. Acompanhe cada parte da criação neste mesmo espaço.
+            </p>
+          </aside>
+          <section className={`studio-panel ${className}`}>{children}</section>
+        </div>
+      </main>
+      <Footer />
+    </>
   );
 }

@@ -1,12 +1,12 @@
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { GeneratedLyrics, OrderStatus, Story } from '@resenha/contracts';
 
 const transitions: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
   draft: ['story_completed', 'cancelled'],
-  story_completed: ['lyrics_generating', 'cancelled'],
+  story_completed: ['lyrics_generating', 'lyrics_ready', 'cancelled'],
   lyrics_generating: ['lyrics_ready', 'failed'],
   lyrics_ready: ['lyrics_generating', 'lyrics_approved', 'cancelled'],
-  lyrics_approved: ['payment_pending', 'cancelled'],
+  lyrics_approved: ['lyrics_ready', 'payment_pending', 'cancelled'],
   payment_pending: ['paid', 'cancelled'],
   paid: ['audio_queued'],
   audio_queued: ['audio_generating'],
@@ -14,7 +14,7 @@ const transitions: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
   review_required: ['delivered', 'failed'],
   delivered: ['revision_requested', 'refunded'],
   revision_requested: ['audio_queued', 'cancelled'],
-  failed: ['lyrics_generating', 'audio_queued', 'cancelled'],
+  failed: ['lyrics_generating', 'lyrics_ready', 'audio_queued', 'cancelled'],
   refunded: [],
   cancelled: [],
 };
@@ -48,6 +48,9 @@ export const calculatePriceCents = (
 
 export const hashToken = (token: string, pepper: string): string =>
   createHash('sha256').update(`${pepper}:${token}`).digest('hex');
+export const stableDeliveryToken = (deliveryId: string, pepper: string): string =>
+  createHmac('sha256', pepper).update(`delivery:v1:${deliveryId}`).digest('base64url');
+
 export const createAccessToken = (): string => randomBytes(32).toString('base64url');
 export const verifyToken = (token: string, expectedHash: string, pepper: string): boolean => {
   const actual = Buffer.from(hashToken(token, pepper), 'hex');
@@ -143,14 +146,20 @@ export const validateLyrics = (lyrics: GeneratedLyrics, story: Story): string[] 
   const errors: string[] = [];
   const fullLyrics = normalize(lyrics.fullLyrics);
   if (!fullLyrics) errors.push('A letra não pode estar vazia.');
-  if (!isRepresented(fullLyrics, story.subjectName))
+  if (story.productType !== 'custom_song' && !isRepresented(fullLyrics, story.subjectName))
     errors.push('O nome principal não aparece na letra.');
   if (!lyrics.sections.some((section) => section.type === 'chorus'))
     errors.push('A letra precisa de refrão.');
   if (lyrics.sections.length < 3) errors.push('A letra precisa ter pelo menos três seções.');
   if (lyrics.fullLyrics.length > 7_000)
     errors.push('A letra ultrapassa o tamanho máximo permitido.');
-  if (story.facts.some((fact) => !isRepresented(fullLyrics, fact)))
+  if (
+    story.facts.some((fact) =>
+      story.productType === 'custom_song'
+        ? !fullLyrics.includes(normalize(fact))
+        : !isRepresented(fullLyrics, fact),
+    )
+  )
     errors.push('A letra não representa todos os fatos obrigatórios.');
   if (story.prohibitedTopics.some((term) => isRepresented(fullLyrics, term)))
     errors.push('A letra contém um assunto proibido.');
@@ -165,12 +174,12 @@ export const makeMusicPrompt = (lyrics: GeneratedLyrics): string => {
     'Crie uma música original em português brasileiro com duração aproximada de dois minutos.',
     `Gênero: ${lyrics.musicalDirection.genre}. Clima: ${lyrics.musicalDirection.mood}. Andamento: ${lyrics.musicalDirection.tempo}.`,
     `Voz: ${lyrics.musicalDirection.voice}. Instrumentação: ${lyrics.musicalDirection.instrumentation.join(', ')}.`,
-    'Música 100% original e alegre; interprete exatamente a letra fornecida, sem alterar palavras.',
+    'Música 100% original; interprete exatamente a letra fornecida, sem alterar palavras.',
     `Letra aprovada:\n${lyrics.fullLyrics}`,
   ].join('\n');
 };
 /** Append-only AI cost ledger: one row per provider call. `rejected` passed the provider but failed local validation (still billed). */
-export const aiUsageKinds = ['lyrics', 'audio'] as const;
+export const aiUsageKinds = ['lyrics', 'audio', 'album_cover'] as const;
 export type AiUsageKind = (typeof aiUsageKinds)[number];
 export const aiUsageStatuses = ['ok', 'blocked', 'error', 'rejected'] as const;
 export type AiUsageStatus = (typeof aiUsageStatuses)[number];

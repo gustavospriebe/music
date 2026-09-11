@@ -4,6 +4,11 @@ const optionalUrl = z.preprocess(
   (value) => (value === '' ? undefined : value),
   z.string().url().optional(),
 );
+const optionalSetting = (max: number) =>
+  z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.string().trim().min(1).max(max).optional(),
+  );
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   API_PORT: z.coerce.number().default(3001),
@@ -15,10 +20,22 @@ const envSchema = z.object({
   ADMIN_PASSWORD: z.string().min(8),
   ADMIN_SESSION_TTL: z.coerce.number().int().positive().default(28800),
   LYRICS_PROVIDER: z.enum(['openrouter']).default('openrouter'),
-  MUSIC_PROVIDER: z.enum(['openrouter']).default('openrouter'),
-  PAYMENT_PROVIDER: z.enum(['mercadopago']).default('mercadopago'),
-  EMAIL_PROVIDER: z.enum(['resend']).default('resend'),
-  AUDIO_REVIEW_MODE: z.enum(['automatic', 'manual']).default('automatic'),
+  MUSIC_PROVIDER: z.enum(['openrouter', 'google']).default('openrouter'),
+  PAYMENT_PROVIDER: z.enum(['abacatepay', 'disabled']).default('abacatepay'),
+  EMAIL_PROVIDER: z.enum(['resend', 'local-log']).default('resend'),
+  AUDIO_REVIEW_MODE: z.enum(['automatic', 'manual']).default('manual'),
+  BRAND_NAME: optionalSetting(120),
+  SUPPORT_EMAIL: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.string().email().optional(),
+  ),
+  COMMERCIAL_READY: z.enum(['true', 'false']).optional(),
+  DELIVERY_ESTIMATE: optionalSetting(500),
+  REVISION_POLICY: optionalSetting(2_000),
+  REFUND_POLICY: optionalSetting(2_000),
+  USAGE_LICENSE: optionalSetting(2_000),
+  TERMS_URL: optionalUrl,
+  PRIVACY_URL: optionalUrl,
   LOCAL_STORAGE_PATH: z.string().default('./var/storage'),
   STORAGE_PROVIDER: z.enum(['local', 's3']).optional(),
   STORAGE_S3_BUCKET: z.string().optional(),
@@ -29,12 +46,16 @@ const envSchema = z.object({
   STORAGE_S3_SECRET_ACCESS_KEY: z.string().optional(),
   OPENROUTER_API_KEY: z.string().optional(),
   OPENROUTER_TEXT_MODEL: z.string().optional(),
+  OPENROUTER_TEXT_MAX_TOKENS: z.coerce.number().int().min(1).max(65536).default(8192),
   OPENROUTER_MUSIC_MODEL: z.string().optional(),
+  GOOGLE_API_KEY: z.string().optional(),
+  GOOGLE_MUSIC_MODEL: z.string().trim().min(1).default('lyria-3.5'),
   OPENROUTER_COVER_TEXT_MODEL: z.string().optional(),
   OPENROUTER_COVER_REFERENCE_MODEL: z.string().optional(),
-  MERCADO_PAGO_ACCESS_TOKEN: z.string().optional(),
-  MERCADO_PAGO_WEBHOOK_SECRET: z.string().optional(),
-  MERCADO_PAGO_WEBHOOK_URL: z.string().optional(),
+  ABACATEPAY_API_KEY: z.string().optional(),
+  ABACATEPAY_PRODUCT_ID: z.string().optional(),
+  ABACATEPAY_WEBHOOK_SECRET: z.string().optional(),
+  ABACATEPAY_WEBHOOK_URL: z.string().optional(),
 });
 export type Env = z.infer<typeof envSchema>;
 export const parseEnv = (source: NodeJS.ProcessEnv = process.env): Env => {
@@ -46,10 +67,20 @@ export const parseEnv = (source: NodeJS.ProcessEnv = process.env): Env => {
     );
   const env = parsed.data;
   if (env.NODE_ENV === 'production') {
-    if (!env.OPENROUTER_API_KEY || !env.OPENROUTER_TEXT_MODEL || !env.OPENROUTER_MUSIC_MODEL)
+    if (env.MUSIC_PROVIDER === 'google' && !env.GOOGLE_API_KEY?.trim())
+      throw new Error('Google production configuration is required');
+    if (
+      env.MUSIC_PROVIDER === 'openrouter' &&
+      (!env.OPENROUTER_API_KEY || !env.OPENROUTER_TEXT_MODEL || !env.OPENROUTER_MUSIC_MODEL)
+    )
       throw new Error('OpenRouter production configuration is required');
-    if (!env.MERCADO_PAGO_ACCESS_TOKEN || !env.MERCADO_PAGO_WEBHOOK_SECRET)
-      throw new Error('Mercado Pago production configuration is required');
+    if (!env.OPENROUTER_API_KEY || !env.OPENROUTER_TEXT_MODEL)
+      throw new Error('OpenRouter production configuration is required');
+    if (
+      env.PAYMENT_PROVIDER === 'abacatepay' &&
+      (!env.ABACATEPAY_API_KEY || !env.ABACATEPAY_PRODUCT_ID || !env.ABACATEPAY_WEBHOOK_SECRET)
+    )
+      throw new Error('AbacatePay production configuration is required');
     if (!env.OPENROUTER_COVER_TEXT_MODEL || !env.OPENROUTER_COVER_REFERENCE_MODEL)
       throw new Error('OpenRouter cover production configuration is required');
   }

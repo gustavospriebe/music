@@ -27,6 +27,58 @@ describe('API client', () => {
     });
   });
 
+  it('sends refinement instructions and saved base version only on explicit refinement', async () => {
+    server.use(
+      http.post(
+        'http://localhost:3001/api/v1/orders/refine-1/lyrics/generate',
+        async ({ request }) => {
+          await expect(request.json()).resolves.toEqual({
+            instructions: 'Refrão mais alegre',
+            baseVersion: 2,
+          });
+          return HttpResponse.json({ number: 3, kind: 'generated' });
+        },
+      ),
+    );
+    await expect(
+      api.generateLyrics('refine-1', { instructions: 'Refrão mais alegre', baseVersion: 2 }),
+    ).resolves.toEqual({ number: 3, kind: 'generated' });
+  });
+
+  it('envia recuperação administrativa por endpoint específico e referência multipart com consentimento', async () => {
+    const called: string[] = [];
+    server.use(
+      http.post(
+        'http://localhost:3001/api/v1/admin/orders/order-1/:operation/*',
+        async ({ request }) => {
+          const path = new URL(request.url).pathname;
+          called.push(path);
+          await expect(request.json()).resolves.toEqual({});
+          return HttpResponse.json({ queued: true });
+        },
+      ),
+    );
+    await api.adminGenerateLyrics('order-1');
+    await api.adminRetryEmail('order-1');
+    await api.adminRegenerateAudio('order-1', 'audio-2');
+    const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json({ queued: true }));
+    vi.stubGlobal('fetch', fetch);
+    await api.retryJob('cover-1', {
+      file: new File(['photo'], 'cover.png', { type: 'image/png' }),
+      consent: true,
+    });
+    const init = fetch.mock.calls[0]?.[1];
+    expect(init?.headers).not.toHaveProperty('content-type');
+    const form = init?.body as FormData;
+    expect(form.get('consent')).toBe('true');
+    expect((form.get('reference') as File).name).toBe('cover.png');
+    expect(called).toEqual([
+      '/api/v1/admin/orders/order-1/lyrics/generate',
+      '/api/v1/admin/orders/order-1/email/retry',
+      '/api/v1/admin/orders/order-1/audio/audio-2/regenerate',
+    ]);
+  });
+
   it('turns the standard API error envelope into a typed error', async () => {
     server.use(
       http.post('http://localhost:3001/api/v1/orders', () =>

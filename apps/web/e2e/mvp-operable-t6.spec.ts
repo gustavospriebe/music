@@ -1,4 +1,16 @@
 import { expect, test } from '@playwright/test';
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/v1/configuration', (route) =>
+    route.fulfill({
+      json: {
+        generation: { lyricsAvailable: true },
+        commercial: { ready: false },
+        payment: { label: 'AbacatePay' },
+        supportEmail: null,
+      },
+    }),
+  );
+});
 
 const lyric = {
   number: 3,
@@ -43,7 +55,7 @@ test('reload acompanha lyrics_generating por polling sem repetir POST', async ({
   await page.goto('/criar/letra?pedido=order-generating-1');
   await expect(page.getByRole('status')).toContainText('Criando sua letra');
   await page.reload();
-  await expect(page.getByRole('textbox', { name: /letra da música/i })).toBeVisible({
+  await expect(page.getByRole('button', { name: 'Editar letra' })).toBeVisible({
     timeout: 8_000,
   });
   expect(generates).toBe(0);
@@ -77,29 +89,35 @@ test('falha de letra oferece retry e erro de edição mantém o texto visível',
   });
   await page.goto('/criar/letra?pedido=order-lyrics-failed');
   await page.getByRole('button', { name: 'Tentar gerar novamente' }).click();
+  await page.getByRole('button', { name: 'Editar letra' }).click();
   const editor = page.getByRole('textbox', { name: /letra da música/i });
   await expect(editor).toBeVisible();
   await editor.fill('Texto que não pode sumir');
-  await page.getByRole('button', { name: /salvar nova versão/i }).click();
+  await page.getByRole('button', { name: /salvar alterações/i }).click();
   await expect(page.getByRole('alert')).toContainText('Não foi possível salvar');
   await expect(editor).toHaveValue('Texto que não pode sumir');
 });
 
 test('salvar letra confirma a nova versão no status acessível', async ({ page }) => {
+  let savedLyric = lyric;
   await page.route('**/api/v1/orders/order-lyrics-saved**', (route) => {
     const request = route.request();
-    if (request.method() === 'PATCH') return route.fulfill({ json: { number: 4, kind: 'edited' } });
+    if (request.method() === 'PATCH') {
+      savedLyric = { ...lyric, number: 4, kind: 'edited', content: request.postDataJSON() };
+      return route.fulfill({ json: { number: 4, kind: 'edited' } });
+    }
     return route.fulfill({
       json: {
         order: { publicId: 'order-lyrics-saved', status: 'lyrics_ready', priceCents: 4990 },
-        lyrics: [lyric],
+        lyrics: [lyric, savedLyric],
         audio: [],
       },
     });
   });
   await page.goto('/criar/letra?pedido=order-lyrics-saved');
+  await page.getByRole('button', { name: 'Editar letra' }).click();
   await page.getByRole('textbox', { name: /letra da música/i }).fill('Versão quatro');
-  await page.getByRole('button', { name: /salvar nova versão/i }).click();
+  await page.getByRole('button', { name: /salvar alterações/i }).click();
   await expect(page.getByRole('status')).toHaveText('Nova versão salva.');
 });
 
@@ -165,7 +183,7 @@ test('status inconsistente não oferece mutação e falha paga não promete rege
   approved = true;
   await page.reload();
   await expect(page.getByRole('heading', { name: /problema na produção/i })).toBeVisible();
-  await expect(page.getByRole('main')).toContainText(/acompanhe este pedido/i);
+  await expect(page.getByRole('main')).toContainText(/pagamento permanece registrado/i);
   await expect(page.getByRole('main')).not.toContainText(/automatic|sem custo|vamos regerar/i);
 });
 
@@ -190,8 +208,13 @@ test('entrega parcial é inconsistente; duas variantes concluem as cinco etapas'
   ];
   await page.reload();
   await expect(
-    page.getByRole('list', { name: /produção da música/i }).getByText('Concluído'),
+    page
+      .getByRole('list', { name: 'Jornada da música' })
+      .getByRole('listitem', { name: /Concluído/ }),
   ).toHaveCount(5);
+  await expect(page.getByRole('list', { name: 'Jornada da música' })).toHaveCount(1);
+  await expect(page.getByRole('list', { name: 'Produção da música' })).toHaveCount(0);
+  await expect(page.getByText('Entrega', { exact: true })).toHaveAttribute('aria-current', 'step');
   await page.getByRole('link', { name: /ouvir versões/i }).click();
   await expect(page.getByRole('main').locator('audio')).toHaveCount(2);
   const downloads = page.getByRole('main').getByRole('link', { name: /baixar versão/i });
@@ -245,18 +268,22 @@ test('salvar e aprovar nomeiam a espera, bloqueiam ambas as ações e preservam 
     });
   });
   await page.goto('/criar/letra?pedido=order-editor-1');
+  await page.getByRole('button', { name: 'Editar letra' }).click();
   const editor = page.getByRole('textbox', { name: /letra da música/i });
   await editor.fill('Texto em edição permanece aqui');
 
-  await page.getByRole('button', { name: /salvar nova versão/i }).click();
+  await page.getByRole('button', { name: /salvar alterações/i }).click();
   await expect(page.getByRole('button', { name: 'Salvando versão' })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Salvamento em andamento' })).toBeDisabled();
   await expect(page.getByRole('alert')).toContainText('Falha ao salvar a versão');
   await expect(editor).toHaveValue('Texto em edição permanece aqui');
 
+  await expect(page.getByRole('button', { name: /aprovar letra/i })).toBeDisabled();
+  await page.getByRole('button', { name: 'Descartar alterações' }).click();
+  await page.getByRole('button', { name: 'Editar letra' }).click();
   await page.getByRole('button', { name: /aprovar letra/i }).click();
   await expect(page.getByRole('button', { name: 'Aprovação em andamento' })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Aprovando letra' })).toBeDisabled();
   await expect(page.getByRole('alert')).toContainText('Falha ao aprovar a letra');
-  await expect(editor).toHaveValue('Texto em edição permanece aqui');
+  await expect(editor).toHaveValue(lyric.content.fullLyrics);
 });

@@ -1,4 +1,16 @@
 import { expect, test } from '@playwright/test';
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/v1/configuration', (route) =>
+    route.fulfill({
+      json: {
+        generation: { lyricsAvailable: true },
+        commercial: { ready: false },
+        payment: { label: 'AbacatePay' },
+        supportEmail: null,
+      },
+    }),
+  );
+});
 
 const completedLyrics = [
   {

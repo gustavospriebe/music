@@ -9,6 +9,7 @@ import {
   makeMusicPrompt,
   retryDelayMs,
   sanitizeAiError,
+  stableDeliveryToken,
   validateLyrics,
   verifyToken,
 } from './index.js';
@@ -99,4 +100,67 @@ describe('lyrics and generation rules', () => {
     expect(sanitizeAiError('x'.repeat(600)).length).toBeLessThanOrEqual(500);
     expect(sanitizeAiError(null)).toBe('unknown provider error');
   });
+});
+
+it('keeps delivery tokens stable for one delivery and isolated across delivery ids and peppers', () => {
+  const token = stableDeliveryToken('delivery-a', 'pepper');
+  expect(token).toBe(stableDeliveryToken('delivery-a', 'pepper'));
+  expect(token).not.toBe(stableDeliveryToken('delivery-b', 'pepper'));
+  expect(token).not.toBe(stableDeliveryToken('delivery-a', 'other-pepper'));
+  expect(token.length).toBeGreaterThanOrEqual(43);
+});
+
+it('lets a custom song interpret the brief without copying it into lyrics', () => {
+  const creative: Story = {
+    productType: 'custom_song',
+    intention: 'livre',
+    buyerEmail: 'author@example.test',
+    subjectName: 'Uma viagem que transforma a vida',
+    occasion: 'Uma ideia',
+    genre: 'MPB',
+    mood: 'Calmo',
+    voice: 'either',
+    facts: [],
+    catchphrases: [],
+    prohibitedTopics: [],
+    termsAccepted: true,
+    marketingAccepted: false,
+    safetyConfirmed: true,
+    brief: 'Uma reflexão sobre a vida na estrada e as diferentes estações do ano. '.repeat(8),
+  };
+  expect(validateLyrics(lyrics, creative)).toEqual([]);
+  expect(makeMusicPrompt(lyrics)).not.toContain('original e alegre');
+});
+
+it('requires even a two-character explicit custom fact while keeping brief interpretation free', () => {
+  const creative: Story = {
+    productType: 'custom_song',
+    intention: 'livre',
+    buyerEmail: 'author@example.test',
+    subjectName: 'Livre',
+    occasion: 'Uma ideia',
+    genre: 'MPB',
+    mood: 'Calmo',
+    voice: 'either',
+    facts: ['Oi'],
+    catchphrases: [],
+    prohibitedTopics: [],
+    termsAccepted: true,
+    marketingAccepted: false,
+    safetyConfirmed: true,
+    brief: 'Uma canção para começar o dia',
+  };
+  expect(validateLyrics(lyrics, creative)).toContain(
+    'A letra não representa todos os fatos obrigatórios.',
+  );
+  expect(validateLyrics({ ...lyrics, fullLyrics: `${lyrics.fullLyrics}\nOi` }, creative)).toEqual(
+    [],
+  );
+});
+
+it('allows administrative restoration to customer lyrics review without bypassing checkout', () => {
+  for (const status of ['story_completed', 'lyrics_approved', 'failed'] as const)
+    expect(() => assertTransition(status, 'lyrics_ready')).not.toThrow();
+  expect(() => assertTransition('payment_pending', 'lyrics_ready')).toThrow();
+  expect(() => assertTransition('lyrics_ready', 'audio_queued')).toThrow();
 });

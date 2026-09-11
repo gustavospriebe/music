@@ -1,4 +1,18 @@
+import { publicConfiguration } from './public-configuration';
 import { expect, test } from '@playwright/test';
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/v1/configuration', (route) =>
+    route.fulfill({
+      json: {
+        generation: { lyricsAvailable: true },
+        commercial: { ready: false },
+        payment: { label: 'AbacatePay' },
+        supportEmail: null,
+      },
+    }),
+  );
+});
+import { finishStoryPreparation } from './studio-helpers';
 
 const rgb = (value: string): [number, number, number] => {
   const channels = value
@@ -30,6 +44,7 @@ test('menu móvel informa estado, trava o scroll e devolve foco no Escape', asyn
   const close = page.getByRole('button', { name: 'Fechar menu' });
   await expect(close).toHaveAttribute('aria-expanded', 'true');
   await expect(page.getByRole('navigation', { name: 'Navegação principal' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Menu' })).toHaveAttribute('aria-modal', 'true');
   await expect
     .poll(() => page.evaluate(() => getComputedStyle(document.body).overflow))
     .toBe('hidden');
@@ -39,6 +54,31 @@ test('menu móvel informa estado, trava o scroll e devolve foco no Escape', asyn
   await expect
     .poll(() => page.evaluate(() => getComputedStyle(document.body).overflow))
     .toBe('visible');
+});
+
+test('menu móvel contém o foco e não alcança conteúdo coberto', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Abrir menu' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Menu' });
+  await expect(dialog).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => document.querySelector('main')?.hasAttribute('inert')))
+    .toBe(true);
+  const cta = page
+    .getByRole('main')
+    .getByRole('link', { name: /criar minha música/i })
+    .first();
+  await expect(cta).toBeHidden();
+  await page.keyboard.press('Tab');
+  const focused = page.locator(':focus');
+  await expect(focused).toBeVisible();
+  await expect(dialog.locator(':focus')).toHaveCount(1);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Abrir menu' })).toBeFocused();
+  await expect
+    .poll(() => page.evaluate(() => document.querySelector('main')?.hasAttribute('inert')))
+    .toBe(false);
 });
 
 test('troca de rota rola ao topo e foca o main sem incluí-lo na ordem de Tab', async ({ page }) => {
@@ -95,6 +135,12 @@ test('todas as rotas públicas mantêm um h1 com line-height e tracking legívei
           { variant: 1, status: 'completed' },
           { variant: 2, status: 'completed' },
         ],
+        payment: {
+          label: 'AbacatePay',
+          checkoutAllowed: true,
+          configured: false,
+          devFallback: true,
+        },
       },
     }),
   );
@@ -148,21 +194,35 @@ test('todas as rotas públicas mantêm um h1 com line-height e tracking legívei
 
 test('viewport 390 mantém conteúdo e ações dentro da tela com alvos de 44 px', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
+  const viewports = ['/', '/criar', '/criar/checkout?pedido=order-a11y', '/minhas-musicas'];
+  for (const viewport of viewports) {
+    await page.goto(viewport);
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => ({
+            clientWidth: document.documentElement.clientWidth,
+            scrollWidth: document.documentElement.scrollWidth,
+          })),
+        viewport,
+      )
+      .toEqual({ clientWidth: 390, scrollWidth: 390 });
+  }
   await page.goto('/');
-  await expect
-    .poll(() =>
-      page.evaluate(() => ({
-        clientWidth: document.documentElement.clientWidth,
-        scrollWidth: document.documentElement.scrollWidth,
-      })),
-    )
-    .toEqual({ clientWidth: 390, scrollWidth: 390 });
   const primary = page.getByRole('main').getByRole('link', { name: /criar minha música/i });
   const box = await primary.boundingBox();
   expect(box?.height).toBeGreaterThanOrEqual(44);
   expect(box?.width).toBeGreaterThanOrEqual(44);
   const heading = page.getByRole('heading', { level: 1 });
   await expect(heading).toBeVisible();
+  const smallTargets = page.getByRole('main').getByRole('link', { name: /criar minha música/i });
+  for (let index = 0; index < (await smallTargets.count()); index += 1) {
+    const target = smallTargets.nth(index);
+    if (!(await target.isVisible())) continue;
+    const size = await target.boundingBox();
+    expect(size?.height, `link ${index}`).toBeGreaterThanOrEqual(44);
+    expect(size?.width, `link ${index}`).toBeGreaterThanOrEqual(44);
+  }
   expect(
     await heading.evaluate((node) => Number.parseFloat(getComputedStyle(node).lineHeight)),
   ).toBeGreaterThanOrEqual(
@@ -182,9 +242,9 @@ test('reduced motion remove a animação decorativa da etapa atual', async ({ pa
     }),
   );
   await page.goto('/pedido/order-motion-1');
-  const current = page.locator('.production-rail [data-state="etapa-atual"]');
+  const current = page.locator('.journey-names [data-state="current"]');
   await expect(current).toBeVisible();
-  const marker = current.locator('.rail-marker');
+  const marker = current.locator('.journey-dot');
   await expect
     .poll(() => marker.evaluate((node) => getComputedStyle(node).animationName))
     .not.toBe('none');
@@ -249,93 +309,100 @@ test('captura os estados finais nos viewports da auditoria', async ({ page }) =>
           order: { publicId, status: order.status, priceCents: 4990 },
           lyrics: order.lyrics,
           audio: order.audio,
+          payment: {
+            label: 'AbacatePay',
+            checkoutAllowed: true,
+            configured: false,
+            devFallback: true,
+          },
         },
       });
+    if (new URL(route.request().url()).pathname.endsWith('/configuration'))
+      return route.fulfill({ json: publicConfiguration });
     return route.fulfill({ status: 404, json: { error: { message: 'Rota visual ausente' } } });
   });
 
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: /sua história merece/i })).toBeVisible();
-  await page.screenshot({ path: '../../docs/audits/mvp-operavel/after/01-entrada-desktop.png' });
+  await expect(page.getByRole('heading', { name: /tem coisa que/i })).toBeVisible();
+  await page.screenshot({ path: 'test-results/visual-evidence/01-entrada-desktop.png' });
 
   await page.goto('/criar');
-  await expect(page.getByRole('heading', { name: /conte a resenha/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /toda música começa/i })).toBeVisible();
   await page.screenshot({
-    path: '../../docs/audits/mvp-operavel/after/02-formulario-vazio-desktop.png',
+    path: 'test-results/visual-evidence/02-formulario-vazio-desktop.png',
   });
 
-  await page.getByRole('button', { name: /gerar minha letra/i }).click();
-  await expect(page.getByLabel(/qual é a ocasião/i)).toHaveAttribute('aria-invalid', 'true');
-  await page.screenshot({ path: '../../docs/audits/mvp-operavel/after/03-validacao-desktop.png' });
+  await page.getByRole('button', { name: /^continuar$/i }).click();
+  await expect(page.getByLabel(/quem ou o que inspira/i)).toHaveAttribute('aria-invalid', 'true');
+  await page.screenshot({ path: 'test-results/visual-evidence/03-validacao-desktop.png' });
 
-  await page.getByLabel(/para quem é a música/i).fill('Bia');
+  await page.getByLabel(/quem ou o que inspira/i).fill('Bia');
   await page.getByLabel(/qual é a ocasião/i).fill('Aniversário');
-  await page.getByLabel(/^seu nome$/i).fill('Nina');
-  await page.getByLabel(/^seu e-mail$/i).fill('nina@example.test');
-  await page
-    .getByLabel(/histórias, apelidos/i)
-    .fill('Sempre chega cantando\nTodo churrasco vira show');
-  await page.getByLabel(/aceito os termos/i).check();
+  await finishStoryPreparation(page);
   await expect(page.getByRole('status')).toContainText('Rascunho salvo');
   await page.screenshot({
-    path: '../../docs/audits/mvp-operavel/after/04-formulario-preenchido-desktop.png',
+    path: 'test-results/visual-evidence/04-formulario-preenchido-desktop.png',
   });
 
   await page.goto('/criar/letra?pedido=order-story-visual');
   await expect(page.getByRole('button', { name: /criar letra agora/i })).toBeVisible();
   await page.screenshot({
-    path: '../../docs/audits/mvp-operavel/after/05-geracao-pronta-para-iniciar-desktop.png',
+    path: 'test-results/visual-evidence/05-geracao-pronta-para-iniciar-desktop.png',
   });
 
   await page.goto('/criar/letra?pedido=order-generating-visual');
   await expect(page.getByRole('status')).toContainText('Criando sua letra');
   await page.screenshot({
-    path: '../../docs/audits/mvp-operavel/after/06-geracao-loading-desktop.png',
+    path: 'test-results/visual-evidence/06-geracao-loading-desktop.png',
   });
 
   await page.goto('/criar/letra?pedido=order-ready-visual');
+  await page.getByRole('button', { name: 'Editar letra' }).click();
   await expect(page.getByRole('textbox', { name: /letra da música/i })).toBeVisible();
-  await expect(page.getByRole('button', { name: /salvar nova versão/i })).toBeInViewport();
+  await page.getByRole('button', { name: /salvar alterações/i }).scrollIntoViewIfNeeded();
+  await expect(page.getByRole('button', { name: /salvar alterações/i })).toBeInViewport();
   await expect(page.getByRole('button', { name: /aprovar letra/i })).toBeInViewport();
   await page.screenshot({
-    path: '../../docs/audits/mvp-operavel/after/07-revisao-letra-desktop.png',
+    path: 'test-results/visual-evidence/07-revisao-letra-desktop.png',
   });
 
   await page.goto('/criar/checkout?pedido=order-approved-visual');
-  await expect(page.getByRole('button', { name: /pagar com mercado pago/i })).toBeVisible();
-  await page.screenshot({ path: '../../docs/audits/mvp-operavel/after/08-checkout-desktop.png' });
+  await expect(
+    page.getByRole('button', { name: /confirmar pagamento \(ambiente local\)/i }),
+  ).toBeVisible();
+  await page.screenshot({ path: 'test-results/visual-evidence/08-checkout-desktop.png' });
 
   await page.goto('/pedido/order-production-visual');
   await expect(page.getByRole('heading', { name: /sendo produzida/i })).toBeVisible();
   await page.screenshot({
-    path: '../../docs/audits/mvp-operavel/after/09-processamento-desktop.png',
+    path: 'test-results/visual-evidence/09-processamento-desktop.png',
   });
 
   await page.goto('/pedido/order-delivered-visual');
   await expect(page.getByRole('heading', { name: /música está pronta/i })).toBeVisible();
-  await page.screenshot({ path: '../../docs/audits/mvp-operavel/after/10-sucesso-desktop.png' });
+  await page.screenshot({ path: 'test-results/visual-evidence/10-sucesso-desktop.png' });
 
   await page.goto('/pedido/order-failed-visual');
   await expect(page.getByRole('heading', { name: /problema na produção/i })).toBeVisible();
-  await page.screenshot({ path: '../../docs/audits/mvp-operavel/after/11-erro-desktop.png' });
+  await page.screenshot({ path: 'test-results/visual-evidence/11-erro-desktop.png' });
 
   await page.evaluate(() => window.localStorage.removeItem('resenha:my-orders'));
   await page.goto('/minhas-musicas');
   await expect(page.getByRole('heading', { name: /ainda não criou/i })).toBeVisible();
-  await page.screenshot({ path: '../../docs/audits/mvp-operavel/after/12-vazio-desktop.png' });
+  await page.screenshot({ path: 'test-results/visual-evidence/12-vazio-desktop.png' });
 
   await page.evaluate(() => window.localStorage.removeItem('resenha:story-draft'));
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: /sua história merece/i })).toBeVisible();
-  await page.screenshot({ path: '../../docs/audits/mvp-operavel/after/13-entrada-mobile.png' });
+  await expect(page.getByRole('heading', { name: /tem coisa que/i })).toBeVisible();
+  await page.screenshot({ path: 'test-results/visual-evidence/13-entrada-mobile.png' });
   await page.getByRole('button', { name: 'Abrir menu' }).click();
   await expect(page.getByRole('button', { name: 'Fechar menu' })).toBeVisible();
-  await page.screenshot({ path: '../../docs/audits/mvp-operavel/after/14-menu-mobile.png' });
+  await page.screenshot({ path: 'test-results/visual-evidence/14-menu-mobile.png' });
 
   await page.goto('/criar');
-  await expect(page.getByRole('heading', { name: /conte a resenha/i })).toBeVisible();
-  await page.screenshot({ path: '../../docs/audits/mvp-operavel/after/15-formulario-mobile.png' });
+  await expect(page.getByRole('heading', { name: /toda música começa/i })).toBeVisible();
+  await page.screenshot({ path: 'test-results/visual-evidence/15-formulario-mobile.png' });
 });

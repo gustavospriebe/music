@@ -27,18 +27,19 @@ jobs:
       CUSTOMER_ACCESS_TOKEN_PEPPER: ci-customer-token-pepper-at-least-32
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
-      - run: corepack enable
       - run: pnpm install --frozen-lockfile
       - run: psql "$DATABASE_URL" -c 'create database resenha_test'
       - run: pnpm db:migrate
       - run: DATABASE_URL="$DATABASE_URL_TEST" pnpm db:migrate
+      - run: pnpm format:check
       - run: pnpm lint
       - run: pnpm typecheck
-      - run: pnpm test
+      - run: pnpm exec turbo run test --concurrency=1
       - run: pnpm build
       - run: pnpm --filter @resenha/web exec playwright install --with-deps chromium
       - run: pnpm test:e2e

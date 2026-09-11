@@ -4,5 +4,8 @@ dist
 var
 playwright-report
 test-results
+pnpm-lock.yaml
 packages/**/*.js
 packages/**/*.d.ts
+
+output
