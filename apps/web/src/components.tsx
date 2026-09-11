@@ -208,10 +208,11 @@ export function CustomerWorkspace({
   className: string;
   children: React.ReactNode;
 }) {
+  const isDelivery = className.includes('delivery') || step === 5;
   return (
     <>
       <Header hidePrimaryAction />
-      <main className="studio-page customer-workspace">
+      <main className={`studio-page customer-workspace ${isDelivery ? 'is-delivery-mode' : ''}`}>
         <div className="studio-topline">
           <Link to="/minhas-musicas" className="studio-back">
             ← Minhas músicas

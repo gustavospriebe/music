@@ -7,6 +7,11 @@ import {
   Radio,
   CheckCircle2,
   Clock3,
+  Copy,
+  Disc3,
+  Download,
+  ImageDown,
+  MessageCircle,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
@@ -769,20 +774,26 @@ function OrderStatusContent({
       )}
       <SongBrief story={detail.story} title={approved?.content.title} />
       {action && (
-        <Link className="button primary" to={action.to}>
-          {action.label}
-        </Link>
+        <div className="order-status-cta-row">
+          <Link className="button primary" to={action.to}>
+            {action.label}
+          </Link>
+        </div>
       )}
-      {journey.step >= 4 && detail.privateAccess && <OwnerCoverCard publicId={publicOrderId} />}
-      {approved && (
-        <details className="price-card approved-lyrics-disclosure">
-          <summary>
-            {approved.content.title} ·{' '}
-            {approved.approvedAt ? 'sua letra aprovada' : 'sua letra em revisão'}
-          </summary>
-          <pre className="lyrics-editor">{approved.content.fullLyrics}</pre>
-        </details>
-      )}
+      {(journey.step >= 4 && detail.privateAccess) || approved ? (
+        <div className="order-status-studio-section">
+          {journey.step >= 4 && detail.privateAccess && <OwnerCoverCard publicId={publicOrderId} />}
+          {approved && (
+            <details className="price-card approved-lyrics-disclosure">
+              <summary>
+                {approved.content.title} ·{' '}
+                {approved.approvedAt ? 'sua letra aprovada' : 'sua letra em revisão'}
+              </summary>
+              <pre className="lyrics-editor">{approved.content.fullLyrics}</pre>
+            </details>
+          )}
+        </div>
+      ) : null}
     </CustomerWorkspace>
   );
 }
@@ -794,6 +805,12 @@ export function OrderPlayer() {
     queryFn: () => api.getOrder(publicOrderId),
     refetchInterval: (query) => (query.state.data?.order.status === 'delivered' ? false : 5000),
   });
+  const coverQuery = useQuery({
+    queryKey: ['cover', 'owner', publicOrderId],
+    queryFn: () => api.cover(publicOrderId),
+    enabled: Boolean(publicOrderId && order.data?.privateAccess),
+  });
+
   if (order.isLoading) return <Loading label="Carregando suas músicas…" />;
   if (order.isError || !order.data)
     return (
@@ -816,33 +833,184 @@ export function OrderPlayer() {
         backLabel="Ver status do pedido"
       />
     );
+
+  const approvedLyrics = latestLyrics(
+    order.data.lyrics.filter((lyric) => Boolean(lyric.approvedAt)),
+  );
+  const story = order.data.story as
+    { subjectName?: string; occasion?: string; genre?: string; mood?: string } | undefined;
+  const songTitle = approvedLyrics?.content.title || story?.subjectName || 'Sua Canção';
+  const cover = coverQuery.data?.cover;
+  const hasCover = cover?.status === 'completed';
+  const coverUrl = api.coverDownloadUrl(publicOrderId);
+
+  const shareOnWhatsApp = () => {
+    const url = window.location.href;
+    const text = `Ouça a música personalizada que criamos: "${songTitle}"!\n${url}`;
+    window.open(
+      `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`,
+      '_blank',
+      'noopener,noreferrer',
+    );
+  };
+
+  const copyOrderLink = () => {
+    void navigator.clipboard.writeText(window.location.href);
+    toast.success('Link do pedido copiado!');
+  };
+
+  const copyLyrics = () => {
+    if (approvedLyrics?.content.fullLyrics) {
+      void navigator.clipboard.writeText(approvedLyrics.content.fullLyrics);
+      toast.success('Letra da música copiada!');
+    }
+  };
+
   return (
     <CustomerWorkspace step={5} complete className="delivery">
-      <p className="eyebrow">SUAS VERSÕES</p>
-      <h1>Ouvir e baixar</h1>
-      <SongBrief story={order.data.story} title={latestLyrics(order.data.lyrics)?.content.title} />
-      {ready.map((audio) => (
-        <div className="price-card" key={audio.variant}>
-          <span>Versão {audio.variant}</span>
-          <audio controls preload="none" src={api.downloadUrl(publicOrderId, audio.variant)} />
-          <a
-            className="button secondary"
-            href={api.downloadUrl(publicOrderId, audio.variant)}
-            download
-          >
-            Baixar versão {audio.variant}
-          </a>
+      <section className="delivery-hero-lounge" aria-label="Apresentação da música">
+        <div className="vinyl-showcase">
+          <div className="vinyl-disc" aria-hidden="true">
+            <div className="vinyl-groove-lines" />
+            <div className="vinyl-center-badge">
+              <div className="vinyl-spindle-hole" />
+              <span className="vinyl-badge-text">RESENHA HD</span>
+            </div>
+          </div>
+          <div className="vinyl-sleeve">
+            {hasCover ? (
+              <img src={coverUrl} alt="Capa oficial do álbum" className="vinyl-cover-image" />
+            ) : (
+              <div className="vinyl-placeholder-artwork">
+                <span className="artwork-badge">ÁLBUM EXCLUSIVO</span>
+                <strong className="artwork-title">{songTitle}</strong>
+                <small className="artwork-genre">{story?.genre || 'Música Original'}</small>
+              </div>
+            )}
+          </div>
         </div>
-      ))}
-      {order.data.privateAccess && (
-        <>
-          <OwnerCoverCard publicId={publicOrderId} />
-          <RevisionRequest publicId={publicOrderId} />
-        </>
-      )}
-      <Link className="button secondary" to={`/pedido/${publicOrderId}`}>
-        ← Status do pedido
-      </Link>
+
+        <div className="delivery-hero-content">
+          <div className="delivery-status-indicator">
+            <span className="pulse-dot" aria-hidden="true" />
+            <p className="eyebrow">SUAS VERSÕES MASTERIZADAS</p>
+          </div>
+
+          <h1 className="delivery-main-heading">Ouvir e baixar</h1>
+          <h2 className="delivery-song-title">{songTitle}</h2>
+
+          <div className="delivery-tags-row">
+            {story?.subjectName && (
+              <span className="pill-tag">Homenagem a {story.subjectName}</span>
+            )}
+            {story?.occasion && <span className="pill-tag">{story.occasion}</span>}
+            {(story?.genre || story?.mood) && (
+              <span className="pill-tag">
+                {[story?.genre, story?.mood].filter(Boolean).join(' · ')}
+              </span>
+            )}
+          </div>
+
+          <div className="delivery-quick-actions">
+            <button
+              type="button"
+              className="button secondary hero-share-whatsapp"
+              onClick={shareOnWhatsApp}
+            >
+              <MessageCircle size={16} aria-hidden="true" /> Compartilhar no WhatsApp
+            </button>
+
+            <button
+              type="button"
+              className="button secondary hero-copy-link"
+              onClick={copyOrderLink}
+            >
+              <Copy size={16} aria-hidden="true" /> Copiar link
+            </button>
+
+            {hasCover && (
+              <a className="button secondary hero-download-cover" href={coverUrl} download>
+                <ImageDown size={16} aria-hidden="true" /> Baixar capa HD
+              </a>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <div className="delivery-studio-grid">
+        <div className="delivery-tracks-column">
+          <div className="column-header">
+            <h3>Faixas Masterizadas</h3>
+            <span className="track-count-badge">2 interpretações</span>
+          </div>
+
+          <div className="tracks-stack">
+            {ready.map((audio) => (
+              <article className="price-card track-player-card" key={audio.variant}>
+                <div className="track-player-header">
+                  <div className="track-title-wrap">
+                    <span className="track-version-label">Versão {audio.variant}</span>
+                    <span
+                      className={`track-pill-badge ${audio.variant === 1 ? 'is-primary' : 'is-alternate'}`}
+                    >
+                      {audio.variant === 1 ? 'Arranjo Principal' : 'Arranjo Variação'}
+                    </span>
+                  </div>
+                  <small className="track-characteristic">
+                    {audio.variant === 1
+                      ? 'Voz principal com melodia marcante e refrão envolvente'
+                      : 'Interpretação intimista com arranjo alternativo'}
+                  </small>
+                </div>
+
+                <div className="audio-player-wrapper">
+                  <audio
+                    controls
+                    preload="none"
+                    src={api.downloadUrl(publicOrderId, audio.variant)}
+                  />
+                </div>
+
+                <div className="track-player-actions">
+                  <a
+                    className="button secondary track-download-button"
+                    href={api.downloadUrl(publicOrderId, audio.variant)}
+                    download
+                  >
+                    <Download size={15} aria-hidden="true" /> Baixar versão {audio.variant}
+                  </a>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          {order.data.privateAccess && <RevisionRequest publicId={publicOrderId} />}
+        </div>
+
+        <div className="delivery-sidebar-column">
+          {approvedLyrics?.content.fullLyrics && (
+            <section className="lyrics-display-card" aria-labelledby="lyrics-display-title">
+              <div className="lyrics-display-header">
+                <h3 id="lyrics-display-title">Letra Oficial</h3>
+                <button
+                  type="button"
+                  className="button secondary small-action-btn"
+                  onClick={copyLyrics}
+                >
+                  <Copy size={13} aria-hidden="true" /> Copiar letra
+                </button>
+              </div>
+              <pre className="poetic-lyrics-content">{approvedLyrics.content.fullLyrics}</pre>
+            </section>
+          )}
+        </div>
+      </div>
+
+      <div className="delivery-footer-navigation">
+        <Link className="button secondary" to={`/pedido/${publicOrderId}`}>
+          ← Status do pedido
+        </Link>
+      </div>
     </CustomerWorkspace>
   );
 }
@@ -859,9 +1027,16 @@ function RevisionRequest({ publicId }: { publicId: string }) {
     },
   });
   return (
-    <section className="revision-form">
-      <h2>Algo precisa de ajuste?</h2>
-      <p>Conte o que aconteceu para a equipe avaliar seu pedido conforme as condições da compra.</p>
+    <details className="revision-form">
+      <summary>
+        <div className="revision-summary-left">
+          <span className="revision-summary-title">Algo precisa de ajuste?</span>
+          <span className="revision-summary-desc">
+            Nossa equipe avalia solicitações conforme os termos do serviço.
+          </span>
+        </div>
+        <span className="revision-summary-toggle">Solicitar ajuste</span>
+      </summary>
       {request.isSuccess ? (
         <p className="notice" role="status">
           Solicitação recebida. A equipe vai avaliar seu pedido.
@@ -897,7 +1072,7 @@ function RevisionRequest({ publicId }: { publicId: string }) {
           </button>
         </form>
       )}
-    </section>
+    </details>
   );
 }
 const myOrderStatusLabel = (status: unknown, approved: boolean, completedAudio: number) => {
@@ -928,13 +1103,18 @@ export function MyOrders() {
     return (
       <>
         <Header hidePrimaryAction />
-        <main className="delivery">
-          <p className="eyebrow">MINHAS MÚSICAS</p>
-          <h1>Você ainda não criou nenhuma música aqui</h1>
-          <p>Os pedidos feitos neste navegador aparecem nesta página, sem cadastro.</p>
-          <Link className="button primary" to="/criar">
-            Criar minha música
-          </Link>
+        <main className="delivery library-empty-stage">
+          <div className="library-empty-card">
+            <div className="empty-vinyl-icon" aria-hidden="true">
+              <Disc3 size={48} />
+            </div>
+            <p className="eyebrow">MINHAS MÚSICAS</p>
+            <h1>Você ainda não criou nenhuma música aqui</h1>
+            <p>Os pedidos feitos neste navegador aparecem nesta página, sem cadastro.</p>
+            <Link className="button primary" to="/criar">
+              Criar minha música
+            </Link>
+          </div>
         </main>
         <Footer />
       </>
@@ -942,84 +1122,130 @@ export function MyOrders() {
   return (
     <>
       <Header />
-      <main className="delivery">
-        <p className="eyebrow">MINHAS MÚSICAS</p>
-        <h1>Suas músicas neste navegador</h1>
-        <p>Sem cadastro: em aparelho novo ou navegador limpo, a lista não acompanha.</p>
-        {details.map((query, index) => {
-          const publicId = ids[index];
-          if (query.isLoading) return <Loading key={publicId} label="Carregando pedidos…" />;
-          if (query.isError || !query.data)
+      <main className="delivery library-page-container">
+        <div className="library-page-header">
+          <div>
+            <p className="eyebrow">DISCOGRAFIA PESSOAL</p>
+            <h1>Suas músicas neste navegador</h1>
+            <p className="library-subtitle">
+              Sem cadastro: em aparelho novo ou navegador limpo, a lista não acompanha.
+            </p>
+          </div>
+          <Link className="button primary library-new-music-btn" to="/criar">
+            + Criar nova música
+          </Link>
+        </div>
+
+        <div className="library-discography-grid">
+          {details.map((query, index) => {
+            const publicId = ids[index];
+            if (query.isLoading) return <Loading key={publicId} label="Carregando pedidos…" />;
+            if (query.isError || !query.data)
+              return (
+                <div className="price-card library-card" key={publicId}>
+                  <span>Acesso a uma música indisponível</span>
+                  <p>
+                    Disponível só neste navegador/dispositivo. Abra no aparelho onde criou ou peça
+                    um novo link de acesso.
+                  </p>
+                  <Link className="button secondary" to={`/pedido/${publicId}`}>
+                    Tentar abrir mesmo assim
+                  </Link>
+                </div>
+              );
+            const title = latestLyrics(query.data.lyrics);
+            const approved = query.data.lyrics.some((lyric) => Boolean(lyric.approvedAt));
+            const completedAudio = completedAudioCount(query.data.audio);
+            const story = query.data.story as
+              { subjectName?: string; occasion?: string; genre?: string } | undefined;
+            const journey = deriveOrderJourney(query.data.order.status, {
+              hasApprovedLyrics: approved,
+              completedAudio,
+            });
+            const nextStep = !journey.valid
+              ? 'Verificar pedido'
+              : journey.kind === 'delivered'
+                ? 'Ouvir e baixar'
+                : journey.kind === 'payment'
+                  ? 'Ir para o pagamento'
+                  : journey.kind === 'production_failed'
+                    ? 'Ver status do pedido'
+                    : journey.kind === 'production'
+                      ? 'Acompanhar produção'
+                      : 'Continuar criação';
+            const createdAt = query.data.order.createdAt
+              ? new Date(query.data.order.createdAt).toLocaleDateString('pt-BR')
+              : null;
+            const isDelivered = journey.valid && journey.kind === 'delivered';
+            const destination = isDelivered ? `/pedido/${publicId}/entrega` : `/pedido/${publicId}`;
+
             return (
-              <div className="price-card" key={publicId}>
-                <span>Acesso a uma música indisponível</span>
-                <p>
-                  Disponível só neste navegador/dispositivo. Abra no aparelho onde criou ou peça um
-                  novo link de acesso.
-                </p>
-                <Link className="button secondary" to={`/pedido/${publicId}`}>
-                  Tentar abrir mesmo assim
-                </Link>
-              </div>
+              <article className="price-card library-card library-discography-item" key={publicId}>
+                <div className="library-vinyl-badge" aria-hidden="true">
+                  <div className="library-vinyl-mini-disc" />
+                  <div className="library-vinyl-mini-sleeve">
+                    <Music2 size={24} />
+                  </div>
+                </div>
+
+                <div className="library-card-content">
+                  <div className="library-item-top">
+                    <span
+                      className={`library-status-pill ${
+                        isDelivered ? 'is-delivered' : 'is-processing'
+                      }`}
+                    >
+                      {myOrderStatusLabel(query.data.order.status, approved, completedAudio)}
+                    </span>
+                    {story?.genre && <span className="library-genre-badge">{story.genre}</span>}
+                  </div>
+
+                  <h2>{title?.content.title ?? story?.subjectName ?? 'Sua música'}</h2>
+
+                  <dl className="summary-list library-item-meta">
+                    {story?.occasion && (
+                      <div>
+                        <dt>Ocasião</dt>
+                        <dd>{story.occasion}</dd>
+                      </div>
+                    )}
+                    {createdAt && (
+                      <div>
+                        <dt>Criada em</dt>
+                        <dd>{createdAt}</dd>
+                      </div>
+                    )}
+                    <div>
+                      <dt>Progresso</dt>
+                      <dd>
+                        {myOrderStatusLabel(query.data.order.status, approved, completedAudio)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Próxima ação</dt>
+                      <dd>{nextStep}</dd>
+                    </div>
+                  </dl>
+
+                  <div className="library-item-cta">
+                    <Link
+                      className={`button ${isDelivered ? 'primary' : 'secondary'}`}
+                      to={destination}
+                    >
+                      {nextStep}
+                    </Link>
+                  </div>
+                </div>
+              </article>
             );
-          const title = latestLyrics(query.data.lyrics);
-          const approved = query.data.lyrics.some((lyric) => Boolean(lyric.approvedAt));
-          const completedAudio = completedAudioCount(query.data.audio);
-          const story = query.data.story as { subjectName?: string; occasion?: string } | undefined;
-          const journey = deriveOrderJourney(query.data.order.status, {
-            hasApprovedLyrics: approved,
-            completedAudio,
-          });
-          const nextStep = !journey.valid
-            ? 'Verificar pedido'
-            : journey.kind === 'delivered'
-              ? 'Ouvir e baixar'
-              : journey.kind === 'payment'
-                ? 'Ir para o pagamento'
-                : journey.kind === 'production_failed'
-                  ? 'Ver status do pedido'
-                  : journey.kind === 'production'
-                    ? 'Acompanhar produção'
-                    : 'Continuar criação';
-          const createdAt = query.data.order.createdAt
-            ? new Date(query.data.order.createdAt).toLocaleDateString('pt-BR')
-            : null;
-          return (
-            <article className="price-card library-card" key={publicId}>
-              <h2>{title?.content.title ?? story?.subjectName ?? 'Sua música'}</h2>
-              <dl className="summary-list">
-                {story?.occasion && (
-                  <div>
-                    <dt>Ocasião</dt>
-                    <dd>{story.occasion}</dd>
-                  </div>
-                )}
-                {createdAt && (
-                  <div>
-                    <dt>Criada em</dt>
-                    <dd>{createdAt}</dd>
-                  </div>
-                )}
-                <div>
-                  <dt>Progresso</dt>
-                  <dd>{myOrderStatusLabel(query.data.order.status, approved, completedAudio)}</dd>
-                </div>
-                <div>
-                  <dt>Próxima ação</dt>
-                  <dd>{nextStep}</dd>
-                </div>
-              </dl>
-              <Link className="button secondary" to={`/pedido/${publicId}`}>
-                {nextStep}
-              </Link>
-            </article>
-          );
-        })}
+          })}
+        </div>
       </main>
       <Footer />
     </>
   );
 }
+
 export function Delivery() {
   const { deliveryToken = '' } = useParams();
   const navigate = useNavigate();
@@ -1029,6 +1255,11 @@ export function Delivery() {
     queryFn: () => api.delivery(deliveryToken),
     enabled: Boolean(deliveryToken),
     refetchInterval: 5000,
+  });
+  const coverQuery = useQuery({
+    queryKey: ['delivery-cover', deliveryToken],
+    queryFn: () => api.deliveryCover(deliveryToken),
+    enabled: Boolean(deliveryToken),
   });
   const recover = useMutation({
     mutationFn: () => api.recoverViaDelivery(deliveryToken),
@@ -1049,57 +1280,197 @@ export function Delivery() {
       </>
     );
   }
+
+  const cover = coverQuery.data?.cover;
+  const hasCover = cover?.status === 'completed';
+  const coverUrl = api.deliveryCoverDownloadUrl(deliveryToken);
+  const approvedLyric = delivery.data?.lyrics[0];
+  const songTitle = approvedLyric?.content.title || 'Sua Canção';
+
+  const shareOnWhatsApp = () => {
+    const text = `Ouça a música personalizada que criamos: "${songTitle}"!\n${window.location.href}`;
+    window.open(
+      `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`,
+      '_blank',
+      'noopener,noreferrer',
+    );
+  };
+
+  const copyDeliveryLink = () => {
+    void navigator.clipboard.writeText(window.location.href);
+    toast.success('Link de entrega copiado!');
+  };
+
   return (
     <>
       <Header />
-      <main className="delivery">
-        <p className="eyebrow">ENTREGA PRIVADA</p>
+      <main className="delivery delivery-page-wrapper">
+        <div className="delivery-header-meta">
+          <p className="eyebrow">ENTREGA PRIVADA</p>
+        </div>
         {delivery.isLoading && <Loading label="Abrindo sua entrega…" />}
         {delivery.data && (
           <>
             {delivery.data.audio.length === 2 ? (
               <>
-                <h1>Sua música está pronta!</h1>
-                <p>Este link é privado. Ouça e baixe as duas versões abaixo.</p>
-                {delivery.data.audio.map((audio) => (
-                  <div className="price-card" key={audio.variant}>
-                    <span>Versão {audio.variant}</span>
-                    <audio controls src={api.deliveryDownloadUrl(deliveryToken, audio.variant)} />
-                    <a
-                      className="button secondary"
-                      href={api.deliveryDownloadUrl(deliveryToken, audio.variant)}
-                      download
-                    >
-                      Baixar versão {audio.variant}
-                    </a>
+                <section className="delivery-hero-lounge" aria-label="Apresentação da música">
+                  <div className="vinyl-showcase">
+                    <div className="vinyl-disc" aria-hidden="true">
+                      <div className="vinyl-groove-lines" />
+                      <div className="vinyl-center-badge">
+                        <div className="vinyl-spindle-hole" />
+                        <span className="vinyl-badge-text">RESENHA HD</span>
+                      </div>
+                    </div>
+                    <div className="vinyl-sleeve">
+                      {hasCover ? (
+                        <img
+                          src={coverUrl}
+                          alt="Capa oficial do álbum"
+                          className="vinyl-cover-image"
+                        />
+                      ) : (
+                        <div className="vinyl-placeholder-artwork">
+                          <span className="artwork-badge">ÁLBUM EXCLUSIVO</span>
+                          <strong className="artwork-title">{songTitle}</strong>
+                          <small className="artwork-genre">Música Original</small>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                ))}
-                {delivery.data.lyrics[0] && (
-                  <details>
-                    <summary>Ver letra aprovada</summary>
-                    <pre className="lyrics-editor">
-                      {delivery.data.lyrics[0].content.fullLyrics}
-                    </pre>
-                  </details>
-                )}
-                <DeliveryCoverCard token={deliveryToken} />
+
+                  <div className="delivery-hero-content">
+                    <div className="delivery-status-indicator">
+                      <span className="pulse-dot" aria-hidden="true" />
+                      <p className="eyebrow">ÁUDIO MASTERIZADO</p>
+                    </div>
+
+                    <h1 className="delivery-main-heading">Sua música está pronta!</h1>
+                    <h2 className="delivery-song-title">{songTitle}</h2>
+                    <p className="delivery-sub-notice">
+                      Este link é privado. Ouça as duas versões masterizadas e faça o download
+                      abaixo.
+                    </p>
+
+                    <div className="delivery-quick-actions">
+                      <button
+                        type="button"
+                        className="button secondary hero-share-whatsapp"
+                        onClick={shareOnWhatsApp}
+                      >
+                        <MessageCircle size={16} aria-hidden="true" /> Compartilhar no WhatsApp
+                      </button>
+
+                      <button
+                        type="button"
+                        className="button secondary hero-copy-link"
+                        onClick={copyDeliveryLink}
+                      >
+                        <Copy size={16} aria-hidden="true" /> Copiar link
+                      </button>
+
+                      {hasCover && (
+                        <a
+                          className="button secondary hero-download-cover"
+                          href={coverUrl}
+                          download
+                        >
+                          <ImageDown size={16} aria-hidden="true" /> Baixar capa HD
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </section>
+
+                <div className="delivery-studio-grid">
+                  <div className="delivery-tracks-column">
+                    <div className="column-header">
+                      <h3>Versões da Música</h3>
+                      <span className="track-count-badge">2 faixas</span>
+                    </div>
+
+                    <div className="tracks-stack">
+                      {delivery.data.audio.map((audio) => (
+                        <article className="price-card track-player-card" key={audio.variant}>
+                          <div className="track-player-header">
+                            <div className="track-title-wrap">
+                              <span className="track-version-label">Versão {audio.variant}</span>
+                              <span
+                                className={`track-pill-badge ${audio.variant === 1 ? 'is-primary' : 'is-alternate'}`}
+                              >
+                                {audio.variant === 1 ? 'Principal' : 'Variação'}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="audio-player-wrapper">
+                            <audio
+                              controls
+                              src={api.deliveryDownloadUrl(deliveryToken, audio.variant)}
+                            />
+                          </div>
+                          <div className="track-player-actions">
+                            <a
+                              className="button secondary track-download-button"
+                              href={api.deliveryDownloadUrl(deliveryToken, audio.variant)}
+                              download
+                            >
+                              <Download size={15} aria-hidden="true" /> Baixar versão{' '}
+                              {audio.variant}
+                            </a>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="delivery-sidebar-column">
+                    {approvedLyric && (
+                      <section
+                        className="lyrics-display-card"
+                        aria-labelledby="delivery-lyrics-title"
+                      >
+                        <div className="lyrics-display-header">
+                          <h3 id="delivery-lyrics-title">Letra Aprovada</h3>
+                          <button
+                            type="button"
+                            className="button secondary small-action-btn"
+                            onClick={() => {
+                              void navigator.clipboard.writeText(approvedLyric.content.fullLyrics);
+                              toast.success('Letra copiada!');
+                            }}
+                          >
+                            <Copy size={13} aria-hidden="true" /> Copiar
+                          </button>
+                        </div>
+                        <pre className="poetic-lyrics-content">
+                          {approvedLyric.content.fullLyrics}
+                        </pre>
+                      </section>
+                    )}
+
+                    <DeliveryCoverCard token={deliveryToken} />
+                  </div>
+                </div>
               </>
             ) : (
-              <>
+              <div className="delivery-incomplete-card">
                 <h1>As versões ainda não estão prontas</h1>
                 <p className="error" role="alert">
                   A entrega está incompleta. Acompanhe o pedido para receber as duas versões.
                 </p>
-              </>
+              </div>
             )}
-            <button
-              type="button"
-              className="button secondary"
-              disabled={recover.isPending}
-              onClick={() => recover.mutate()}
-            >
-              {recover.isPending ? 'Liberando…' : 'Acompanhar pedido neste navegador'}
-            </button>
+
+            <div className="delivery-recover-bar">
+              <button
+                type="button"
+                className="button secondary"
+                disabled={recover.isPending}
+                onClick={() => recover.mutate()}
+              >
+                {recover.isPending ? 'Liberando…' : 'Acompanhar pedido neste navegador'}
+              </button>
+            </div>
           </>
         )}
       </main>
