@@ -1,6 +1,6 @@
 # Evidência de ativação — 12/09/2026
 
-Homologação técnica executada no Railway; comércio público fechado. A integração final está na [PR #2](https://github.com/gustavospriebe/music/pull/2). Nenhum resultado abaixo comprova venda real ou aceite artístico.
+Homologação técnica executada no Railway; comércio público fechado. A integração foi concluída na [PR #2](https://github.com/gustavospriebe/music/pull/2). Nenhum resultado abaixo comprova venda real ou aceite artístico.
 
 ## Git, CI e promoção
 
@@ -50,3 +50,11 @@ Homologação técnica executada no Railway; comércio público fechado. A integ
 ## O que ainda não está autorizado/comprovado
 
 Preço e condições comerciais aprovadas/publicadas; escolha final/KYC do gateway e PIX de produção; reembolso real no gateway; aceite artístico por escuta humana; backup recorrente independente com retenção; capacidade medida para um prazo comercial; política completa de retenção/exclusão e responsável por suporte/incidentes. Essas pendências mantêm `COMMERCIAL_READY=false`.
+
+## Encerramento da implementação publicada
+
+PR #2 integrada na `main` em **`efb0f1789adbebc9beea02e92d538b885fe17544`**, com árvore idêntica ao HEAD `7092ebb` aprovado. [CI da main34706291941](https://github.com/gustavospriebe/music/actions/runs/34706291941) PASS; checks do HEAD da PR34706072351/34706074833 também PASS, **487 Vitest + um operacional e 48 E2E**.
+
+Os três serviços ficaram SUCCESS nesse mesmo SHA: API `f4afaf96-da0d-4792-9d79-29c742408e91`, web `f347a8d6-754b-41e7-81f9-10b7308db742`, worker `f89b8949-3e73-4807-b3d4-06cdda5c06ac`. O worker foi promovido explicitamente após o CI porque o trigger o pulou por arquivos inalterados. Health API/proxy200, página inicial200, erro da API404 preservado como JSON, pagamento sandbox e comércio fechado reconfirmados.
+
+Acesso anônimo aos três objetos S3 respondeu403. `VITE_API_URL` foi removida do serviço web; somente o upstream de servidor permanece. Sessão administrativa encerrada; chave temporária ausente da lista Railway e material SSH local removido. Este registro documental posterior descreve o SHA de implementação acima; diferenças posteriores limitadas a STATE/validação não alteram a imagem testada.
