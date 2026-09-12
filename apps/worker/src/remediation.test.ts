@@ -163,6 +163,7 @@ describe('worker remediation proof', () => {
     const started = new Promise<void>((resolve) => {
       entered = resolve;
     });
+    let initialLease: Date;
     const provider: LyricsProvider = {
       generate: async (input) => {
         expect(input).not.toHaveProperty('buyerEmail');
@@ -170,6 +171,12 @@ describe('worker remediation proof', () => {
         expect(
           (await pool.query('select status from ai_calls where job_id=$1', [jobId])).rows,
         ).toEqual([{ status: 'started' }]);
+        initialLease = (
+          await pool.query<{ lease_expires_at: Date }>(
+            'select lease_expires_at from generation_jobs where id=$1',
+            [jobId],
+          )
+        ).rows[0]!.lease_expires_at;
         entered();
         await wait;
         return { lyrics, usage: usage() };
@@ -177,15 +184,28 @@ describe('worker remediation proof', () => {
     };
     const worker = createWorker({
       pool,
-      config: { ...config(), lockTimeoutMs: 120 },
+      config: { ...config(), lockTimeoutMs: 3000 },
       lyrics: provider,
     });
     const tick = worker.tick();
     await started;
-    await new Promise((resolve) => setTimeout(resolve, 350));
-    expect((await releaseStaleJobs(pool, 120)).some((row) => row.id === jobId)).toBe(false);
-    release();
-    await tick;
+    try {
+      // Observe a real heartbeat while I/O remains blocked; a 120 ms lease races CI scheduling.
+      await vi.waitFor(
+        async () => {
+          const { rows } = await pool.query<{ renewed: boolean }>(
+            'select lease_expires_at > $2::timestamptz as renewed from generation_jobs where id=$1',
+            [jobId, initialLease],
+          );
+          expect(rows[0]?.renewed).toBe(true);
+        },
+        { timeout: 5000, interval: 50 },
+      );
+      expect((await releaseStaleJobs(pool, 3000)).some((row) => row.id === jobId)).toBe(false);
+    } finally {
+      release();
+      await tick;
+    }
     expect(
       (await pool.query('select status,attempts from generation_jobs where id=$1', [jobId])).rows,
     ).toEqual([{ status: 'completed', attempts: 1 }]);
