@@ -221,11 +221,11 @@ test('entrega parcial é inconsistente; duas variantes concluem as cinco etapas'
   await expect(downloads).toHaveCount(2);
   await expect(downloads.nth(0)).toHaveAttribute(
     'href',
-    '/api/v1/orders/order-delivery-1/assets/1/download',
+    new URL('/api/v1/orders/order-delivery-1/assets/1/download', page.url()).href,
   );
   await expect(downloads.nth(1)).toHaveAttribute(
     'href',
-    '/api/v1/orders/order-delivery-1/assets/2/download',
+    new URL('/api/v1/orders/order-delivery-1/assets/2/download', page.url()).href,
   );
 });
 
