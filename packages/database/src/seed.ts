@@ -10,12 +10,7 @@ if (!Number.isSafeInteger(songPrice) || songPrice < 0 || songPrice > 2_147_483_6
   throw new Error('SONG_PRICE_CENTS must be integer cents between 0 and 2147483647');
 await db
   .insert(products)
-  .values([
-    { type: 'custom_song', name: 'Sua música', priceCents: songPrice },
-    { type: 'friend_roast', name: 'Música da Resenha', priceCents: 4990 },
-    { type: 'team_anthem', name: 'Hino da Pelada', priceCents: 4990 },
-    { type: 'emotional_tribute', name: 'Sua História em Música', priceCents: 4990 },
-  ])
+  .values([{ type: 'custom_song', name: 'Sua música', priceCents: songPrice, active: true }])
   .onConflictDoNothing({ target: products.type });
 if (songPrice > 0)
   await db
@@ -25,7 +20,7 @@ if (songPrice > 0)
 if (process.env.ADMIN_EMAIL)
   await db
     .insert(adminUsers)
-    .values({ email: process.env.ADMIN_EMAIL, passwordHash: 'env-managed' })
+    .values({ email: process.env.ADMIN_EMAIL })
     .onConflictDoUpdate({
       target: adminUsers.email,
       set: { updatedAt: sql`now()` },

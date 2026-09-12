@@ -39,7 +39,10 @@ describe('estúdio de criação livre', () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
-    apiMock.configuration.mockResolvedValue({ generation: { lyricsAvailable: false } });
+    apiMock.configuration.mockResolvedValue({
+      generation: { lyricsAvailable: false },
+      commercial: { ready: false, policyVersion: 'draft-v1', termsUrl: null, privacyUrl: null },
+    });
     apiMock.createOrder.mockReset();
     apiMock.saveStory.mockReset();
     apiMock.sendBeacon.mockReset();

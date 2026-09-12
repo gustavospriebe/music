@@ -5,7 +5,11 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
+import { Readable } from 'node:stream';
+
+export type StorageRange = { start: number; end: number };
 
 export type StorageProvider = {
   put: (
@@ -14,6 +18,7 @@ export type StorageProvider = {
     mime: string,
   ) => Promise<{ key: string; size: number; mime: string }>;
   get: (key: string) => Promise<Buffer>;
+  open: (key: string, range?: StorageRange) => Promise<Readable>;
   delete: (key: string) => Promise<void>;
 };
 
@@ -79,6 +84,18 @@ const safeTarget = (basePath: string, key: string): string => {
   return target;
 };
 
+const checkedRange = (range?: StorageRange): StorageRange | undefined => {
+  if (
+    range &&
+    (!Number.isSafeInteger(range.start) ||
+      !Number.isSafeInteger(range.end) ||
+      range.start < 0 ||
+      range.end < range.start)
+  )
+    throw new RangeError('Invalid storage range');
+  return range;
+};
+
 export const createLocalStorage = (basePath: string): StorageProvider => ({
   put: async (key, data, mime) => {
     const target = safeTarget(basePath, key);
@@ -87,6 +104,7 @@ export const createLocalStorage = (basePath: string): StorageProvider => ({
     return { key, size: data.length, mime };
   },
   get: (key) => readFile(safeTarget(basePath, key)),
+  open: async (key, range) => createReadStream(safeTarget(basePath, key), checkedRange(range)),
   delete: async (key) => rm(safeTarget(basePath, key), { force: true }),
 });
 
@@ -122,6 +140,18 @@ export const createS3Storage = (
       };
       if (!result.Body?.transformToByteArray) throw new Error('S3 object body is unavailable');
       return Buffer.from(await result.Body.transformToByteArray());
+    },
+    open: async (key, range) => {
+      checkedRange(range);
+      const result = (await send(
+        new GetObjectCommand({
+          Bucket: config.bucket,
+          Key: key,
+          ...(range ? { Range: `bytes=${range.start}-${range.end}` } : {}),
+        }),
+      )) as { Body?: unknown };
+      if (!(result.Body instanceof Readable)) throw new Error('S3 object stream is unavailable');
+      return result.Body;
     },
     delete: async (key) => {
       await send(new DeleteObjectCommand({ Bucket: config.bucket, Key: key }));

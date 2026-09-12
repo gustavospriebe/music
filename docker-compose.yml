@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_USER: resenha
       POSTGRES_PASSWORD: resenha
@@ -11,10 +11,10 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
-    volumes: [postgres-data:/var/lib/postgresql/data]
+    volumes: [postgres18-data:/var/lib/postgresql]
   mailpit:
     image: axllent/mailpit:v1.22
     profiles: ['mail']
     ports: ['${MAILPIT_SMTP_PORT:-1025}:1025', '${MAILPIT_WEB_PORT:-8025}:8025']
 volumes:
-  postgres-data:
+  postgres18-data:

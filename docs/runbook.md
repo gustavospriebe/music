@@ -1,3 +1,5 @@
+> HISTÓRICO — documento anterior à remediação de 12/09/2026. Comandos, modelos, orçamento e alegações de prontidão abaixo podem estar superados e não autorizam nova execução. Use o [mapa vigente](documentation-map.md) para implementação e operação.
+
 # Runbook operacional
 
 ## Job preso ou falha de provider

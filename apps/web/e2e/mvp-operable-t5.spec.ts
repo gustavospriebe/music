@@ -5,7 +5,7 @@ test.beforeEach(async ({ page }) => {
     route.fulfill({
       json: {
         generation: { lyricsAvailable: true },
-        commercial: { ready: false },
+        commercial: { ready: false, policyVersion: 'draft-v1', termsUrl: null, privacyUrl: null },
         payment: { label: 'AbacatePay' },
         supportEmail: null,
       },
@@ -73,7 +73,7 @@ test('rascunho recarrega, erro recebe foco e retry remoto preserva a tentativa',
 test('landing não antecipa preço e checkout usa o snapshot do pedido', async ({ page }) => {
   await page.route('**/api/v1/products', (route) =>
     route.fulfill({
-      json: [{ type: 'friend_roast', name: 'Música da Resenha', priceCents: 6789, active: true }],
+      json: [{ type: 'custom_song', name: 'Sua música', priceCents: 6789, active: true }],
     }),
   );
   await page.route('**/api/v1/orders/order-price-123', (route) =>

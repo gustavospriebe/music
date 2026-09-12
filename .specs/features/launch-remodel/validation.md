@@ -1,5 +1,7 @@
 # Launch Remodel Validation
 
+> Registro histórico de um recorte anterior. O modelo vigente e a evidência atual estão em [docs/documentation-map.md](../../../docs/documentation-map.md) e [audit-remediation](../audit-remediation/spec.md). Este registro não autoriza publicação nem gasto com providers.
+
 **Result**: PASS
 
 PASS técnico local: 15/15 critérios de aceitação possuem evidência de resultado, 185 testes passaram no gate independente e 7/7 mutações comportamentais foram detectadas. Este resultado não autoriza lançamento comercial e não representa homologação de providers, CI remoto, deploy ou aceite humano.

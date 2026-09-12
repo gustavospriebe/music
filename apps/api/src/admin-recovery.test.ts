@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { hashToken, stableDeliveryToken } from '@resenha/domain';
 import { mkdtempSync } from 'node:fs';
-import { rm } from 'node:fs/promises';
+import { rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 const storagePath = mkdtempSync(join(tmpdir(), 'admin-recovery-'));
@@ -11,7 +11,8 @@ import { createDb, products } from '@resenha/database';
 import { generatedLyricsSchema, type GeneratedLyrics } from '@resenha/contracts';
 import { buildApp } from './app.js';
 import { parseEnv } from './env.js';
-import type { LyricsProvider, LyricsResult } from './providers.js';
+import type { LyricsProvider, LyricsResult } from '@resenha/providers';
+import { settlePublicLyrics } from './lyrics-test-support.js';
 
 const env = parseEnv({
   NODE_ENV: 'test',
@@ -55,6 +56,7 @@ const result = (lyrics: GeneratedLyrics = changed): LyricsResult => ({
     inputTokens: 10,
     outputTokens: 20,
     costUsd: '0',
+    costSource: 'reported',
     latencyMs: 1,
   },
 });
@@ -84,6 +86,7 @@ const prepare = async (app: FastifyInstance, status = 'lyrics_ready') => {
     brief: 'Uma música sobre os amigos encontrados pelo caminho',
     safetyConfirmed: true,
     termsAccepted: true,
+    policyVersion: 'draft-v1',
   };
   expect(
     (
@@ -130,33 +133,97 @@ const adminFor = async (app: FastifyInstance) => {
 };
 const paid = async (id: string) => {
   await pool.query(
-    "insert into payments(order_id,provider,status,amount_cents) values($1,'dev','approved',0)",
+    "insert into payments(order_id,provider,status,amount_cents,attempt,idempotency_key,external_reference) values($1,'dev','approved',0,1,gen_random_uuid()::text,gen_random_uuid()::text)",
     [id],
   );
   await pool.query('update lyric_versions set approved_at=now() where order_id=$1', [id]);
+  const production = await pool.query(
+    `insert into productions(order_id,number,lyric_version_id,status) select $1::uuid,1,id,'review_required' from lyric_versions where order_id=$1 order by number desc limit 1 returning id`,
+    [id],
+  );
+  await pool.query('update orders set current_production_id=$2 where id=$1', [
+    id,
+    production.rows[0].id,
+  ]);
 };
-const jobFor = async (id: string, type = 'generate_audio', payload = {}, status = 'failed') =>
-  (
+const jobFor = async (
+  id: string,
+  type = 'generate_audio',
+  payload: Record<string, unknown> = {},
+  status = 'failed',
+) => {
+  const order = (await pool.query('select current_production_id from orders where id=$1', [id]))
+    .rows[0];
+  const target = (
+    await pool.query(
+      'select coalesce(max(number),0)+1 as number from lyric_versions where order_id=$1',
+      [id],
+    )
+  ).rows[0].number;
+  const persisted =
+    type === 'generate_audio'
+      ? { productionId: order.current_production_id, ...payload }
+      : type === 'generate_lyrics'
+        ? { targetVersion: target, ...payload }
+        : payload;
+  return (
     await pool.query(
       'insert into generation_jobs(order_id,type,payload,idempotency_key,status,attempts,max_attempts,last_error) values($1,$2,$3,$4,$5,6,6,$6) returning id',
-      [id, type, JSON.stringify(payload), randomUUID(), status, 'private provider payload'],
+      [id, type, JSON.stringify(persisted), randomUUID(), status, 'private provider payload'],
     )
   ).rows[0].id as string;
+};
 
 const audioFor = async (orderId: string) => {
+  const current = await pool.query('select current_production_id from orders where id=$1', [
+    orderId,
+  ]);
+  let productionId = current.rows[0].current_production_id as string | null;
+  if (!productionId) {
+    const created = await pool.query(
+      `insert into productions(order_id,number,lyric_version_id,status) select $1::uuid,coalesce((select max(number) from productions where order_id=$1),0)+1,id,'review_required' from lyric_versions where order_id=$1 order by number desc limit 1 returning id`,
+      [orderId],
+    );
+    productionId = created.rows[0].id as string;
+    await pool.query('update orders set current_production_id=$2 where id=$1', [
+      orderId,
+      productionId,
+    ]);
+  }
+  const sampleCount = 8000 * 12;
+  const wav = Buffer.alloc(44 + sampleCount * 2);
+  wav.write('RIFF');
+  wav.writeUInt32LE(wav.length - 8, 4);
+  wav.write('WAVEfmt ', 8);
+  wav.writeUInt32LE(16, 16);
+  wav.writeUInt16LE(1, 20);
+  wav.writeUInt16LE(1, 22);
+  wav.writeUInt32LE(8000, 24);
+  wav.writeUInt32LE(16000, 28);
+  wav.writeUInt16LE(2, 32);
+  wav.writeUInt16LE(16, 34);
+  wav.write('data', 36);
+  wav.writeUInt32LE(sampleCount * 2, 40);
+  for (let index = 0; index < sampleCount; index++)
+    wav.writeInt16LE(
+      Math.round(2000 * Math.sin((index * 2 * Math.PI * 440) / 8000)),
+      44 + index * 2,
+    );
   const rows = [];
   for (const variant of [1, 2]) {
+    const storageKey = `${randomUUID()}.wav`;
+    await writeFile(join(storagePath, storageKey), wav);
     const assetId = (
       await pool.query(
-        "insert into stored_files(order_id,storage_key,mime_type,size_bytes) values($1,$2,'audio/mpeg',3) returning id",
-        [orderId, randomUUID()],
+        "insert into stored_files(order_id,storage_key,mime_type,size_bytes) values($1,$2,'audio/wav',$3) returning id",
+        [orderId, storageKey, wav.length],
       )
     ).rows[0].id;
     rows.push(
       (
         await pool.query(
-          "insert into audio_generations(order_id,variant,status,asset_id,provider,model) values($1,$2,'completed',$3,'google','lyria-3.5') returning *",
-          [orderId, variant, assetId],
+          "insert into audio_generations(order_id,variant,status,file_id,provider,model,production_id,selected,duration_ms) values($1,$2,'completed',$3,'google','lyria-3.5',$4,true,12000) returning *",
+          [orderId, variant, assetId, productionId],
         )
       ).rows[0],
     );
@@ -166,7 +233,7 @@ const audioFor = async (orderId: string) => {
 const linkFor = async (orderId: string) => {
   const id = randomUUID();
   await pool.query(
-    'insert into deliveries(id,order_id,token_hash,delivered_at) values($1,$2,$3,now())',
+    'insert into deliveries(id,order_id,token_hash,delivered_at,production_id) values($1,$2,$3,now(),(select current_production_id from orders where id=$2::uuid))',
     [
       id,
       orderId,
@@ -236,6 +303,7 @@ describe('administrative recovery', () => {
     ).toBeNull();
     await pool.query("update orders set status='failed' where id=$1", [order.id]);
     await pool.query('delete from lyric_versions where order_id=$1', [order.id]);
+    const provider = { generate };
     expect(
       (
         await app.inject({
@@ -245,7 +313,8 @@ describe('administrative recovery', () => {
           payload: {},
         })
       ).statusCode,
-    ).toBe(200);
+    ).toBe(202);
+    await settlePublicLyrics(pool, order.publicId, provider, env.DATABASE_URL);
     expect(generate).toHaveBeenCalledTimes(1);
     expect(
       (await pool.query('select status from orders where id=$1', [order.id])).rows[0].status,
@@ -300,7 +369,7 @@ describe('administrative recovery', () => {
         ),
         bytes,
         Buffer.from(
-          '\r\n--testboundary\r\nContent-Disposition: form-data; name="consent"\r\n\r\ntrue\r\n--testboundary--\r\n',
+          '\r\n--testboundary\r\nContent-Disposition: form-data; name="consent"\r\n\r\ntrue\r\n--testboundary\r\nContent-Disposition: form-data; name="policyVersion"\r\n\r\ndraft-v1\r\n--testboundary--\r\n',
         ),
       ]);
     const headers = { ...admin, 'content-type': 'multipart/form-data; boundary=testboundary' };
@@ -322,7 +391,7 @@ describe('administrative recovery', () => {
     const cover = (await pool.query('select * from album_covers where order_id=$1', [order.id]))
       .rows[0];
     expect(cover).toMatchObject({ status: 'pending', attempt: 1, had_reference: true });
-    expect(cover.reference_asset_id).toEqual(expect.any(String));
+    expect(cover.reference_file_id).toEqual(expect.any(String));
     expect(cover.created_at.getTime()).toBeLessThan(Date.now() - 7 * 86400000);
     const detail = (
       await app.inject({ url: `/api/v1/admin/orders/${order.id}`, headers: admin })
@@ -362,7 +431,7 @@ describe('administrative recovery', () => {
         ])
       ).rows[0],
     ).toEqual({
-      payload: { provider: 'google', model: 'lyria-3.5' },
+      payload: { provider: 'google', model: 'lyria-3.5', productionId: audio[0].production_id },
       status: 'pending',
       max_attempts: 7,
     });
@@ -393,8 +462,19 @@ describe('administrative recovery', () => {
       ).statusCode,
     ).toBe(200);
     expect(
-      (await pool.query('select * from audio_generations where order_id=$1', [order.id])).rows,
+      (
+        await pool.query('select * from audio_generations where order_id=$1 and selected', [
+          order.id,
+        ])
+      ).rows,
     ).toEqual([audio[1]]);
+    expect(
+      (
+        await pool.query('select id,file_id,selected from audio_generations where id=$1', [
+          audio[0].id,
+        ])
+      ).rows[0],
+    ).toEqual({ id: audio[0].id, file_id: audio[0].file_id, selected: false });
     expect(
       (
         await pool.query(
@@ -404,7 +484,12 @@ describe('administrative recovery', () => {
       ).rows,
     ).toEqual([
       {
-        payload: { variant: 1, provider: 'google', model: 'lyria-3.5' },
+        payload: {
+          variant: 1,
+          provider: 'google',
+          model: 'lyria-3.5',
+          productionId: audio[0].production_id,
+        },
         max_attempts: 1,
       },
     ]);
@@ -428,7 +513,17 @@ describe('administrative recovery', () => {
           [order.id],
         )
       ).rows,
-    ).toEqual([{ payload: { provider: 'openrouter', model: 'openrouter/test-music-model' } }]);
+    ).toEqual([
+      {
+        payload: {
+          provider: 'openrouter',
+          model: 'openrouter/test-music-model',
+          productionId: (
+            await pool.query('select current_production_id from orders where id=$1', [order.id])
+          ).rows[0].current_production_id,
+        },
+      },
+    ]);
     expect(
       (
         await app.inject({
@@ -493,7 +588,7 @@ describe('administrative recovery', () => {
           [order.id],
         )
       ).rows,
-    ).toEqual([{ type: 'deliver-notify' }]);
+    ).toEqual([{ type: 'deliver_notify' }]);
     expect(
       (
         await app.inject({
@@ -504,7 +599,7 @@ describe('administrative recovery', () => {
       ).statusCode,
     ).toBe(409);
     await pool.query(
-      "insert into email_deliveries(order_id,template,recipient,provider,status) values($1,'music_delivered','private@example.test','local-log','sent')",
+      "insert into email_deliveries(order_id,production_id,template,recipient,provider,status) values($1,(select current_production_id from orders where id=$1::uuid),'music_delivered','private@example.test','local-log','sent')",
       [order.id],
     );
     expect((await app.inject({ method: 'POST', url, headers: admin })).json()).toEqual({
@@ -526,7 +621,7 @@ describe('administrative recovery', () => {
         ]);
       else
         await pool.query(
-          "insert into payments(order_id,provider,status,amount_cents) values($1,'dev','approved',0)",
+          "insert into payments(order_id,provider,status,amount_cents,attempt,idempotency_key,external_reference) values($1,'dev','approved',0,1,gen_random_uuid()::text,gen_random_uuid()::text)",
           [order.id],
         );
       const jobId = await jobFor(order.id);
@@ -685,14 +780,31 @@ describe('administrative recovery', () => {
       "insert into album_covers(order_id,attempt,status,had_reference,model) values($1,1,'failed',false,'test')",
       [records[1]!.id],
     );
-    await jobFor(records[2]!.id, 'deliver-notify');
+    await paid(records[2]!.id);
+    await paid(records[3]!.id);
+    // An older sent notice must not hide failure of the newly released production.
+    await pool.query(
+      "insert into email_deliveries(order_id,production_id,template,recipient,provider,status) select id,current_production_id,'music_delivered','test@example.test','local-log','sent' from orders where id=$1",
+      [records[2]!.id],
+    );
+    const nextProduction = (
+      await pool.query(
+        "insert into productions(order_id,number,lyric_version_id,status) select order_id,2,lyric_version_id,'completed' from productions where order_id=$1 returning id",
+        [records[2]!.id],
+      )
+    ).rows[0].id;
+    await pool.query('update orders set current_production_id=$2 where id=$1', [
+      records[2]!.id,
+      nextProduction,
+    ]);
+    await jobFor(records[2]!.id, 'deliver_notify');
     await pool.query(
       "insert into album_covers(order_id,attempt,status,had_reference,model) values($1,1,'failed',false,'test'),($1,2,'completed',false,'test')",
       [records[3]!.id],
     );
     await jobFor(records[3]!.id, 'generate_audio');
     await pool.query(
-      "insert into email_deliveries(order_id,template,recipient,provider,status) values($1,'music_delivered','test@example.test','local-log','sent')",
+      "insert into email_deliveries(order_id,production_id,template,recipient,provider,status) values($1,(select current_production_id from orders where id=$1::uuid),'music_delivered','test@example.test','local-log','sent')",
       [records[3]!.id],
     );
     await pool.query("update orders set status='review_required' where id=$1", [records[4]!.id]);

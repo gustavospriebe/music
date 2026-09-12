@@ -1,5 +1,7 @@
 # Launch Remodel Specification
 
+> Registro histórico de um recorte anterior. O modelo vigente e a evidência atual estão em [docs/documentation-map.md](../../../docs/documentation-map.md) e [audit-remediation](../audit-remediation/spec.md). Este registro não autoriza publicação nem gasto com providers.
+
 ## Problem Statement
 
 A criação atual força uma brincadeira entre amigos e um formulário extenso. A revisão confirmou falhas em retry de pagamento, links de entrega, suporte e configuração de providers. Esta entrega amplia o produto e corrige caminhos essenciais para ativação posterior.

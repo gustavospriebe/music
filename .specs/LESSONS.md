@@ -77,6 +77,13 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - evidence: SAFE-04 (observability)
 - last seen: 2026-09-04T22:59:04Z
 
+### L-010 - Serialize suites that claim the global PostgreSQL queue and clear fixtures only inside an explicitly isolated local test database.
+
+- signal: `gate_fail` · recurrence: 1 feature(s) · scope: `postgres-tests` · harmful: 0
+- features: audit-remediation
+- evidence: VERIFY-01: .specs/features/audit-remediation/validation.md (postgres-tests)
+- last seen: 2026-09-12T04:55:05Z
+
 ## Quarantined (failed when applied - ignore)
 
 A confirmed lesson that recurred alongside failure. Kept for the maintainer to review.

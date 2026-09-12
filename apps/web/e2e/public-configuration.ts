@@ -3,6 +3,7 @@ export const publicConfiguration = {
   supportEmail: null,
   generation: { lyricsAvailable: true },
   commercial: {
+    policyVersion: 'draft-v1',
     ready: false,
     deliveryEstimate: null,
     revisionPolicy: null,

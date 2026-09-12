@@ -1,5 +1,7 @@
 # Validation: Lyrics Production Polish
 
+> Registro histórico de um recorte anterior. O modelo vigente e a evidência atual estão em [docs/documentation-map.md](../../../docs/documentation-map.md) e [audit-remediation](../audit-remediation/spec.md). Este registro não autoriza publicação nem gasto com providers.
+
 **Result**: PASS
 
 Atualização EDIT-03: o PASS abaixo permanece a evidência técnica histórica. A ampliação editorial de composição tem resultado **parcial**, descrito no final; não há aprovação artística consistente das novas amostras.

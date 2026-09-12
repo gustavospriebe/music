@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
-import { Header, JourneySteps, ProductPill, RouteFocus } from './components';
+import { Header, JourneySteps, RouteFocus } from './components';
 
 describe('navegação pública', () => {
   it('oferece o CTA canônico e fecha o menu com Escape devolvendo foco', async () => {
@@ -98,11 +98,6 @@ describe('navegação pública', () => {
     expect(main).toHaveAttribute('tabindex', '-1');
     expect(scrollTo).toHaveBeenLastCalledWith({ left: 0, top: 0, behavior: 'instant' });
     scrollTo.mockRestore();
-  });
-
-  it('identifica corretamente o produto selecionado', () => {
-    render(<ProductPill type="emotional_tribute" />);
-    expect(screen.getByText('Sua História em Música')).toBeInTheDocument();
   });
 
   it.each([

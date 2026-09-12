@@ -1,3 +1,5 @@
+> HISTÓRICO — documento anterior à remediação de 12/09/2026. Comandos, modelos, orçamento e alegações de prontidão abaixo podem estar superados e não autorizam nova execução. Use o [mapa vigente](documentation-map.md) para implementação e operação.
+
 # Plano de implementação (histórico)
 
 O plano canônico da Fase 2 agora está em [IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md). Este arquivo é mantido para links existentes.

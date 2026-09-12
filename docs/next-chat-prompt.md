@@ -1,3 +1,5 @@
+> HISTÓRICO — documento anterior à remediação de 12/09/2026. Comandos, modelos, orçamento e alegações de prontidão abaixo podem estar superados e não autorizam nova execução. Use o [mapa vigente](documentation-map.md) para implementação e operação.
+
 # Handoff histórico — Música da Resenha (sessão de 04/09/2026)
 
 > Este snapshot não representa o estado atual. Comece por [project-context.md](project-context.md) e `.specs/STATE.md`; confronte ambos com `git status`, `git log` e CI/Railway ao vivo.

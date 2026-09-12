@@ -1,5 +1,7 @@
 # Google Lyria 3.5 Integration — Validation
 
+> Registro histórico de um recorte anterior. O modelo vigente e a evidência atual estão em [docs/documentation-map.md](../../../docs/documentation-map.md) e [audit-remediation](../audit-remediation/spec.md). Este registro não autoriza publicação nem gasto com providers.
+
 **Data**: 2026-09-08  
 **Status**: PARTIAL  
 **Escopo**: verificação independente pós-execução, somente leitura do código, das evidências existentes e do manifesto live indicado pelo usuário.  

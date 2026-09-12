@@ -1,5 +1,7 @@
 # MVP Operável Specification
 
+> Registro histórico de um recorte anterior. O modelo vigente e a evidência atual estão em [docs/documentation-map.md](../../../docs/documentation-map.md) e [audit-remediation](../audit-remediation/spec.md). Este registro não autoriza publicação nem gasto com providers.
+
 ## Problem Statement
 
 A aplicação possui as peças do fluxo de música personalizada, mas ainda aceita estados inválidos como sucesso, perde contexto visual entre rotas, permite duplicação em operações com custo e expõe identificadores internos em respostas públicas. O MVP precisa tornar criação, geração, revisão, pagamento local, acompanhamento, entrega e recuperação previsíveis em desktop e mobile, sem depender de chamadas externas nesta validação.

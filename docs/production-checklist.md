@@ -1,28 +1,53 @@
 # Checklist de produção
 
-## Antes de publicar
+Referência: 2026-09-12. Nenhum item é marcado por existir código, spec ou comando. Registrar data, revisão, ambiente e resultado verificável; não anexar PII/secrets. A ativação externa aplicou e conferiu `0000`–`0016` no Railway, com pagamento sandbox, IA, e-mail e restore reais. PIX de produção continua pendente.
 
-- [ ] Rotacionar qualquer segredo que tenha sido exposto e inserir segredos somente no gestor de ambiente.
-- [ ] Usar PostgreSQL gerenciado ou isolado, backups testados e retenção definida.
-- [ ] Aplicar migrations pelo pre-deploy único da API, executar o seed inicial de produtos uma vez e testar restauração.
-- [ ] Configurar domínio, HTTPS, CORS restrito, `WEB_URL`, cookies `Secure` e proxy confiável.
-- [ ] Configurar bucket S3 privado, bloqueio público, backup/versionamento quando suportado e provar download apenas pela capability da API. Railway Bucket exige export/backup separado porque não oferece versionamento.
-- [ ] Homologar AbacatePay em devMode: secret do webhook, consulta do billing, duplicação e estados não pagos.
-- [ ] Validar OpenRouter/Resend apenas com autorização, limites de custo e alertas configurados.
-- [ ] Definir `ADMIN_EMAIL` e `ADMIN_PASSWORD` no gestor de segredos, reiniciar a API e validar o login sem registrar a senha.
-- [ ] Revisar termos, privacidade, consentimento de marketing, prazo comercial e política de ajustes com jurídico/comercial.
-- [ ] Confirmar que textos/demo não alegam depoimentos, números ou áudio reais.
+## Código e schema da revisão a promover
 
-## Operação
+- [x] Identificar branch, HEAD, WIP e `origin/main`; integrar/revisar mudanças sem perder trabalho existente.
+- [x] Executar gates locais da revisão final em Node 22/PostgreSQL 18: format, lint, typecheck, testes de banco, build e E2E. Ler skips e confirmar URLs dos bancos isolados.
+- [x] Conferir CI remoto e imagens da revisão exata; um CI antigo não valida o WIP.
+- [x] Provar migrations em banco vazio e upgrade até `0011`, incluindo `0012`–`0016`, sem modificar migrations já aplicadas. Comparar journal, constraints e schema real, não só snapshot TypeScript.
+- [ ] Revisar dados legados: produções `legacy_unverified`, jobs sem versão alvo e tentativas de pagamento incompatíveis com unicidade devem ter decisão explícita antes de retomar execução.
+- [x] Executar pre-deploy de migration uma única vez pela API e confirmar journal/schema live. Seed inicial de `custom_song` é operação separada; não reprecificar pedidos existentes.
+- [x] Planejar retorno operacional: schema novo com código velho não é rollback automaticamente seguro. Registrar backup e compatibilidade antes de promover.
 
-- [ ] Executar `pnpm check` e `pnpm test:e2e` em CI com banco real antes da promoção.
-- [ ] Construir `docker/api/Dockerfile`, `docker/worker/Dockerfile` e `docker/web/Dockerfile`; imagens não rodam como root.
-- [ ] Monitorar saúde da API, backlog/dead-letter, jobs travados, falhas de provider e receita sem registrar PII em logs.
-- [ ] Definir rotação de logs, resposta a incidente, suporte e procedimento de anonimização/exclusão de sessão.
-- [ ] Fazer teste de entrega, download, cancelamento e recuperação de worker após deploy.
-- [ ] Executar `RESTORE_DRILL_CONFIRM=ERASE_RESTORE_DRILL_DATABASE ./scripts/restore-drill.sh` contra banco isolado e anexar evidência sem PII.
-- [ ] Confirmar limpeza de referências de capa encerradas e órfãs com mais de sete dias.
+Provas: [remediação local](../.specs/features/audit-remediation/validation.md) e [ativação externa](../.specs/features/external-activation/validation.md). Cada item composto só é marcado quando todas as partes estão demonstradas; não presumir que uma prova técnica inclui aceite comercial.
 
-A topologia escolhida é um único projeto Railway com `web`, `api`, `worker`, `Postgres` e `Bucket`. A estrutura pode ser provisionada antes da promoção, mas nenhum serviço de aplicação recebe tráfego comercial até este checklist e o runbook externo passarem.
+## Aceite comercial e pagamento
 
-Use [external-activation-runbook.md](external-activation-runbook.md) para comandos, evidências, rollback e aceite. Até preencher todos os aceites, o estado é **EXTERNAL BLOCKED**.
+- [ ] Dono definiu preço positivo no catálogo; snapshot do pedido e valor do produto/cobrança remota coincidem.
+- [ ] Prazo, suporte, ajustes, reembolso, licença, termos e privacidade foram aprovados e publicados; links e `POLICY_VERSION` não provisória conferidos no navegador.
+- [ ] Submissão registra finalidade, versão e instante dos aceites, inclusive marketing negativo e direitos de imagem quando usados.
+- [ ] Escolha do gateway explícita; adapter completo, sem tratar configuração de outro fornecedor como suporte implementado.
+- [x] Homologação sandbox confirmou checkout/simulação, webhook autenticado, consulta inequívoca, reenvios sem produção extra e reconciliação.
+- [x] Testes PostgreSQL cobrem duplicação do mesmo ID, ordem invertida, expiração, criação incerta e provider histórico; não são eventos reais no gateway.
+- [ ] PIX de produção autorizado e concluído: valor real, ambiente real, confirmação, produção única e visibilidade financeira. Homologação/devMode não marca este item.
+- [ ] Procedimento de reembolso confirmado no gateway e no sistema: histórico, revogação da entrega e bloqueio de novos efeitos. Não confundir consulta de refund com capacidade de solicitá-lo via app.
+- [ ] `COMMERCIAL_READY` ligado somente depois dos aceites; textos/demonstrações não alegam depoimentos, números ou resultados reais inexistentes.
+
+## Runtime, segurança e entrega
+
+- [x] Projeto Railway `musica`, serviços e revisão implantada conferidos. Não assumir que catálogo HTTP ou health 200 comprovam migrations recentes.
+- [ ] HTTPS, domínio, `WEB_URL`, CORS, proxy confiável e cookies Secure/HttpOnly conferidos; capability de visualização não permite mutar ou ler contato/briefing.
+- [ ] Admin único autenticado pelo env; credenciais e rotação operadas no gestor de secrets. Erros/logs não contêm SQL, parâmetros, tokens, PII ou corpo bruto do upstream.
+- [ ] API/worker com mesmas referências de banco/storage e configuração financeira para reconciliação. Imagens finais construídas e executando sem root.
+- [x] Worker com credenciais/modelos das capacidades usadas, remetente `EMAIL_FROM` correto e `AUDIO_REVIEW_MODE=manual`. Qualquer `automatic_release` tem aceite explícito, sem promessa de revisão artística automática.
+- [ ] Rodada de IA autorizada e limitada prova duas faixas decodificáveis, letra correspondente e escuta humana; entrega parcial/produção errada/arquivo inacessível não é liberada.
+- [x] Resend confirmou `delivered` para mensagem enviada do container worker ao destinatário de teste autorizado, com link privado. A tentativa anterior devolvida permanece no histórico.
+- [ ] Operação acompanha bounce/reclamações no Resend e possui procedimento de correção de destinatário. O admin informa aceite pelo provedor; ainda não ingere bounce automaticamente.
+- [ ] Download privado e Range funcionam com autorização; acesso revogado/reembolsado é negado. URLs de bucket não são públicas.
+- [ ] Reinício/lease vencido durante chamada não deixa worker antigo concluir nem repete automaticamente chamadas `unknown`. Procedimento de investigação e recuperação explícita ensaiado.
+
+## Continuidade e capacidade
+
+- [x] Backup PostgreSQL e restore isolado executados em banco descartável identificado.
+- [ ] Retenção e backup PostgreSQL recorrente definidos/configurados; backup nativo Railway requer Pro e não foi contratado.
+- [x] Export pontual dos três objetos reais para destino local privado e restore banco + objetos comprovaram hashes/downloads/revogação.
+- [ ] Backup recorrente de objetos em destino independente com retenção configurada; o export pontual não marca esta condição.
+- [ ] Região e custo de tráfego app/bucket conhecidos; bucket privado não equivale a backup, versionamento ou rede privada.
+- [ ] Monitorar idade/tamanho da fila, leases expirados, falhas, chamadas desconhecidas, custo estimado/desconhecido, reconciliação pendente e tempo de revisão humana.
+- [ ] Definir suporte, resposta a incidentes e retenção/exclusão de contato, briefing, letras, imagens de referência, arquivos e e-mails. Limpeza pontual de referência não é política LGPD completa.
+- [ ] Medir capacidade com fluxo representativo antes de anunciar prazo ou aumentar concorrência. Dois áudios sequenciais não oferecem, por si, capacidade comercial comprovada.
+
+Infraestrutura online, teste local, homologação e operação comercial são estados diferentes. Até os aceites aplicáveis estarem demonstrados, manter a cobrança comercial indisponível. Procedimentos e evidências externas: [external-activation-runbook.md](external-activation-runbook.md).

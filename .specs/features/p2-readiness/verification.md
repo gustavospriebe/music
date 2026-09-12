@@ -1,5 +1,7 @@
 # P2 Readiness Validation
 
+> Registro histórico de um recorte anterior. O modelo vigente e a evidência atual estão em [docs/documentation-map.md](../../../docs/documentation-map.md) e [audit-remediation](../audit-remediation/spec.md). Este registro não autoriza publicação nem gasto com providers.
+
 **Validated:** 2026-09-05T00:59:34Z  
 **Implementation range:** `be80987..960b195`  
 **Local verdict:** PASS  

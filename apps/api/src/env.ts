@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { readStorageConfig } from '@resenha/providers';
+import { readPaymentConfig, readStorageConfig } from '@resenha/providers';
 const optionalUrl = z.preprocess(
   (value) => (value === '' ? undefined : value),
   z.string().url().optional(),
@@ -22,8 +22,9 @@ const envSchema = z.object({
   LYRICS_PROVIDER: z.enum(['openrouter']).default('openrouter'),
   MUSIC_PROVIDER: z.enum(['openrouter', 'google']).default('openrouter'),
   PAYMENT_PROVIDER: z.enum(['abacatepay', 'disabled']).default('abacatepay'),
+  PAYMENT_ENVIRONMENT: z.enum(['sandbox', 'live']).optional(),
   EMAIL_PROVIDER: z.enum(['resend', 'local-log']).default('resend'),
-  AUDIO_REVIEW_MODE: z.enum(['automatic', 'manual']).default('manual'),
+  AUDIO_REVIEW_MODE: z.enum(['automatic_release', 'manual']).default('manual'),
   BRAND_NAME: optionalSetting(120),
   SUPPORT_EMAIL: z.preprocess(
     (value) => (value === '' ? undefined : value),
@@ -36,6 +37,7 @@ const envSchema = z.object({
   USAGE_LICENSE: optionalSetting(2_000),
   TERMS_URL: optionalUrl,
   PRIVACY_URL: optionalUrl,
+  POLICY_VERSION: optionalSetting(100),
   LOCAL_STORAGE_PATH: z.string().default('./var/storage'),
   STORAGE_PROVIDER: z.enum(['local', 's3']).optional(),
   STORAGE_S3_BUCKET: z.string().optional(),
@@ -55,6 +57,7 @@ const envSchema = z.object({
   ABACATEPAY_API_KEY: z.string().optional(),
   ABACATEPAY_PRODUCT_ID: z.string().optional(),
   ABACATEPAY_WEBHOOK_SECRET: z.string().optional(),
+  ABACATEPAY_REQUIRE_WEBHOOK_SIGNATURE: z.enum(['true', 'false']).optional(),
   ABACATEPAY_WEBHOOK_URL: z.string().optional(),
 });
 export type Env = z.infer<typeof envSchema>;
@@ -85,5 +88,6 @@ export const parseEnv = (source: NodeJS.ProcessEnv = process.env): Env => {
       throw new Error('OpenRouter cover production configuration is required');
   }
   readStorageConfig(env);
+  readPaymentConfig(env);
   return env;
 };

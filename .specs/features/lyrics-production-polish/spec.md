@@ -1,5 +1,7 @@
 # Refinamento da letra, checkout e produção
 
+> Registro histórico de um recorte anterior. O modelo vigente e a evidência atual estão em [docs/documentation-map.md](../../../docs/documentation-map.md) e [audit-remediation](../audit-remediation/spec.md). Este registro não autoriza publicação nem gasto com providers.
+
 ## Problema observado pelo usuário
 
 Depois de preparar a história, o cliente encontra uma tela intermediária e uma letra com duas ações pouco explicativas. A edição não convida a adaptar o resultado. Condições comerciais ausentes viram scaffold visível, e o acompanhamento parece parado. A capa precisa poder ser testada com configuração real.

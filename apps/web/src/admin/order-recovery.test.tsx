@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AdminOrderDetail } from '../api';
 import { AdminOrderOperations, AudioVariantRecovery } from './order-recovery';
 const mocks = vi.hoisted(() => ({
+  configuration: vi.fn(),
   retryJob: vi.fn(),
   adminGenerateLyrics: vi.fn(),
   adminRetryEmail: vi.fn(),
@@ -55,9 +56,10 @@ function show(detail = base, unsavedLyrics = false) {
   return { ...view, update: (value: AdminOrderDetail) => view.rerender(wrap(value)) };
 }
 describe('ações de recuperação administrativas', () => {
-  beforeEach(() =>
-    Object.values(mocks).forEach((mock) => mock.mockReset().mockResolvedValue({ queued: true })),
-  );
+  beforeEach(() => {
+    Object.values(mocks).forEach((mock) => mock.mockReset().mockResolvedValue({ queued: true }));
+    mocks.configuration.mockResolvedValue({ commercial: { policyVersion: 'draft-v1' } });
+  });
   it('só gera letra após confirmação e informa sucesso sem chamar áudio', async () => {
     show();
     expect(mocks.adminGenerateLyrics).not.toHaveBeenCalled();
@@ -109,7 +111,11 @@ describe('ações de recuperação administrativas', () => {
       screen.getByRole('button', { name: 'Confirmar: Retomar criação da capa' }),
     );
     await waitFor(() =>
-      expect(mocks.retryJob).toHaveBeenCalledExactlyOnceWith('cover-job', { file, consent: true }),
+      expect(mocks.retryJob).toHaveBeenCalledExactlyOnceWith('cover-job', {
+        file,
+        consent: true,
+        policyVersion: 'draft-v1',
+      }),
     );
   });
   it('arquivo e consentimento não superam capability negada ou job ausente', async () => {
@@ -182,7 +188,7 @@ describe('ações de recuperação administrativas', () => {
           orderId="order"
           audio={{
             id: 'audio-2',
-            assetId: 'asset',
+            fileId: 'file',
             variant: 2,
             status: 'completed',
             canRegenerate: true,

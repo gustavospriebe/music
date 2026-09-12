@@ -1,5 +1,7 @@
 # Design
 
+> Registro histórico de um recorte anterior. O modelo vigente e a evidência atual estão em [docs/documentation-map.md](../../../docs/documentation-map.md) e [audit-remediation](../audit-remediation/spec.md). Este registro não autoriza publicação nem gasto com providers.
+
 A web preserva React/Vite e tokens creme/coral/preto; a criação vira um estúdio guiado em quatro passos dentro da jornada existente. custom_song adiciona uma história livre sem reinterpretar os três produtos antigos. O catálogo persiste preço e o pedido mantém snapshot. Configuração comercial pública usa DTO explícito. Pagamento e email possuem contratos pequenos com adapters existentes; disabled e local-log são estados operacionais explícitos. Checkout e webhook serializam a confirmação com PostgreSQL. Entrega persiste intenção imutável antes do envio e deriva token estável sem armazenar capability em texto aberto. Revogação verifica versão atual de acesso; ajuste tem caminho cliente/admin.
 
 Ownership: backend_readiness possui API/contracts/domain/database; delivery_readiness possui worker/providers e solicita alterações de schema ao backend; customer_redesign possui web; principal possui docs/config raiz/nginx e integração. Banco para QA é descartável e separado por suíte. Nenhuma chave real será usada.

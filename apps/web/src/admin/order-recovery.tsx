@@ -1,5 +1,5 @@
 import { failureDiagnosis, jobStatusPt } from './labels';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api, type AdminOrderDetail } from '../api';
 import { AudioRecoveryActions, ConfirmOperation, JobDiagnosticCard } from './order-operations';
@@ -37,7 +37,7 @@ function useOrderOperations(id: string) {
       reference,
     }: {
       jobId: string;
-      reference?: { file: File; consent: boolean };
+      reference?: { file: File; consent: boolean; policyVersion: string };
     }) => api.retryJob(jobId, reference),
     onSettled: refresh,
   });
@@ -56,10 +56,16 @@ function CoverRecovery({
   detail: AdminOrderDetail;
   busy: boolean;
   pending: boolean;
-  onRetry: (jobId: string, reference?: { file: File; consent: boolean }) => void;
+  onRetry: (
+    jobId: string,
+    reference?: { file: File; consent: boolean; policyVersion: string },
+  ) => void;
 }) {
   const [reference, setReference] = useState<File | null>(null);
-  const [consent, setConsent] = useState(false);
+  const [acceptedPolicy, setAcceptedPolicy] = useState<string>();
+  const configuration = useQuery({ queryKey: ['configuration'], queryFn: api.configuration });
+  const policyVersion = configuration.data?.commercial.policyVersion ?? undefined;
+  const consent = Boolean(acceptedPolicy && acceptedPolicy === policyVersion);
   const recovery = detail.recovery?.cover;
   const cover = [...(detail.covers ?? [])].sort((a, b) => b.attempt - a.attempt)[0];
   const requiresReference = recovery?.requiresReference === true;
@@ -93,15 +99,20 @@ function CoverRecovery({
               type="file"
               accept="image/png,image/jpeg,image/webp"
               disabled={busy}
-              onChange={(event) => setReference(event.target.files?.[0] ?? null)}
+              onChange={(event) => {
+                setReference(event.target.files?.[0] ?? null);
+                setAcceptedPolicy(undefined);
+              }}
             />
           </label>
           <label className="check-row">
             <input
               type="checkbox"
               checked={consent}
-              disabled={busy}
-              onChange={(event) => setConsent(event.target.checked)}
+              disabled={busy || !policyVersion}
+              onChange={(event) =>
+                setAcceptedPolicy(event.target.checked ? policyVersion : undefined)
+              }
             />
             Tenho autorização para usar esta foto na capa.
           </label>
@@ -116,7 +127,9 @@ function CoverRecovery({
           if (recovery?.jobId)
             onRetry(
               recovery.jobId,
-              requiresReference && reference ? { file: reference, consent } : undefined,
+              requiresReference && reference && acceptedPolicy
+                ? { file: reference, consent, policyVersion: acceptedPolicy }
+                : undefined,
             );
         }}
       />
@@ -203,13 +216,14 @@ function EmailRecovery({
       {notifications.length ? (
         notifications.map((item) => (
           <p key={item.id}>
-            {item.status === 'sent' ? 'Enviado' : jobStatusPt(item.status)} ·{' '}
+            {item.status === 'sent' ? 'Aceito pelo provedor' : jobStatusPt(item.status)} ·{' '}
             {new Date(item.updatedAt).toLocaleString('pt-BR')}
           </p>
         ))
       ) : (
         <p>Nenhum envio registrado.</p>
       )}
+      <p>O aceite do envio não confirma recebimento. Consulte devoluções no provedor de e-mail.</p>
       <ConfirmOperation
         label="Reenviar aviso de entrega"
         impact="Envia novamente o aviso ao e-mail do cliente com acesso à entrega existente. Não gera áudio nem capa."
@@ -251,7 +265,7 @@ function OperationJobHistory({ detail }: { detail: AdminOrderDetail }) {
                 detail.order.status === 'delivered' &&
                 job.type === 'generate_audio' &&
                 job.status !== 'completed'
-                  ? 'deliver-notify'
+                  ? 'deliver_notify'
                   : job.type,
               nextRunAt: job.runAt,
               diagnosis: failureDiagnosis(job.lastError, job.retryBlockedReason, job.errorCode),
@@ -415,5 +429,56 @@ export function AudioVariantRecovery({
         message={`A versão ${audio.variant} foi enfileirada para nova criação.`}
       />
     </>
+  );
+}
+
+export function UnknownAiCalls({ detail }: { detail: AdminOrderDetail }) {
+  const client = useQueryClient();
+  const [note, setNote] = useState('');
+  const [acknowledged, setAcknowledged] = useState(false);
+  const resolve = useMutation({
+    mutationFn: (callId: string) => api.resolveAiCall(detail.order.id, callId, note),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['admin', 'order', detail.order.id] }),
+  });
+  if (!detail.unknownCalls?.length) return null;
+  return (
+    <section aria-label="Resultados externos desconhecidos">
+      <h3>Conferência de chamadas sem resultado</h3>
+      <p>
+        Confira o histórico do provedor antes de autorizar outra tentativa. A chamada anterior pode
+        ter sido cobrada.
+      </p>
+      <label>
+        Resultado da conferência
+        <textarea value={note} maxLength={1000} onChange={(event) => setNote(event.target.value)} />
+      </label>
+      <label>
+        <input
+          type="checkbox"
+          checked={acknowledged}
+          onChange={(event) => setAcknowledged(event.target.checked)}
+        />
+        Conferi o provedor e autorizo uma nova tentativa, mesmo que isso gere outra cobrança.
+      </label>
+      {detail.unknownCalls.map((call) => (
+        <article key={call.id}>
+          <p>
+            {call.kind} · {call.provider} · {new Date(call.createdAt).toLocaleString('pt-BR')}
+          </p>
+          <button
+            type="button"
+            disabled={!acknowledged || note.trim().length < 3 || resolve.isPending}
+            onClick={() => resolve.mutate(call.id)}
+          >
+            Registrar conferência e liberar retomada
+          </button>
+        </article>
+      ))}
+      <OperationFeedback
+        error={resolve.error}
+        success={resolve.isSuccess}
+        message="Conferência registrada. Use a ação de retomada desejada; o custo anterior continua desconhecido."
+      />
+    </section>
   );
 }

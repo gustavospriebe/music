@@ -1,3 +1,5 @@
+> HISTÓRICO — documento anterior à remediação de 12/09/2026. Comandos, modelos, orçamento e alegações de prontidão abaixo podem estar superados e não autorizam nova execução. Use o [mapa vigente](documentation-map.md) para implementação e operação.
+
 # Capa de álbum gerada por IA — pesquisa e backlog
 
 **Estado em 04/09/2026:** P2 implementado e validado localmente; ativação permanece **EXTERNAL BLOCKED**. Nenhuma chamada paga de capa foi feita.

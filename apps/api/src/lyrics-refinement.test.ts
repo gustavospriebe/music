@@ -6,7 +6,8 @@ import { createDb, products } from '@resenha/database';
 import { generatedLyricsSchema, type GeneratedLyrics } from '@resenha/contracts';
 import { buildApp } from './app.js';
 import { parseEnv } from './env.js';
-import type { LyricsProvider, LyricsResult } from './providers.js';
+import type { LyricsProvider, LyricsResult } from '@resenha/providers';
+import { settlePublicLyrics } from './lyrics-test-support.js';
 
 const env = parseEnv({
   NODE_ENV: 'test',
@@ -48,6 +49,7 @@ const result = (lyrics: GeneratedLyrics = changed): LyricsResult => ({
     inputTokens: 10,
     outputTokens: 20,
     costUsd: '0',
+    costSource: 'reported',
     latencyMs: 1,
   },
 });
@@ -56,6 +58,8 @@ const appWith = async (provider: LyricsProvider) => {
   apps.push(app);
   return app;
 };
+const settle = (publicId: string, provider: LyricsProvider) =>
+  settlePublicLyrics(pool, publicId, provider, env.DATABASE_URL);
 const prepare = async (app: FastifyInstance, status = 'lyrics_ready') => {
   const created = await app.inject({
     method: 'POST',
@@ -77,6 +81,7 @@ const prepare = async (app: FastifyInstance, status = 'lyrics_ready') => {
     brief: 'Uma música sobre os amigos encontrados pelo caminho',
     safetyConfirmed: true,
     termsAccepted: true,
+    policyVersion: 'draft-v1',
   };
   expect(
     (
@@ -140,8 +145,9 @@ describe('refining a saved lyrics version', () => {
       headers: order.headers,
       payload: { instructions: '  Deixe o refrão mais animado  ', baseVersion: 2 },
     });
-    expect(refined.statusCode).toBe(200);
-    expect(refined.json()).toEqual({ number: 3, kind: 'generated' });
+    expect(refined.statusCode).toBe(202);
+    expect(refined.json()).toEqual({ accepted: true, status: 'lyrics_generating' });
+    await settle(order.publicId, { generate });
     expect(generate.mock.calls[0]?.[2]).toEqual({
       instructions: 'Deixe o refrão mais animado',
       lyrics: {
@@ -280,63 +286,48 @@ describe('refining a saved lyrics version', () => {
   });
 
   it('blocks edits, approval and another refinement while the claimed generation is running', async () => {
-    let start!: () => void;
-    let release!: () => void;
-    const started = new Promise<void>((resolve) => {
-      start = resolve;
-    });
-    const waiting = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    const generate = vi.fn(async () => {
-      start();
-      await waiting;
-      return result();
-    });
+    const generate = vi.fn(async () => result());
     const app = await appWith({ generate });
     const order = await prepare(app);
-    const running = app.inject({
+    const running = await app.inject({
       method: 'POST',
       url: order.url,
       headers: order.headers,
       payload: { instructions: 'Mais energia no refrão', baseVersion: 1 },
     });
-    await started;
-    try {
-      expect(
-        (
-          await app.inject({
-            method: 'PATCH',
-            url: `/api/v1/orders/${order.publicId}/lyrics/1`,
-            headers: order.headers,
-            payload: changed,
-          })
-        ).statusCode,
-      ).toBe(400);
-      expect(
-        (
-          await app.inject({
-            method: 'POST',
-            url: `/api/v1/orders/${order.publicId}/lyrics/1/approve`,
-            headers: order.headers,
-            payload: {},
-          })
-        ).statusCode,
-      ).toBe(400);
-      expect(
-        (
-          await app.inject({
-            method: 'POST',
-            url: order.url,
-            headers: order.headers,
-            payload: { instructions: 'Mude outra coisa', baseVersion: 1 },
-          })
-        ).statusCode,
-      ).toBe(409);
-    } finally {
-      release();
-    }
-    expect((await running).statusCode).toBe(200);
+    expect(running.statusCode).toBe(202);
+    expect(
+      (
+        await app.inject({
+          method: 'PATCH',
+          url: `/api/v1/orders/${order.publicId}/lyrics/1`,
+          headers: order.headers,
+          payload: changed,
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: `/api/v1/orders/${order.publicId}/lyrics/1/approve`,
+          headers: order.headers,
+          payload: {},
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: order.url,
+          headers: order.headers,
+          payload: { instructions: 'Mude outra coisa', baseVersion: 1 },
+        })
+      ).statusCode,
+    ).toBe(409);
+    expect(generate).not.toHaveBeenCalled();
+    await settle(order.publicId, { generate });
     expect(generate).toHaveBeenCalledTimes(1);
     expect(
       (
@@ -349,9 +340,12 @@ describe('refining a saved lyrics version', () => {
   it('keeps the saved editor version when refinement fails, records the error and allows retry', async () => {
     const generate = vi
       .fn<LyricsProvider['generate']>()
-      .mockRejectedValueOnce(new Error('synthetic provider error'))
+      .mockRejectedValueOnce(
+        Object.assign(new Error('synthetic definite provider failure'), { outcome: 'failed' }),
+      )
       .mockResolvedValue(result());
-    const app = await appWith({ generate });
+    const provider = { generate };
+    const app = await appWith(provider);
     const order = await prepare(app);
     const before = (
       await pool.query('select * from lyric_versions where order_id=$1 order by number', [order.id])
@@ -365,7 +359,8 @@ describe('refining a saved lyrics version', () => {
           payload: { instructions: 'Mais energia no refrão', baseVersion: 1 },
         })
       ).statusCode,
-    ).toBe(500);
+    ).toBe(202);
+    await settle(order.publicId, provider);
     const detail = (
       await app.inject({ url: `/api/v1/orders/${order.publicId}`, headers: order.headers })
     ).json();
@@ -400,7 +395,8 @@ describe('refining a saved lyrics version', () => {
           payload: { instructions: 'Mais energia no refrão', baseVersion: 2 },
         })
       ).statusCode,
-    ).toBe(200);
+    ).toBe(202);
+    await settle(order.publicId, { generate });
     expect(generate).toHaveBeenCalledTimes(2);
   });
 

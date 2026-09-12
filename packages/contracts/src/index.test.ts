@@ -9,6 +9,13 @@ import {
   publicOrderSchema,
   publicProductSchema,
   storySchema,
+  creativeBriefSchema,
+  readStorySchema,
+  lyricsContentSchema,
+  generatedLyricsSchema,
+  lyricsJobPayloadSchema,
+  audioJobPayloadSchema,
+  adminResolveAiCallSchema,
 } from './index.js';
 
 const common = {
@@ -20,34 +27,28 @@ const common = {
   mood: 'Animado',
   facts: ['Sempre chega cantando', 'Junta toda a turma'],
   termsAccepted: true as const,
+  policyVersion: 'draft-v1',
 };
 
 describe('storySchema', () => {
-  it('accepts a complete friend-roast story and applies list defaults', () => {
+  it('accepts a complete custom song and applies list defaults', () => {
     const story = storySchema.parse({
       ...common,
-      productType: 'friend_roast',
-      relationship: 'Amiga',
-      traits: ['Engraçada'],
-      biggestStory: 'A viagem para a praia',
-      roastLevel: 'light',
+      productType: 'custom_song',
+      brief: 'Uma canção de aniversário para a Bia, com a turma toda cantando junto.',
       safetyConfirmed: true,
     });
     expect(story.catchphrases).toEqual([]);
-    expect(story.productType).toBe('friend_roast');
+    expect(story.productType).toBe('custom_song');
+    expect(story.intention).toBe('livre');
   });
 
-  it('requires the product-specific safety confirmation', () => {
+  it('requires safety confirmation', () => {
     const result = storySchema.safeParse({
       ...common,
-      productType: 'team_anthem',
-      location: 'Vila Madalena',
-      colors: 'Azul e branco',
-      players: ['Nando'],
-      greatestWin: 'Final do bairro',
-      biggestLoss: 'Chuva no campo',
-      anthemStyle: 'samba',
-      amateurConfirmed: false,
+      productType: 'custom_song',
+      brief: 'Uma canção de aniversário para a Bia, com a turma toda cantando junto.',
+      safetyConfirmed: false,
     });
     expect(result.success).toBe(false);
   });
@@ -56,13 +57,9 @@ describe('storySchema', () => {
     const result = storySchema.safeParse({
       ...common,
       subjectName: ' ',
-      productType: 'emotional_tribute',
-      relationship: 'Irmã',
-      howMet: 'Na escola',
-      mostImportantMemory: 'A formatura',
-      gratitudeReason: 'Pelo apoio',
-      milestone: 'A mudança',
-      desiredFeeling: 'Alegria',
+      productType: 'custom_song',
+      brief: 'Uma canção de aniversário para a Bia, com a turma toda cantando junto.',
+      safetyConfirmed: true,
     });
     expect(result.success).toBe(false);
   });
@@ -71,16 +68,21 @@ describe('storySchema', () => {
 describe('public order contracts', () => {
   it('requires an idempotency UUID for order creation', () => {
     expect(
-      createOrderSchema.safeParse({ productType: 'friend_roast', creationKey: 'repeat-me' })
-        .success,
+      createOrderSchema.safeParse({ productType: 'custom_song', creationKey: 'repeat-me' }).success,
+    ).toBe(false);
+    expect(
+      createOrderSchema.safeParse({
+        productType: 'friend_roast',
+        creationKey: '51cc3b09-2902-42cf-9071-70f078d36cd7',
+      }).success,
     ).toBe(false);
     expect(
       createOrderSchema.parse({
-        productType: 'friend_roast',
+        productType: 'custom_song',
         creationKey: '51cc3b09-2902-42cf-9071-70f078d36cd7',
       }),
     ).toEqual({
-      productType: 'friend_roast',
+      productType: 'custom_song',
       creationKey: '51cc3b09-2902-42cf-9071-70f078d36cd7',
     });
   });
@@ -94,22 +96,22 @@ describe('public order contracts', () => {
   it('rejects internal fields in public product and order payloads', () => {
     expect(
       publicProductSchema.parse({
-        type: 'friend_roast',
-        name: 'Música da Resenha',
+        type: 'custom_song',
+        name: 'Sua música',
         priceCents: 4990,
         active: true,
       }),
     ).toEqual({
-      type: 'friend_roast',
-      name: 'Música da Resenha',
+      type: 'custom_song',
+      name: 'Sua música',
       priceCents: 4990,
       active: true,
     });
     expect(
       publicProductSchema.safeParse({
         id: 'ae52d924-4dd6-4b8e-bd05-20da31a98f02',
-        type: 'friend_roast',
-        name: 'Música da Resenha',
+        type: 'custom_song',
+        name: 'Sua música',
         priceCents: 4990,
         active: true,
       }).success,
@@ -117,7 +119,7 @@ describe('public order contracts', () => {
     expect(
       publicOrderSchema.safeParse({
         publicId: 'order-demo-123',
-        productType: 'friend_roast',
+        productType: 'custom_song',
         status: 'draft',
         priceCents: 4990,
         createdAt: '2026-09-04T12:00:00.000Z',
@@ -204,6 +206,7 @@ const freeIdea = {
   brief: 'Uma canção sobre encontros pelo caminho',
   safetyConfirmed: true,
   termsAccepted: true,
+  policyVersion: 'draft-v1',
 };
 
 describe('intention and optional occasion are independent', () => {
@@ -229,19 +232,104 @@ describe('intention and optional occasion are independent', () => {
     expect(storySchema.safeParse({ ...freeIdea, occasion: 'x'.repeat(241) }).success).toBe(false);
     expect(storySchema.safeParse({ ...freeIdea, intention: 'unsupported' }).success).toBe(false);
   });
-  it('keeps occasion required for the legacy friend-roast product', () => {
-    const legacy = {
-      ...common,
-      productType: 'friend_roast',
-      relationship: 'Amiga',
-      traits: ['Engraçada'],
-      biggestStory: 'A viagem para a praia',
-      roastLevel: 'light',
-      safetyConfirmed: true,
+});
+
+describe('audit remediation intake boundaries', () => {
+  it('pins the generated lyric version before any provider call', () => {
+    const refinement = { instructions: 'Mais emoção', baseVersion: 2 };
+    expect(lyricsJobPayloadSchema.parse({ targetVersion: 3, refinement })).toEqual({
+      targetVersion: 3,
+      refinement,
+    });
+    for (const targetVersion of [undefined, 0, -1, 1.5, '3', 2_147_483_648])
+      expect(lyricsJobPayloadSchema.safeParse({ targetVersion }).success).toBe(false);
+  });
+  it('requires explicit duplicate-cost acknowledgement and an audit note', () => {
+    expect(
+      adminResolveAiCallSchema.parse({
+        acknowledgeDuplicateCost: true,
+        note: '  Conferido no provedor  ',
+      }),
+    ).toEqual({ acknowledgeDuplicateCost: true, note: 'Conferido no provedor' });
+    for (const input of [
+      { note: 'Conferido no provedor' },
+      { acknowledgeDuplicateCost: false, note: 'Conferido no provedor' },
+      { acknowledgeDuplicateCost: true, note: '  ' },
+      { acknowledgeDuplicateCost: true, note: 'Conferido', extra: true },
+    ])
+      expect(adminResolveAiCallSchema.safeParse(input).success).toBe(false);
+  });
+  it('requires an explicit policy version for a new acceptance', () => {
+    expect(storySchema.safeParse({ ...freeIdea, policyVersion: undefined }).success).toBe(false);
+    expect(storySchema.safeParse({ ...freeIdea, policyVersion: ' ' }).success).toBe(false);
+    expect(storySchema.parse(freeIdea).policyVersion).toBe('draft-v1');
+  });
+  it('keeps contact and all consent fields outside the creative provider input', () => {
+    const brief = creativeBriefSchema.parse({
+      ...freeIdea,
+      buyerName: 'Comprador',
+      marketingAccepted: true,
+    });
+    expect(brief.brief).toBe(freeIdea.brief);
+    for (const field of [
+      'buyerEmail',
+      'buyerName',
+      'termsAccepted',
+      'marketingAccepted',
+      'safetyConfirmed',
+      'policyVersion',
+    ])
+      expect(brief).not.toHaveProperty(field);
+  });
+  it('reads historical stories without manufacturing positive acceptance', () => {
+    const read = readStorySchema.parse({
+      ...creativeBriefSchema.parse(freeIdea),
+      buyerEmail: freeIdea.buyerEmail,
+      marketingAccepted: false,
+    });
+    expect(read).not.toHaveProperty('termsAccepted');
+    expect(read).not.toHaveProperty('marketingKnown');
+    expect(read).not.toHaveProperty('policyVersion');
+    expect(storySchema.safeParse(read).success).toBe(false);
+  });
+  it('requires a production reference for an audio job', () => {
+    expect(audioJobPayloadSchema.safeParse({ provider: 'google' }).success).toBe(false);
+    expect(
+      audioJobPayloadSchema.parse({
+        productionId: '651aa69d-f879-4ac4-9044-6d4d4d63a4fa',
+        variant: 2,
+      }),
+    ).toEqual({ productionId: '651aa69d-f879-4ac4-9044-6d4d4d63a4fa', variant: 2 });
+  });
+  it('permits free edited lyrics but requires structure from the generation provider', () => {
+    const content = {
+      title: 'Uma canção',
+      summary: 'Uma viagem',
+      language: 'pt-BR',
+      musicalDirection: {
+        genre: 'MPB',
+        mood: 'Calmo',
+        tempo: 'medium',
+        voice: 'either',
+        instrumentation: ['Violão'],
+      },
+      pronunciationNotes: [],
+      sections: [],
+      fullLyrics: 'Uma estrada aberta\nUm novo amanhecer',
+      safetyNotes: [],
     };
-    expect(storySchema.safeParse({ ...legacy, occasion: '' }).success).toBe(false);
-    expect(storySchema.safeParse({ ...legacy, occasion: undefined }).success).toBe(false);
-    expect(storySchema.parse(legacy).occasion).toBe('Aniversário');
+    expect(lyricsContentSchema.parse(content).fullLyrics).toBe(content.fullLyrics);
+    expect(generatedLyricsSchema.safeParse(content).success).toBe(false);
+    expect(
+      generatedLyricsSchema.safeParse({
+        ...content,
+        sections: [1, 2, 3].map((n) => ({
+          type: 'verse',
+          label: `Verso ${n}`,
+          lyrics: 'Versos livres',
+        })),
+      }).success,
+    ).toBe(false);
   });
 });
 

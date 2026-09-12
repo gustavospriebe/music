@@ -1,5 +1,7 @@
 # Validation: Studio Flow UAT Fixes
 
+> Registro histórico de um recorte anterior. O modelo vigente e a evidência atual estão em [docs/documentation-map.md](../../../docs/documentation-map.md) e [audit-remediation](../audit-remediation/spec.md). Este registro não autoriza publicação nem gasto com providers.
+
 **Result**: PASS
 
 PASS técnico local para os cinco critérios, incluindo UAT-05 acrescentado após a observação real de HTTP402. O gate integrado independente de 201 testes precedeu os retoques finais da web e do worker. Depois, o worker passou 40 testes focais independentes; a web possui evidência própria de 76 testes e 44 E2E. Cinco mutações no total foram detectadas. O novo gate integrado do estado completo ficou adiado enquanto os autores iniciavam a feature separada `lyrics-production-polish`. As correções respondem aos problemas relatados na UAT; isso não substitui o novo aceite visual do usuário nem comprova o resultado das chamadas reais conduzidas pelo principal.

@@ -1,5 +1,7 @@
 # UI Remodel Local Validation
 
+> Registro histórico de um recorte anterior. O modelo vigente e a evidência atual estão em [docs/documentation-map.md](../../../docs/documentation-map.md) e [audit-remediation](../audit-remediation/spec.md). Este registro não autoriza publicação nem gasto com providers.
+
 **Date**: 2026-09-06
 **Feature**: `.specs/features/ui-remodel/`
 **Environment**: macOS, Node v24.14.1, pnpm 12.3.4, PostgreSQL descartável (`resenha_remodel`, `resenha_remodel_test`, `resenha_qa`)

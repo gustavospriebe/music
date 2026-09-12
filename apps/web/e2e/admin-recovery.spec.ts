@@ -1,3 +1,4 @@
+import { publicConfiguration } from './public-configuration';
 import { expect, test } from '@playwright/test';
 const lyric = {
   id: 'lyric',
@@ -75,6 +76,7 @@ test('admin revisa letra e retoma faltantes por confirmação, atualizando diagn
   await page.route('**/api/v1/**', async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
+    if (path.endsWith('/configuration')) return route.fulfill({ json: publicConfiguration });
     if (path.endsWith('/lyrics') && request.method() === 'PATCH') {
       expect(request.postDataJSON().fullLyrics).toBe('Uma nova letra revisada');
       value.lyrics = [{ ...lyric, number: 2, content: request.postDataJSON() }];
@@ -139,11 +141,14 @@ test('admin recupera capa com foto consentida e envia somente aviso de entrega',
   await page.route('**/api/v1/**', async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
+    if (path.endsWith('/configuration')) return route.fulfill({ json: publicConfiguration });
     if (path.endsWith('/jobs/cover-job/retry')) {
       coverRequests++;
       expect(request.headers()['content-type']).toContain('multipart/form-data; boundary=');
       const body = request.postData() ?? '';
       expect(body).toContain('name="consent"');
+      expect(body).toContain('name="policyVersion"');
+      expect(body).toContain(publicConfiguration.commercial.policyVersion);
       expect(body).toContain('true');
       expect(body).toContain('filename="reference.png"');
       value.recovery.cover.canRetry = false;

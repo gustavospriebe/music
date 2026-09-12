@@ -20,7 +20,7 @@ export function clearDraft() {
   }
 }
 
-/** Local recovery is intentional until an opaque story-session token is available from the API. */
+/** The draft belongs to this browser; the customer can clear it before submission. */
 export function useDraft(values: Draft, enabled = true) {
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   useEffect(() => {

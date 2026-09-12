@@ -1,88 +1,58 @@
-# Contexto canônico do projeto
+# Contexto canônico — Música da Resenha
 
-Este documento é o ponto de entrada para agentes e sessões novas. Evidência operacional corrente fica em `.specs/STATE.md`; especificações e validações por entrega ficam em `.specs/features/`.
+Data de referência: 2026-09-12. Este documento descreve o produto único após `audit-remediation` e sua ativação técnica no Railway. A homologação usa pagamento sandbox; não há aceite comercial nem PIX de produção. Consulte [.specs/STATE.md](../.specs/STATE.md) para refs, execuções e evidências datadas. Uma spec ou este documento é uma alegação a conferir no código e no ambiente.
 
-## Produto e fluxo
+## Produto
 
-Música da Resenha transforma uma história, homenagem, presente ou ideia livre em letra revisável, pagamento, duas versões de áudio e uma capa opcional. O cliente prepara sua direção criativa em quatro passos internos, sem restringir gênero ou ocasião a uma resenha. A API cria o pedido e gera a letra. O pagamento confirmado cria um job durável no PostgreSQL. O worker gera áudio/capa, persiste arquivos privados e envia o aviso de entrega. A API medeia todo download por capability; o bucket nunca é público.
+Um produto vivo, `custom_song`: história/ideia livre → letra gerada, editável e refinável → aprovação → checkout PIX → duas versões de áudio da letra aprovada → revisão humana → entrega privada por link e e-mail. Capa é opcional e paralela; sua falha não deve bloquear a música. Não há cadastro. A lista “Minhas músicas” depende deste navegador; o link de entrega concede visualização, não edição do pedido.
 
-```mermaid
-flowchart LR
-  Browser[web: React/Vite] --> API[api: Fastify]
-  API --> DB[(Postgres: dados + fila)]
-  Worker[worker contínuo] --> DB
-  API --> AI[OpenRouter: letra]
-  API --> Payment[Adapter de pagamento]
-  API --> Bucket[(Bucket privado)]
-  Worker --> AI2[OpenRouter: áudio/capa]
-  Worker --> Bucket
-  Worker --> Email[Adapter de email]
-```
+Preço e regras comerciais pertencem ao servidor. `products.price_cents` é o preço vigente; `orders.price_cents` é o snapshot da criação. Zero significa preço indefinido para cobrança real. O dono ainda precisa escolher preço, aprovar/publicar condições e homologar pagamento de produção.
 
-## Fronteiras reais
+## Mapa do código
 
-| Componente           | Responsabilidade                                                     | Entrada de produção                                                |
-| -------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `apps/web`           | Jornada pública e admin; não contém regra de preço/status            | Nginx não-root, porta `8080`, `VITE_API_URL` incorporada no build  |
-| `apps/api`           | HTTP, auth/capabilities, letra, checkout/webhook e proxy de arquivos | Fastify, `PORT` ou `API_PORT`, readiness em `/api/v1/health/ready` |
-| `apps/worker`        | Polling contínuo, áudio, capa, retry/revisão e e-mail                | Processo sem domínio/cron; restart `ALWAYS`                        |
-| `packages/database`  | Drizzle, migrations, seed e fila com `FOR UPDATE SKIP LOCKED`        | `DATABASE_URL` compartilhada por API e worker                      |
-| `packages/domain`    | Transições, tokens e prompts compartilhados por API/worker           | Toda mudança de status passa por `assertTransition`                |
-| `packages/contracts` | Schemas compartilhados por API/worker                                | A web mantém tipos próprios hoje                                   |
-| `packages/providers` | Adapters de storage e email                                          | Produção exige S3 compatível privado                               |
+| Fronteira            | Responsabilidade e entrada                                                                                                                            |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web`           | Jornada pública e administração; consome contratos e configuração sanitizada.                                                                         |
+| `apps/api`           | Fastify: HTTP, cookies/capabilities, validação, enqueue, checkout/webhook e downloads privados. Rotas administrativas separadas por responsabilidade. |
+| `apps/worker`        | Processo contínuo: fila, reconciliação financeira, letra, áudio, capa e e-mail.                                                                       |
+| `packages/contracts` | Zod: entrada do formulário, `CreativeBrief`, leitura sem aceite inventado, letra e payloads de jobs.                                                  |
+| `packages/domain`    | Transições, identidade/monotonicidade de pagamento, texto canônico, validação, prompts, tokens e erros seguros.                                       |
+| `packages/database`  | Schema Drizzle, migrations, fila com lease e settlement financeiro transacional.                                                                      |
+| `packages/providers` | Adapters de pagamento, letra, armazenamento e e-mail; rede específica de áudio/capa continua no worker.                                               |
 
-OpenRouter e transporte AbacatePay da API vivem em `apps/api/src/providers.ts`; seleção de pagamento em `apps/api/src/payment.ts`. OpenRouter de áudio/capa permanece no worker. E-mail foi extraído para `packages/providers/src/email.ts`; intenção persistida e retry pertencem ao worker. Configuração pública sanitizada fica em `apps/api/src/configuration.ts`.
+Não há Redis, framework de agentes nem fila externa. PostgreSQL guarda dados e jobs. `fetch` pontual + validação + histórico de chamadas é suficiente para o fluxo atual; nenhuma necessidade presente justifica outro runtime de IA.
 
-## Topologia Railway decidida
+## Invariantes que importam
 
-O projeto Railway privado `musica-da-resenha` e os serviços vazios `web`, `api` e `worker` já existem. Eles ainda não têm source, variáveis, domínio ou deployment. `Postgres` e `Bucket` ainda não foram criados porque seu provisionamento inicia infraestrutura/deploy e permanece atrás de autorização explícita. Esse estado foi reconfirmado em leitura ao vivo em 2026-09-07: nenhum deployment nos três serviços e nenhum Postgres/Bucket. Revalide antes de qualquer ação futura.
+- `Story` é uma submissão HTTP composta. `story_sessions.data` guarda `CreativeBrief`; `order_contacts` guarda contato; `order_consents` guarda finalidade, versão e instante. O briefing livre ainda pode conter dados pessoais sobre o homenageado. Separar contato não o torna anônimo.
+- `fullLyrics` é o texto canônico. Se as seções deixarem de representar esse texto numa edição, são esvaziadas. A resposta do gerador tem contrato estrutural mais exigente que uma edição livre.
+- Cada produção fixa `lyric_version_id`. Áudios têm histórico por produção/variante/tentativa, arquivo exclusivo e seleção explícita. Entrega aponta para a produção liberada.
+- Estado do pedido descreve a jornada; não é livro financeiro. `payments` registra tentativas e dinheiro, incluindo `unknown` e `refunded`. Webhook e reconciliação aplicam o mesmo settlement.
+- O worker registra `ai_calls` antes da chamada externa e condiciona efeitos ao lease. Resultado desconhecido exige reconciliação/revisão explícita; timeout não autoriza pagar outra chamada automaticamente.
+- `ai_usage.cost_source` distingue informado, estimado e desconhecido. `null` não é custo zero; falta de histórico não comprova ausência de gasto.
+- Revisão padrão é `AUDIO_REVIEW_MODE=manual`. `automatic_release` é liberação sem audição, não uma avaliação artística automática. O antigo valor `automatic` foi removido.
+- Tokens ficam como hash; cookies são assinados e HttpOnly. Downloads passam pela API. Admin único usa `ADMIN_EMAIL`/`ADMIN_PASSWORD` do ambiente por decisão do dono; não há coluna de senha decorativa no schema novo.
 
-A topologia alvo usa o ambiente inicial `production` sem tráfego comercial, com `web`, `api`, `worker`, `Postgres` e `Bucket`. Os três apps usam o mesmo repositório `gustavospriebe/music`, branch `main`, e contexto de build na raiz porque compartilham workspaces. API e worker usam o mesmo banco e bucket. Somente web e API recebem domínio público.
+## Código local, Git e Railway são provas diferentes
 
-O Bucket Railway é S3 compatível, privado e criptografado em repouso. Ele não oferece backup automático, versionamento, lifecycle nem object lock. Objetos precisam de export/backup externo. O tráfego serviço→bucket usa rede pública e conta como egress do serviço.
+A auditoria encontrou trabalho local não publicado e catálogo remoto incompatível; a ativação externa corrigiu esse descompasso com backup, drenagem e promoção conjunta. O projeto Railway conhecido é **`musica`**, com `web`, `api`, `worker`, `Postgres` e `Bucket`. Não usar o nome histórico `musica-da-resenha` como alvo de operação.
 
-## Gates e estados
+A leitura do banco local existente confirmou PostgreSQL 16.11 e migrations até `0011`; trocar a imagem do compose não atualiza um volume existente. A ativação validou instalação limpa e atualização em PostgreSQL 18 isolado. O Railway foi inspecionado por SQL: PostgreSQL 18.6, migrations `0000`–`0016` com os 17 hashes versionados, catálogo somente `custom_song`. O volume local 16 não foi alterado. Disponibilidade HTTP e catálogo não substituem essa inspeção.
 
-- `pnpm check`: format, lint, typecheck, testes e build locais.
-- `pnpm test:e2e`: Playwright separado; requer aplicação/banco preparados.
-- CI remoto: PostgreSQL 16, migrations no banco principal e de teste, suítes serializadas no banco compartilhado, demais gates e Playwright.
-- Provider real, Browser UAT, homologação, deploy e produção são gates distintos. Nunca derive um do outro.
+`0012` registra produção, tentativas financeiras, consentimentos, leases e chamadas de IA. Histórico sem origem comprovável recebe `legacy_unverified`, sem adivinhar letra ou aceite. `0013` recupera o alvo de jobs de letra apenas quando a chave histórica comprova a versão; jobs ativos sem prova ficam bloqueados. `0014` vincula a intenção de e-mail à produção para permitir avisos de uma revisão sem repetir o aviso anterior. `0015` e `0016` separam ambientes financeiros e de webhook; histórico sem prova conserva NULL. Migrations já aplicadas são imutáveis.
 
-O CI remoto importado falhava antes do install porque `actions/setup-node` tentava localizar pnpm para o cache antes da instalação. O workflow corrigido instala pnpm primeiro com `pnpm/action-setup`, declara no Turbo as variáveis de teste permitidas e serializa as suítes que truncam o mesmo banco. A correção passou localmente, mas ainda não foi publicada nem observada em uma execução remota.
+## Evidência e operação
 
-O contrato local atual é Node 22 + pnpm 12.3.4. O `pnpm-lock.yaml` tem dois documentos oficiais do pnpm 12 (ambiente e grafo do projeto), fica fora do Prettier e passou em instalação congelada byte-estável. A baseline de 2026-09-06 passou migrations/seed, 119 testes, build, 30 E2E e imagens Docker de web/API/worker sem chamadas externas. Consulte `.specs/features/local-readiness-ui-audit/local-validation.md`.
+`pnpm check` reúne format, lint, typecheck, testes e build; E2E é um gate separado. Só um resultado executado na revisão correspondente comprova o gate. O contrato de runtime é Node 22 e pnpm 12.3.4; CI e testes de banco devem usar PostgreSQL 18. Gates finais desta entrega ficam na sua validação, não presumidos aqui.
 
-A auditoria anterior de cliente e administração está em `docs/ui-ux-audit.md`. Ela preserva a direção visual existente e prioriza arquitetura da jornada, confiança comercial, cockpit operacional, privacidade e acessibilidade antes do redesign. A remodelagem que a implementa está entregue em `docs/ui-remodel-report.md` (spec/design/tasks/validação em `.specs/features/ui-remodel/`): jornada única de cinco etapas, checkout com resumo e estado do provider, cockpit admin com agregados do servidor e PII mascarada, menu mobile com foco contido. Texto jurídico/comercial segue pendente e o lançamento comercial segue bloqueado.
+Testes sintéticos e provas externas estão separados na [validação de ativação](../.specs/features/external-activation/validation.md): houve checkout e pagamento simulado no gateway, reconciliação, webhook real, quatro chamadas de IA e restore dos três objetos reais. Aceite de envio pelo Resend não equivale a recebimento; qualidade artística depende de escuta humana. A aplicação deve continuar comercialmente indisponível até os aceites externos. Não herdar autorizações antigas de crédito, publicação ou deploy de handoffs. A exceção de homologação exige admin e capability; o frontend acessa a API pela própria origem via proxy Nginx.
 
-## Restrições de operação
+## Ordem de leitura
 
-- Não registrar secrets, tokens, payloads pessoais nem IDs internos em logs ou docs.
-- Não executar provider pago sem autorização e teto de custo.
-- Não criar Redis/fila paralela: PostgreSQL já é a fila durável.
-- Não usar disco efêmero em produção. `STORAGE_PROVIDER=s3` é obrigatório.
-- Migration é repetível; seed inicial é necessário para popular produtos. Nunca usar seed como migration recorrente sem conferir seu efeito.
-- `AUDIO_REVIEW_MODE=manual` é o default seguro de ativação até decisão comercial explícita.
+1. Este contexto e [.specs/STATE.md](../.specs/STATE.md).
+2. [Arquitetura](architecture.md), [produto](product.md), schema e migrations.
+3. [Preocupações atuais](../.specs/codebase/CONCERNS.md) e [evolução](evolucao-mvp.md).
+4. [Configuração de providers](provider-setup.md), [contratos dos providers](providers.md), [checklist de produção](production-checklist.md) e [runbook externo](external-activation-runbook.md).
+5. [Spec da correção](../.specs/features/audit-remediation/spec.md) e sua validação para distinguir implementado, testado e pendente.
 
-## Próximos documentos
-
-- Infra: `docs/railway-setup.md`
-- Providers e segredos: `docs/provider-setup.md`
-- Ativação externa: `docs/external-activation-runbook.md`
-- Checklist de promoção: `docs/production-checklist.md`
-- Auditoria UI/UX atual: `docs/ui-ux-audit.md`
-- Baseline local: `.specs/features/local-readiness-ui-audit/local-validation.md`
-- Estado atual e decisões: `.specs/STATE.md`
-
-## Entrega atual: launch-remodel
-
-A revisão geral e remodelagem de 2026-09-07 estão em `.specs/features/launch-remodel/` e `docs/launch-remodel-report.md`. O produto custom_song amplia criação sem reescrever produtos antigos. Preço inicial0 significa pendente, não gratuito; seed preserva catálogo já precificado e pedidos mantêm snapshot. Condições comerciais e preço positivo bloqueiam checkout real enquanto não definidos. Gateway pode permanecer disabled.
-
-Acesso assinado vincula tipo, pedido e versão corrente; revogação invalida cookies e links antigos. Revisão pós-entrega é visível ao admin. Intenção de email e link permanecem estáveis no retry, sem token aberto no banco. Logs locais foram removidos do worktree com backup; nenhum histórico remoto foi reescrito.
-
-Preview local isolado: `bash scripts/local-preview.sh api|web|worker`, web5180/API3010, banco music_launch_preview. O script neutraliza chaves por padrão e admite opt-in seletivo `PREVIEW_AI=lyrics|lyrics-audio|all`, depois de autorização com orçamento; `all` inclui capas. O worker com IA roda sem watch para que alterações de código não reiniciem uma chamada paga em andamento. Runtime e gates usam Node22. Não houve commit, push ou deploy.
-
-## Correções após UAT humana
-
-As observações do usuário sobre intenção/ocasião, controles duplicados e jornada foram tratadas em `.specs/features/studio-flow-uat-fixes/` e `docs/studio-flow-uat-fixes.md`. A segunda rodada amplia edição/refinamento da letra, condições comerciais e atividade de produção em `.specs/features/lyrics-production-polish/`. Consulte essas evidências e STATE antes de considerar a experiência concluída.
-
-O usuário autorizou chamadas reais até US$3 nesta rodada de 2026-09-07. Um pedido fictício produziu letra, duas versões de áudio e capa com sucesso. Outro pedido encontrou primeiro HTTP402 por limite específico da chave, embora a conta tivesse saldo; o usuário removeu esse limite. Na retomada, o filtro do modelo recusou duas tentativas e o job encerrou. Esses resultados comprovam chamadas específicas, não disponibilidade irrestrita nem aceite artístico. Erros permanentes de áudio não geram retries automáticos; uma retomada administrativa explícita preserva o contador histórico e libera pelo menos mais uma tentativa.
+`docs/handoff-mvp-launch.md` está arquivado. Specs antigas de três produtos/Mercado Pago são história, não contrato para novos consumidores.

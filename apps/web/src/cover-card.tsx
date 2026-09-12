@@ -72,6 +72,7 @@ function CoverForm({
   hasPreviousCover,
   reference,
   consent,
+  policyAvailable,
   pending,
   error,
   onReference,
@@ -82,6 +83,7 @@ function CoverForm({
   hasPreviousCover: boolean;
   reference: File | undefined;
   consent: boolean;
+  policyAvailable: boolean;
   pending: boolean;
   error: Error | null;
   onReference: (file: File | undefined) => void;
@@ -108,6 +110,7 @@ function CoverForm({
           <input
             type="checkbox"
             checked={consent}
+            disabled={!policyAvailable}
             onChange={(event) => onConsent(event.target.checked)}
           />
           Tenho permissão para usar as pessoas presentes nesta foto.
@@ -132,7 +135,10 @@ function CoverForm({
 export function OwnerCoverCard({ publicId }: { publicId: string }) {
   const queryClient = useQueryClient();
   const [reference, setReference] = useState<File>();
-  const [consent, setConsent] = useState(false);
+  const [acceptedPolicy, setAcceptedPolicy] = useState<string>();
+  const configuration = useQuery({ queryKey: ['configuration'], queryFn: api.configuration });
+  const policyVersion = configuration.data?.commercial.policyVersion ?? undefined;
+  const consent = Boolean(acceptedPolicy && acceptedPolicy === policyVersion);
   const [showRegeneration, setShowRegeneration] = useState(false);
   const queryKey = ['cover', 'owner', publicId] as const;
   const query = useQuery({
@@ -141,7 +147,7 @@ export function OwnerCoverCard({ publicId }: { publicId: string }) {
     refetchInterval: ({ state }) => (isCreating(state.data?.cover ?? null) ? 2_000 : false),
   });
   const create = useMutation({
-    mutationFn: () => api.createCover(publicId, reference, consent),
+    mutationFn: () => api.createCover(publicId, reference, consent, acceptedPolicy),
     onSuccess: async (cover) => {
       queryClient.setQueryData(queryKey, { available: true, cover });
       setShowRegeneration(false);
@@ -182,13 +188,14 @@ export function OwnerCoverCard({ publicId }: { publicId: string }) {
         hasPreviousCover={Boolean(cover)}
         reference={reference}
         consent={consent}
+        policyAvailable={Boolean(policyVersion)}
         pending={create.isPending}
         error={create.error}
         onReference={(file) => {
           setReference(file);
-          setConsent(false);
+          setAcceptedPolicy(undefined);
         }}
-        onConsent={setConsent}
+        onConsent={(value) => setAcceptedPolicy(value ? policyVersion : undefined)}
         onSubmit={submit}
       />
     </section>

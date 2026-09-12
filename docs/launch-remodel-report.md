@@ -1,3 +1,5 @@
+> HISTÓRICO — leitura anterior à remediação de 12/09/2026. Alegações de schema, providers, status e prontidão abaixo podem estar superadas. Este documento não autoriza implementação, gastos ou publicação. Use o [modelo vigente](project-context.md) e sua validação.
+
 # Revisão e remodelagem da aplicação
 
 **Entrega local validada em 2026-09-07. Lançamento comercial ainda depende de decisões e gates externos.** A aplicação está disponível no preview isolado [http://localhost:5180](http://localhost:5180), com API 3010 e worker ativos. Implementação dividida entre três subagentes, integração pelo principal e verificador independente.

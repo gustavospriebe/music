@@ -1,5 +1,7 @@
 # Validation: Admin Recovery
 
+> Registro histórico de um recorte anterior. O modelo vigente e a evidência atual estão em [docs/documentation-map.md](../../../docs/documentation-map.md) e [audit-remediation](../audit-remediation/spec.md). Este registro não autoriza publicação nem gasto com providers.
+
 **Result**: PASS técnico local — 7/7 critérios, 289 testes e sensor comportamental 7/7 detectado.
 
 **Data**: 2026-09-07. **Verificador**: subagente independente, sem autoria da implementação. Escopo: incremento de recuperação administrativa; API, worker, domínio, contratos e interface. Somente este relatório foi editado pelo verificador nesta rodada. O WIP anterior foi preservado; não houve chamadas a providers, uso do banco operacional, commit ou deploy.

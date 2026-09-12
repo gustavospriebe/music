@@ -1,5 +1,7 @@
 # Correções da UAT do estúdio
 
+> Registro histórico de um recorte anterior. O modelo vigente e a evidência atual estão em [docs/documentation-map.md](../../../docs/documentation-map.md) e [audit-remediation](../audit-remediation/spec.md). Este registro não autoriza publicação nem gasto com providers.
+
 ## Contexto
 
 O teste humano de 2026-09-07 encontrou redundância nos controles, sobrescrita de ocasião e quebra de continuidade depois de salvar. Os gates técnicos anteriores não representavam aceite desta experiência.

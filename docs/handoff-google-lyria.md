@@ -1,3 +1,5 @@
+> HISTÓRICO — documento anterior à remediação de 12/09/2026. Comandos, modelos, orçamento e alegações de prontidão abaixo podem estar superados e não autorizam nova execução. Use o [mapa vigente](documentation-map.md) para implementação e operação.
+
 # Handoff — Música da Resenha / Google Lyria e comparação de modelos
 
 Preparado em 07/09/2026. Repositório: `/Users/gustavopriebe/dev/music`. Leia este documento como contexto de continuidade, não como prova de que processos e preços permanecem iguais na próxima sessão.

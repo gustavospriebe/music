@@ -8,7 +8,10 @@ Comece por `docs/project-context.md` e reconcilie `.specs/STATE.md` com Git, CI 
 - TypeScript estrito, ESM, funções pequenas e dependências explícitas. Não introduza services/classes/DI sem necessidade concreta.
 - Rotas validam HTTP; domínio guarda invariantes; repositórios persistem; providers encapsulam rede; worker é retomável.
 - Não exponha IDs internos, tokens, payloads pessoais ou secrets. Use centavos inteiros e UTC.
-- Status só muda por `assertTransition`; eventos e versões de letra são históricos, não mutáveis.
+- Estado do pedido muda por `assertTransition`; estado financeiro usa as transições do domínio de pagamento. Eventos e versões de letra são históricos. Produção fixa sua letra; nenhuma regeneração apaga artefatos anteriores.
+- I/O cobrado exige tentativa durável antes da rede. Lease perdida impede efeitos de produção. Resultado desconhecido exige conferência, não retry automático.
+- `ai_usage` não reprecifica custo conhecido; uma observação tardia pode completar custo antes desconhecido, com evento. Nunca rotule estimativa como custo informado.
+- Migrações publicadas/aplicadas são imutáveis; use migração nova. Testes só em banco isolado explícito, com providers controlados.
 
 ## Comandos
 

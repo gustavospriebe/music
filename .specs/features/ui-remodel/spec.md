@@ -1,5 +1,7 @@
 # UI Remodel Specification
 
+> Registro histórico de um recorte anterior. O modelo vigente e a evidência atual estão em [docs/documentation-map.md](../../../docs/documentation-map.md) e [audit-remediation](../audit-remediation/spec.md). Este registro não autoriza publicação nem gasto com providers.
+
 ## Problem Statement
 
 A auditoria em `docs/ui-ux-audit.md` mostra base visual forte (creme, coral, preto, tipografia expressiva, tom brasileiro), mas continuidade quebrada na jornada do cliente, checkout sem confiança suficiente, administração como projeção técnica do backend com PII exposta e menu mobile sem contenção de foco. A remodelagem corrige arquitetura da informação, confiança, operação, privacidade e acessibilidade sobre os componentes, rotas, estilos e tokens existentes, sem novo frontend, template ou design system.

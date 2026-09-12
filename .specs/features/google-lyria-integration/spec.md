@@ -1,5 +1,7 @@
 # Google Lyria 3.5 Integration Specification
 
+> Registro histórico de um recorte anterior. O modelo vigente e a evidência atual estão em [docs/documentation-map.md](../../../docs/documentation-map.md) e [audit-remediation](../audit-remediation/spec.md). Este registro não autoriza publicação nem gasto com providers.
+
 ## Problem Statement
 
 O worker só consegue gerar áudio por OpenRouter, embora o projeto precise comparar o Lyria 3.5 direto da API Google com o Lyria 3 Pro atualmente usado. A seleção atual é implícita no processo e os registros de áudio/uso gravam `openrouter` fixo, o que impede comparação confiável, troca segura de fornecedor e diagnóstico de recusas.

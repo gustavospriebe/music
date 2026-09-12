@@ -21,7 +21,7 @@ RUN pnpm --filter @resenha/worker build
 FROM node:22-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
-RUN addgroup -S app && adduser -S app -G app
+RUN apk add --no-cache ffmpeg && addgroup -S app && adduser -S app -G app
 COPY --from=build --chown=app:app /app /app
 USER app
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD node -e "try { process.kill(1, 0); } catch { process.exit(1); }"

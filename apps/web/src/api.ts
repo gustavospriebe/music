@@ -1,3 +1,4 @@
+import type { LyricsGenerateAccepted } from '@resenha/contracts';
 import type {
   AdminAudio,
   AlbumCover,
@@ -10,10 +11,8 @@ import type {
   Story,
 } from './types';
 
-/** Em dev, usa URL relativa e o proxy do Vite (funciona via Tailscale/IP). Produção exige VITE_API_URL no build. */
-const baseUrl =
-  import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? '' : 'http://localhost:3001');
-const url = (path: string) => `${baseUrl}/api/v1${path}`;
+/** A mesma origem preserva cookies privados no Vite e no proxy de produção. */
+const url = (path: string) => new URL(`/api/v1${path}`, window.location.origin).href;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** UUID v4 sem depender de `crypto.randomUUID` (ausente em HTTP não-seguro). */
@@ -94,6 +93,7 @@ export type PublicConfiguration = {
     usageLicense: string | null;
     termsUrl: string | null;
     privacyUrl: string | null;
+    policyVersion: string | null;
   };
   payment: {
     provider: 'abacatepay' | 'disabled';
@@ -105,7 +105,7 @@ export type PublicConfiguration = {
 export const api = {
   configuration: () => request<PublicConfiguration>('/configuration'),
   products: () => request<PublicProduct[]>('/products'),
-  createOrder: (productType: ProductType, creationKey: string, visitorId?: string) =>
+  createOrder: (productType: 'custom_song', creationKey: string, visitorId?: string) =>
     request<{ publicId: string }>(`/orders`, {
       method: 'POST',
       body: JSON.stringify({
@@ -121,7 +121,7 @@ export const api = {
     }),
   getOrder: (publicId: string) => request<OrderDetail>(`/orders/${publicId}`),
   cover: (publicId: string) => request<AlbumCoverResponse>(`/orders/${publicId}/cover`),
-  createCover: (publicId: string, reference?: File, consent = false) => {
+  createCover: (publicId: string, reference?: File, consent = false, policyVersion?: string) => {
     if (!reference)
       return request<AlbumCover>(`/orders/${publicId}/cover`, {
         method: 'POST',
@@ -129,6 +129,7 @@ export const api = {
       });
     const body = new FormData();
     body.append('consent', String(consent));
+    body.append('policyVersion', policyVersion ?? '');
     body.append('reference', reference);
     return request<AlbumCover>(`/orders/${publicId}/cover`, { method: 'POST', body });
   },
@@ -144,7 +145,7 @@ export const api = {
       ...(content ? { body: JSON.stringify({ content }) } : {}),
     }),
   generateLyrics: (publicId: string, refinement?: { instructions: string; baseVersion: number }) =>
-    request(`/orders/${publicId}/lyrics/generate`, {
+    request<LyricsGenerateAccepted>(`/orders/${publicId}/lyrics/generate`, {
       method: 'POST',
       ...(refinement ? { body: JSON.stringify(refinement) } : {}),
     }),
@@ -185,7 +186,7 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
   adminGenerateLyrics: (id: string) =>
-    request<{ number: number }>(`/admin/orders/${id}/lyrics/generate`, {
+    request<LyricsGenerateAccepted>(`/admin/orders/${id}/lyrics/generate`, {
       method: 'POST',
       body: JSON.stringify({}),
     }),
@@ -218,7 +219,16 @@ export const api = {
     ),
   adminOverview: () =>
     request<{
-      totals: { orders: number; paid: number; revenueCents: number };
+      totals: { orders: number; paid: number; revenueCents: number; refundedCents: number };
+      financialEnvironments: FinancialEnvironmentTotals[];
+      queue: {
+        pending: number;
+        processing: number;
+        failed: number;
+        oldestPendingAgeSeconds: number | null;
+        expiredLeases: number;
+        unknownCalls: number;
+      };
       attention: {
         failed: number;
         failedOperationalOrders?: number;
@@ -230,11 +240,17 @@ export const api = {
   adminOrder: (id: string) => request<AdminOrderDetail>(`/admin/orders/${id}`),
   adminAssetStreamUrl: (orderId: string, assetId: string) =>
     url(`/admin/orders/${orderId}/assets/${assetId}/stream`),
-  retryJob: (id: string, reference?: { file: File; consent: boolean }) => {
+  resolveAiCall: (orderId: string, callId: string, note: string) =>
+    request<{ resolved: true }>(`/admin/orders/${orderId}/ai-calls/${callId}/resolve`, {
+      method: 'POST',
+      body: JSON.stringify({ acknowledgeDuplicateCost: true, note }),
+    }),
+  retryJob: (id: string, reference?: { file: File; consent: boolean; policyVersion: string }) => {
     const body = reference ? new FormData() : JSON.stringify({});
     if (body instanceof FormData && reference) {
-      body.append('reference', reference.file);
       body.append('consent', String(reference.consent));
+      body.append('policyVersion', reference.policyVersion);
+      body.append('reference', reference.file);
     }
     return request<{ queued: true }>(`/admin/jobs/${id}/retry`, { method: 'POST', body });
   },
@@ -262,6 +278,14 @@ export const api = {
   },
 };
 export type FunnelStep = { event: string; orders: number; rateFromPrevious: number | null };
+export type PaymentEnvironment = 'live' | 'sandbox' | 'local';
+export type FinancialEnvironmentTotals = {
+  environment: PaymentEnvironment | 'unclassified';
+  attempts: number;
+  paid: number;
+  approvedCents: number;
+  refundedCents: number;
+};
 export type Funnel = {
   days: number;
   steps: FunnelStep[];
@@ -281,10 +305,30 @@ export type AdminOrder = {
 /** Admin-authenticated lyric rows keep addressing internal versions directly. */
 export type AdminLyrics = Lyrics & { id: string };
 export type AdminOrderDetail = {
+  unknownCalls?: {
+    id: string;
+    kind: string;
+    provider: string;
+    status: string;
+    createdAt: string;
+  }[];
+  productionHistory?: {
+    id: string;
+    number: number;
+    lyricVersionId: string | null;
+    status: string;
+    provenance: string;
+  }[];
+  events?: { type: string; createdAt: string }[];
   order: AdminOrder;
   story?: Story;
   lyrics: AdminLyrics[];
-  payments: { id: string; status: string; amountCents: number }[];
+  payments: {
+    id: string;
+    status: string;
+    amountCents: number;
+    environment: PaymentEnvironment | null;
+  }[];
   jobs: {
     id: string;
     status: string;
@@ -350,6 +394,7 @@ export type AiUsageRow = {
   inputTokens: number;
   outputTokens: number;
   costUsd: string | null;
+  costSource?: 'reported' | 'estimated' | 'unknown';
   latencyMs: number | null;
   status: string;
   error: string | null;
@@ -358,6 +403,8 @@ export type AiUsageRow = {
   createdAt: string;
 };
 export type AiCost = {
+  estimatedCalls?: number;
+  unknownCostCalls?: number;
   /** Decimal USD strings summed exactly in PostgreSQL; format, never float-sum. */
   totalUsd: string;
   lyricsUsd: string;

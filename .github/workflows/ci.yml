@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:18-alpine
         env:
           POSTGRES_USER: resenha
           POSTGRES_PASSWORD: resenha
@@ -33,6 +33,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: psql "$DATABASE_URL" -c 'create database resenha_test'
       - run: pnpm db:migrate
       - run: DATABASE_URL="$DATABASE_URL_TEST" pnpm db:migrate
@@ -40,6 +41,9 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm exec turbo run test --concurrency=1
+      - run: pnpm test:ops
       - run: pnpm build
+      - run: docker build -f docker/web/Dockerfile -t music-web:ci .
+      - run: node scripts/test-web-proxy.mjs music-web:ci
       - run: pnpm --filter @resenha/web exec playwright install --with-deps chromium
       - run: pnpm test:e2e

@@ -9,12 +9,14 @@ import {
   type AdminOrderDetail as AdminDetail,
   type AiUsageSummary,
   type Funnel,
+  type FinancialEnvironmentTotals,
 } from '../api';
 import { Loading } from '../components';
 import { formatMoney, formatUsdExact } from '../types';
 import { eventPt, maskEmail, nextActionPt, orderAgePt, paymentStatusPt, statusPt } from './labels';
 import { AdminShell } from './shell';
 import { AdminOrderOperations, AudioVariantRecovery } from './order-recovery';
+import { UnknownAiCalls } from './order-recovery';
 
 function ConfirmAction({
   label,
@@ -228,6 +230,31 @@ function monthCostLine(month: AiUsageSummary['month'] | undefined): string {
   return ` · ${month.calls} chamadas · letra ${formatUsdExact(month.lyricsUsd)} · áudio ${formatUsdExact(month.audioUsd)}`;
 }
 
+const paymentEnvironmentLabels: Record<string, string> = {
+  live: 'Cobrança real',
+  sandbox: 'Homologação sem cobrança',
+  local: 'Teste local',
+};
+const paymentEnvironmentPt = (environment: string | null | undefined): string =>
+  paymentEnvironmentLabels[environment ?? ''] ?? 'Ambiente desconhecido — conferir histórico';
+
+function AdminFinancialEnvironments({ rows }: { rows: FinancialEnvironmentTotals[] }) {
+  return (
+    <section aria-label="Valores excluídos da receita real">
+      <h2>Valores excluídos da receita real</h2>
+      {rows
+        .filter((row) => row.environment !== 'live')
+        .map((row) => (
+          <p key={row.environment}>
+            {paymentEnvironmentPt(row.environment)}: {row.attempts} tentativas · {row.paid} pedidos
+            com pagamento aprovado · {formatMoney(row.approvedCents)} aprovados ·{' '}
+            {formatMoney(row.refundedCents)} reembolsados
+          </p>
+        ))}
+    </section>
+  );
+}
+
 function deliveryRateLine(funnel: Funnel | undefined): string {
   if (!funnel || stepOrdersOf(funnel, 'paid') <= 0) return '';
   const rate = (stepOrdersOf(funnel, 'delivered') / stepOrdersOf(funnel, 'paid')) * 100;
@@ -256,19 +283,24 @@ function AdminOverviewCards({
       </article>
       <article className="card">
         <b>{totals.paid}</b>
-        <p>Pagos/em produção (total do servidor)</p>
+        <p>Pedidos com pagamento real confirmado</p>
       </article>
       <article className="card">
         <b>{formatMoney(totals.revenueCents)}</b>
-        <p>Receita registrada (total do servidor)</p>
+        <p>Receita real confirmada, descontados reembolsos</p>
       </article>
       <article className="card">
         <b>{month ? formatUsdExact(month.totalUsd) : '—'}</b>
-        <p>Custo IA no mês{monthCostLine(month)}</p>
+        <p>
+          Custo IA conhecido no mês, todos os pedidos (inclui homologação){monthCostLine(month)}
+          {month &&
+            ((month.unknownCostCalls ?? 0) > 0 || (month.estimatedCalls ?? 0) > 0) &&
+            ` · ${month.estimatedCalls ?? 0} estimadas · ${month.unknownCostCalls ?? 0} sem custo conhecido`}
+        </p>
       </article>
       <article className="card">
         <b>{delivery}</b>
-        <p>Entregues / pagos (30d){deliveryRateLine(funnel)}</p>
+        <p>Entregues / pagos operacionais (30d, inclui testes){deliveryRateLine(funnel)}</p>
       </article>
       <article className="card">
         <b>{blocked}</b>
@@ -281,7 +313,8 @@ function AdminOverviewCards({
 function AdminFunnel({ funnel, error }: { funnel: Funnel | undefined; error: boolean }) {
   return (
     <>
-      <h2>Funil (30 dias)</h2>
+      <h2>Funil operacional (30 dias)</h2>
+      <p>Inclui pedidos de teste e homologação. As etapas não representam receita real.</p>
       {error && (
         <p className="error">
           Funil indisponível (resumo de analytics falhou); pedidos seguem normais.
@@ -302,8 +335,8 @@ function AdminFunnel({ funnel, error }: { funnel: Funnel | undefined; error: boo
             </p>
           ))}
           <p>
-            Custo por venda: {formatUsdExact(funnel.perSaleUsd)} ({funnel.salesWithCost} vendas com
-            custo)
+            Custo por entrega com pagamento real: {formatUsdExact(funnel.perSaleUsd)} (
+            {funnel.salesWithCost} entregas com custo)
           </p>
         </>
       )}
@@ -345,7 +378,24 @@ export function AdminDashboard() {
         />
         <AdminAttentionList alerts={overview.data.attention} items={attentionItems} />
       </section>
+      {overview.data.queue && (
+        <section aria-label="Fila de produção">
+          <p>
+            Fila: {overview.data.queue.pending} aguardando · {overview.data.queue.processing} em
+            execução · {overview.data.queue.failed} com falha · {overview.data.queue.unknownCalls}{' '}
+            chamadas sem resultado.
+          </p>
+          <p>
+            Espera mais antiga:{' '}
+            {overview.data.queue.oldestPendingAgeSeconds == null
+              ? 'fila vazia'
+              : `${Math.ceil(overview.data.queue.oldestPendingAgeSeconds / 60)} min`}{' '}
+            · {overview.data.queue.expiredLeases} posses expiradas.
+          </p>
+        </section>
+      )}
       <AdminOverviewCards totals={overview.data.totals} usage={usage.data} funnel={funnel.data} />
+      <AdminFinancialEnvironments rows={overview.data.financialEnvironments ?? []} />
       {usage.isError && (
         <p className="error">
           Observabilidade de custo indisponível (resumo de IA falhou); pedidos seguem normais.
@@ -425,9 +475,6 @@ function AdminOrderFilters({
         <select value={productType} onChange={(event) => onProductType(event.target.value)}>
           <option value="">Todos</option>
           <option value="custom_song">Sua música original</option>
-          <option value="friend_roast">Música da Resenha</option>
-          <option value="team_anthem">Hino da Pelada</option>
-          <option value="emotional_tribute">Sua História em Música</option>
         </select>
       </label>
       <label>
@@ -790,7 +837,7 @@ export function AdminOrderDetail() {
   const value = detail.data;
   const approved = value.lyrics.find((lyric) => lyric.approvedAt) ?? value.lyrics[0];
   const storyRows = storyText(value.story);
-  const completedAudio = value.audio.filter((a) => a.assetId && a.status === 'completed');
+  const completedAudio = value.audio.filter((a) => a.fileId && a.status === 'completed');
   return (
     <AdminShell section="orders" title={`Pedido · ${statusPt(value.order.status)}`}>
       <AdminDetailRefreshNotice error={detail.isError} />
@@ -825,12 +872,16 @@ export function AdminOrderDetail() {
           <h2>Pagamento</h2>
           <p>
             {value.payments
-              .map((x) => `${paymentStatusPt(x.status)} · ${formatMoney(x.amountCents)}`)
+              .map(
+                (x) =>
+                  `${paymentEnvironmentPt(x.environment)} · ${paymentStatusPt(x.status)} · ${formatMoney(x.amountCents)}`,
+              )
               .join(', ') || 'Ainda não iniciado'}
           </p>
+          <UnknownAiCalls detail={value} />
           <h2>Custo de IA</h2>
           <p>
-            Total {formatUsdExact(value.aiCost.totalUsd)} · letra{' '}
+            Total conhecido {formatUsdExact(value.aiCost.totalUsd)} · letra{' '}
             {formatUsdExact(value.aiCost.lyricsUsd)} · áudio {formatUsdExact(value.aiCost.audioUsd)}{' '}
             · {value.aiCost.calls} chamadas · {value.aiCost.inputTokens + value.aiCost.outputTokens}{' '}
             tokens
@@ -839,13 +890,30 @@ export function AdminOrderDetail() {
             <p key={row.id}>
               {row.kind} · {statusPt(row.status)} · {row.model ?? 'modelo desconhecido'} ·{' '}
               {row.inputTokens + row.outputTokens} tokens ·{' '}
-              {row.costUsd ? formatUsdExact(row.costUsd) : 'custo ausente'} ·{' '}
-              {row.latencyMs !== null ? `${row.latencyMs}ms` : 'sem latência'} · tentativa{' '}
+              {row.costUsd
+                ? `${formatUsdExact(row.costUsd)} (${row.costSource === 'estimated' ? 'estimado' : 'informado'})`
+                : 'custo desconhecido'}{' '}
+              · {row.latencyMs !== null ? `${row.latencyMs}ms` : 'sem latência'} · tentativa{' '}
               {row.attempt} {row.error && <small className="error">{row.error}</small>}
             </p>
           ))}
         </section>
         <section aria-label="Entrega e acesso">
+          {value.productionHistory?.length ? (
+            <>
+              <h2>Histórico de produção</h2>
+              <ul>
+                {value.productionHistory.map((production) => (
+                  <li key={production.id}>
+                    Produção {production.number} · {statusPt(production.status)} ·{' '}
+                    {production.provenance === 'legacy_unverified'
+                      ? 'origem da letra não comprovada'
+                      : `letra ${value.lyrics.find((lyric) => lyric.id === production.lyricVersionId)?.number ?? 'registrada'}`}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
           <h2>Solicitações de ajuste</h2>
           {value.revisionRequests?.length ? (
             <ul className="revision-requests">
@@ -883,11 +951,11 @@ export function AdminOrderDetail() {
               <audio
                 controls
                 preload="none"
-                src={api.adminAssetStreamUrl(value.order.id, a.assetId as string)}
+                src={api.adminAssetStreamUrl(value.order.id, a.fileId as string)}
               />
               <a
                 className="button secondary"
-                href={api.adminAssetStreamUrl(value.order.id, a.assetId as string)}
+                href={api.adminAssetStreamUrl(value.order.id, a.fileId as string)}
                 download
               >
                 Baixar faixa {a.variant}

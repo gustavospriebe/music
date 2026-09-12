@@ -29,7 +29,7 @@ const baseEnv: Env = {
   GOOGLE_MUSIC_MODEL: 'lyria-3.5',
   PAYMENT_PROVIDER: 'abacatepay',
   EMAIL_PROVIDER: 'resend',
-  AUDIO_REVIEW_MODE: 'automatic',
+  AUDIO_REVIEW_MODE: 'automatic_release',
   LOCAL_STORAGE_PATH: '',
   OPENROUTER_API_KEY: 'test-key-never-called',
   OPENROUTER_COVER_TEXT_MODEL: 'google/gemini-3.1-flash-lite-image',
@@ -44,8 +44,8 @@ beforeAll(async () => {
   await db.execute(sql`truncate table orders cascade`);
   await db
     .insert(products)
-    .values({ type: 'friend_roast', name: 'Produto', priceCents: 4990 })
-    .onConflictDoUpdate({ target: products.type, set: { priceCents: 4990 } });
+    .values({ type: 'custom_song', name: 'Produto', priceCents: 4990, active: true })
+    .onConflictDoUpdate({ target: products.type, set: { priceCents: 4990, active: true } });
 });
 
 afterAll(async () => {
@@ -64,7 +64,7 @@ const createSession = async (app: FastifyInstance) => {
   const response = await app.inject({
     method: 'POST',
     url: '/api/v1/orders',
-    payload: { productType: 'friend_roast', creationKey: randomUUID() },
+    payload: { productType: 'custom_song', creationKey: randomUUID() },
   });
   return {
     publicId: (response.json() as { publicId: string }).publicId,
@@ -75,15 +75,24 @@ const createSession = async (app: FastifyInstance) => {
 const markPaid = async (publicId: string) => {
   await pool.query("update orders set status='audio_queued' where public_id=$1", [publicId]);
   await pool.query(
-    `insert into payments(order_id,provider,status,amount_cents)
-     select id,'local','approved',price_cents from orders where public_id=$1`,
+    `insert into payments(order_id,provider,status,amount_cents,attempt,idempotency_key,external_reference)
+     select id,'dev','approved',price_cents,1,gen_random_uuid()::text,gen_random_uuid()::text from orders where public_id=$1`,
     [publicId],
   );
 };
 
-const multipart = (consent: string | undefined, bytes: Buffer, mime = 'image/png') => {
+const multipart = (
+  consent: string | undefined,
+  bytes: Buffer,
+  mime = 'image/png',
+  policyVersion = 'draft-v1',
+) => {
   const boundary = `----resenha-${randomUUID()}`;
-  const parts: Buffer[] = [];
+  const parts: Buffer[] = [
+    Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="policyVersion"\r\n\r\n${policyVersion}\r\n`,
+    ),
+  ];
   if (consent !== undefined)
     parts.push(
       Buffer.from(
@@ -195,6 +204,31 @@ describe('album cover public flow', () => {
     });
     expect(rejected.statusCode).toBe(400);
 
+    const staleBody = multipart('true', png, 'image/png', 'old-policy');
+    const stale = await app.inject({
+      method: 'POST',
+      url: `/api/v1/orders/${noConsent.publicId}/cover`,
+      headers: { cookie: noConsent.cookie, ...staleBody.headers },
+      payload: staleBody.payload,
+    });
+    expect(stale.statusCode).toBe(409);
+    expect(
+      (
+        await pool.query(
+          'select count(*)::int as count from order_consents where order_id=(select id from orders where public_id=$1)',
+          [noConsent.publicId],
+        )
+      ).rows[0].count,
+    ).toBe(0);
+    expect(
+      (
+        await pool.query(
+          'select count(*)::int as count from stored_files where order_id=(select id from orders where public_id=$1)',
+          [noConsent.publicId],
+        )
+      ).rows[0].count,
+    ).toBe(0);
+
     const invalid = await createSession(app);
     await markPaid(invalid.publicId);
     const bad = multipart('true', Buffer.from('<svg></svg>'), 'image/png');
@@ -217,9 +251,17 @@ describe('album cover public flow', () => {
     });
     expect(response.statusCode).toBe(202);
     expect(response.json()).toMatchObject({ attempt: 1, hasReference: true });
+    expect(
+      (
+        await pool.query(
+          "select policy_version,accepted from order_consents where order_id=(select id from orders where public_id=$1) and kind='reference_image'",
+          [accepted.publicId],
+        )
+      ).rows,
+    ).toEqual([{ policy_version: 'draft-v1', accepted: true }]);
     const stored = await pool.query(
       `select f.storage_key,f.mime_type from stored_files f
-       join album_covers c on c.reference_asset_id=f.id
+       join album_covers c on c.reference_file_id=f.id
        join orders o on o.id=c.order_id where o.public_id=$1`,
       [accepted.publicId],
     );
@@ -246,7 +288,7 @@ describe('album cover public flow', () => {
          insert into stored_files(order_id,storage_key,mime_type,size_bytes)
          select id,$2,'image/png',$3 from orders where public_id=$1 returning id
        )
-       update album_covers set status='completed',cover_asset_id=asset.id
+       update album_covers set status='completed',cover_file_id=asset.id
        from asset where album_covers.order_id=(select id from orders where public_id=$1)`,
       [session.publicId, key, png.length],
     );
@@ -267,8 +309,10 @@ describe('album cover public flow', () => {
     const deliveryToken = `delivery-${randomUUID()}-private`;
     await pool.query("update orders set status='delivered' where public_id=$1", [session.publicId]);
     await pool.query(
-      `insert into deliveries(order_id,token_hash,delivered_at)
-       select id,$2,now() from orders where public_id=$1`,
+      `with lyric as (insert into lyric_versions(order_id,number,kind,content,approved_at) select id,1,'approved','{}'::jsonb,now() from orders where public_id=$1 returning id,order_id),
+        production as (insert into productions(order_id,number,lyric_version_id,status) select order_id,1,id,'completed' from lyric returning id,order_id)
+       insert into deliveries(order_id,production_id,token_hash,delivered_at)
+       select order_id,id,$2,now() from production`,
       [session.publicId, hashToken(deliveryToken, baseEnv.CUSTOMER_ACCESS_TOKEN_PEPPER)],
     );
     const deliverySummary = await app.inject({
