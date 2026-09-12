@@ -1,6 +1,6 @@
 # Ativação externa e homologação
 
-Status: em execução. Autorização: pedido do dono em 12/09/2026 para avançar com Railway, Resend e AbacatePay configurados. Esta etapa sucede a remediação local; não transforma seus testes sintéticos em prova externa.
+Status: homologação técnica concluída; comércio público fechado, com gates comerciais explícitos na validação. Autorização: pedido do dono em 12/09/2026 para avançar com Railway, Resend e AbacatePay configurados. Esta etapa sucede a remediação local; não transforma seus testes sintéticos em prova externa.
 
 ## Resultado esperado
 
