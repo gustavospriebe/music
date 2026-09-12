@@ -16,4 +16,10 @@ describe('production audio validity', () => {
   it('rejects a valid but shorter recording before completion', async () => {
     await expect(validateAudio(testAudio(2))).rejects.toMatchObject({ code: 'AI_AUDIO_TOO_SHORT' });
   });
+  it('measures the minimum using decoded samples including the final block', async () => {
+    expect(await validateAudio(testAudio(10))).toEqual({ durationMs: 10_000 });
+    await expect(validateAudio(testAudio(9.999))).rejects.toMatchObject({
+      code: 'AI_AUDIO_TOO_SHORT',
+    });
+  });
 });
