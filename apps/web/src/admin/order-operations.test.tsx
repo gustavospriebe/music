@@ -8,7 +8,7 @@ describe('diagnóstico operacional do pedido', () => {
   it('traduz tipos e estados conhecidos sem expor identificadores técnicos desconhecidos', () => {
     expect(jobNamePt('generate_audio')).toBe('Criação das versões de áudio');
     expect(jobNamePt('generate_cover')).toBe('Criação da capa');
-    expect(jobNamePt('deliver-notify')).toBe('Entrega e aviso por e-mail');
+    expect(jobNamePt('deliver_notify')).toBe('Entrega e aviso por e-mail');
     expect(jobNamePt('internal-new-job')).toBe('Processamento do pedido');
     expect(jobStatusPt('pending')).toBe('Aguardando execução');
     expect(jobStatusPt('processing')).toBe('Em processamento');

@@ -1,5 +1,7 @@
 # Local Validation Evidence
 
+> Registro histórico de um recorte anterior. O modelo vigente e a evidência atual estão em [docs/documentation-map.md](../../../docs/documentation-map.md) e [audit-remediation](../audit-remediation/spec.md). Este registro não autoriza publicação nem gasto com providers.
+
 **Date**: 2026-09-06  
 **Environment**: macOS, Node.js 22.22.2, pnpm 12.3.4  
 **Result**: PASS within the boundaries below

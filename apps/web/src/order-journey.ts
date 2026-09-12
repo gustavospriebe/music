@@ -1,22 +1,7 @@
-export const orderStatuses = [
-  'draft',
-  'story_completed',
-  'lyrics_generating',
-  'lyrics_ready',
-  'lyrics_approved',
-  'payment_pending',
-  'paid',
-  'audio_queued',
-  'audio_generating',
-  'review_required',
-  'delivered',
-  'revision_requested',
-  'failed',
-  'refunded',
-  'cancelled',
-] as const;
+import { orderStatusSchema, type OrderStatus } from '@resenha/contracts';
 
-export type OrderStatus = (typeof orderStatuses)[number];
+export const orderStatuses = orderStatusSchema.options;
+export type { OrderStatus };
 type JourneyAction =
   | 'continue_story'
   | 'open_lyrics'

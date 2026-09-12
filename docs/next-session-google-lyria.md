@@ -1,3 +1,5 @@
+> HISTÓRICO — documento anterior à remediação de 12/09/2026. Comandos, modelos, orçamento e alegações de prontidão abaixo podem estar superados e não autorizam nova execução. Use o [mapa vigente](documentation-map.md) para implementação e operação.
+
 # Prompt para a próxima sessão
 
 > Atualização em 08/09/2026: este prompt foi executado. A integração T1–T7 e a comparação live de quatro chamadas foram concluídas tecnicamente. Consulte `docs/google-lyria-comparison.md` e `.specs/features/google-lyria-integration/validation.md`; permanecem escuta humana, sensor, homologação e publicação.

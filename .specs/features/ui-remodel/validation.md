@@ -1,5 +1,7 @@
 # ui-remodel Validation (second pass)
 
+> Registro histórico de um recorte anterior. O modelo vigente e a evidência atual estão em [docs/documentation-map.md](../../../docs/documentation-map.md) e [audit-remediation](../audit-remediation/spec.md). Este registro não autoriza publicação nem gasto com providers.
+
 **Date**: 2026-09-06
 **Spec**: `.specs/features/ui-remodel/spec.md` (31 requirements)
 **Diff range**: uncommitted worktree vs `HEAD` (`c9f3d04`); feature surface scoped to `apps/web/src/components.tsx`, `apps/web/src/pages/public.tsx`, `apps/web/src/pages/landing.tsx`, `apps/web/src/types.ts`, `apps/web/src/api.ts`, `apps/web/src/styles.css`, `apps/web/src/admin/labels.ts` (new), `apps/web/src/admin/shell.tsx` (new), `apps/web/src/admin/routes.tsx`, `apps/api/src/app.ts`, plus tests `apps/web/src/components.test.tsx`, `apps/web/src/public-form.test.tsx`, `apps/web/src/pages/checkout.test.tsx` (new), `apps/web/src/admin/routes.test.tsx` (new), `apps/api/src/flow.test.ts`, `apps/web/e2e/mvp-flows.spec.ts`, `apps/web/e2e/mvp-operable-t5.spec.ts`, `apps/web/e2e/mvp-operable-t6.spec.ts`, `apps/web/e2e/mvp-operable-t7.spec.ts`, `apps/web/e2e/ui-remodel-qa.spec.ts` (new)

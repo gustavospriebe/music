@@ -22,7 +22,10 @@ const next = () => userEvent.click(screen.getByRole('button', { name: /^continua
 describe('regressões da UAT do estúdio', () => {
   beforeEach(() => {
     localStorage.clear();
-    apiMock.configuration.mockResolvedValue({ generation: { lyricsAvailable: false } });
+    apiMock.configuration.mockResolvedValue({
+      generation: { lyricsAvailable: false },
+      commercial: { ready: false, policyVersion: 'draft-v1', termsUrl: null, privacyUrl: null },
+    });
   });
   it('deep link só escolhe intenção e não sobrescreve ocasião do rascunho', async () => {
     localStorage.setItem(

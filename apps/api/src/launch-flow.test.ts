@@ -4,15 +4,17 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { createDb, products } from '@resenha/database';
+import { createDb, products, reconcilePayment } from '@resenha/database';
 import { createLocalStorage } from '@resenha/providers';
-import { hashToken } from '@resenha/domain';
+import { hashToken, type PaymentDetails } from '@resenha/domain';
 import { buildApp } from './app.js';
 import { parseEnv, type Env } from './env.js';
 import type { PaymentProvider } from './payment.js';
 
 const env = parseEnv({
   NODE_ENV: 'test',
+  PAYMENT_ENVIRONMENT: 'live',
+  POLICY_VERSION: 'test-v1',
   DATABASE_URL:
     process.env.DATABASE_URL_TEST ?? 'postgresql://resenha:resenha@localhost:5433/music_launch_api',
   COOKIE_SECRET: 'launch-test-cookie-secret-at-least-32-chars',
@@ -56,6 +58,11 @@ const orderWith = async (app: FastifyInstance, status = 'lyrics_approved', price
     'update orders set status=$1,price_cents=$2 where public_id=$3 returning id',
     [status, price, publicId],
   );
+  if (status !== 'draft')
+    await pool.query(
+      "insert into lyric_versions(order_id,number,kind,content,approved_at) values($1,1,'approved','{}',now())",
+      [rows[0].id],
+    );
   return { id: rows[0].id as string, publicId, headers: { cookie: cookieOf(response) } };
 };
 const adminFor = async (app: FastifyInstance) => {
@@ -72,28 +79,41 @@ const fixturePayment = () => {
     calls: 0,
     failCheckout: false,
     id: randomUUID(),
-    status: 'approved',
+    status: 'approved' as 'pending' | 'approved' | 'rejected' | 'cancelled',
     amountCents: 4990,
     currency: 'BRL',
     externalReference: null as string | null,
     keys: [] as string[],
   };
+  // Invalid currency/reference are deliberately injected in boundary tests below.
+  const snapshot = () =>
+    ({ ...state, provider: 'abacatepay', environment: 'live' }) as PaymentDetails;
   const adapter: PaymentProvider = {
+    name: 'abacatepay',
     createCheckout: async (input) => {
       state.calls++;
       state.keys.push(input.idempotencyKey);
+      state.externalReference = input.externalReference;
+      state.id = randomUUID();
       if (state.failCheckout) throw new Error('synthetic timeout');
-      return { checkoutUrl: 'https://example.test/pay' };
+      return { ...snapshot(), status: 'pending', checkoutUrl: 'https://example.test/pay' };
     },
-    getPayment: async () => ({ ...state }),
+    getPayment: async () => snapshot(),
+    findPayment: async () => snapshot(),
   };
   return { state, adapter };
 };
 const webhook = (app: FastifyInstance, id: string) =>
   app.inject({
     method: 'POST',
-    url: `/api/v1/webhooks/abacate-pay?webhookSecret=${env.ABACATEPAY_WEBHOOK_SECRET}`,
-    payload: { event: 'checkout.completed', data: { id } },
+    url: `/api/v1/webhooks/abacatepay?webhookSecret=${env.ABACATEPAY_WEBHOOK_SECRET}`,
+    payload: {
+      id: `event_${id}`,
+      apiVersion: 2,
+      devMode: false,
+      event: 'checkout.completed',
+      data: { checkout: { id } },
+    },
   });
 beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), 'music-launch-api-'));
@@ -130,6 +150,7 @@ describe('launch commerce and money', () => {
         brief,
         safetyConfirmed: true,
         termsAccepted: true,
+        policyVersion: 'test-v1',
       },
     });
     expect(saved.statusCode).toBe(200);
@@ -148,11 +169,26 @@ describe('launch commerce and money', () => {
       subjectName: 'Um verão que mudou tudo',
       genre: 'MPB',
       mood: 'Contemplativo',
+      buyerEmail: 'author@example.test',
+    });
+    const stored = (
+      await pool.query('select data from story_sessions where order_id=$1', [order.id])
+    ).rows[0].data as Record<string, unknown>;
+    expect(stored).not.toHaveProperty('buyerEmail');
+    expect(stored).not.toHaveProperty('buyerName');
+    expect(stored).not.toHaveProperty('termsAccepted');
+    expect(stored).not.toHaveProperty('marketingAccepted');
+    expect(stored).toMatchObject({
+      brief,
+      facts: [],
+      subjectName: 'Um verão que mudou tudo',
+      genre: 'MPB',
+      mood: 'Contemplativo',
     });
     expect(
-      (await pool.query('select data from story_sessions where order_id=$1', [order.id])).rows[0]
-        .data,
-    ).toEqual(detail.story);
+      (await pool.query('select email from order_contacts where order_id=$1', [order.id])).rows[0]
+        .email,
+    ).toBe('author@example.test');
     expect(detail.order.status).toBe('story_completed');
     expect(
       (await pool.query('select id from ai_usage where order_id=$1', [order.id])).rowCount,
@@ -180,17 +216,23 @@ describe('launch commerce and money', () => {
         brief: 'Uma música sobre os amigos que encontramos pelo caminho',
         safetyConfirmed: true,
         termsAccepted: true,
+        policyVersion: 'test-v1',
       },
     });
     expect(saved.statusCode).toBe(200);
     const detail = (
       await app.inject({ url: `/api/v1/orders/${order.publicId}`, headers: order.headers })
     ).json();
-    expect(detail.story).toMatchObject({ intention: 'amizade', occasion: '' });
-    expect(
-      (await pool.query('select data from story_sessions where order_id=$1', [order.id])).rows[0]
-        .data,
-    ).toEqual(detail.story);
+    expect(detail.story).toMatchObject({
+      intention: 'amizade',
+      occasion: '',
+      buyerEmail: 'author@example.test',
+    });
+    const stored = (
+      await pool.query('select data from story_sessions where order_id=$1', [order.id])
+    ).rows[0].data as Record<string, unknown>;
+    expect(stored).not.toHaveProperty('buyerEmail');
+    expect(stored).toMatchObject({ intention: 'amizade', occasion: '' });
   });
   it('snapshots catalog price on creation and never reprices an existing order', async () => {
     const app = await appWith();
@@ -276,7 +318,7 @@ describe('launch commerce and money', () => {
       priceConfigured: false,
     });
   });
-  it('serializes concurrent checkout and keeps retry idempotency stable after failure', async () => {
+  it('serializes checkout and reconciles uncertain creation before reusing it', async () => {
     const { adapter, state } = fixturePayment();
     const app = await appWith(adapter);
     const order = await orderWith(app);
@@ -287,12 +329,30 @@ describe('launch commerce and money', () => {
         headers: order.headers,
       });
     state.failCheckout = true;
-    expect((await checkout()).statusCode).toBe(500);
+    expect((await checkout()).statusCode).toBe(503);
     state.failCheckout = false;
     const responses = await Promise.all([checkout(), checkout()]);
-    expect(responses.map((r) => r.statusCode)).toEqual([200, 200]);
-    expect(state.calls).toBe(2);
-    expect(state.keys[0]).toBe(state.keys[1]);
+    expect(responses.map((r) => r.statusCode)).toEqual([409, 409]);
+    expect(state.calls).toBe(1);
+    expect(state.keys).toHaveLength(1);
+    const pending = (await pool.query('select id from payments where order_id=$1', [order.id]))
+      .rows[0];
+    state.status = 'pending';
+    adapter.findPayment = async () => ({
+      ...(await adapter.getPayment(state.id)),
+      checkoutUrl: 'https://example.test/pay',
+    });
+    expect(
+      await reconcilePayment(
+        pool,
+        pending.id,
+        () => adapter,
+        { provider: 'openrouter', model: 'synthetic' },
+        { force: true },
+      ),
+    ).toBe('settled');
+    expect((await checkout()).statusCode).toBe(200);
+    expect(state.calls).toBe(1);
     expect(
       (await pool.query('select id from payments where order_id=$1', [order.id])).rowCount,
     ).toBe(1);
@@ -301,7 +361,6 @@ describe('launch commerce and money', () => {
     const { adapter, state } = fixturePayment();
     const app = await appWith(adapter);
     const order = await orderWith(app);
-    state.externalReference = order.publicId;
     await app.inject({
       method: 'POST',
       url: `/api/v1/orders/${order.publicId}/checkout`,
@@ -311,23 +370,24 @@ describe('launch commerce and money', () => {
       (
         await app.inject({
           method: 'POST',
-          url: '/api/v1/webhooks/abacate-pay',
+          url: '/api/v1/webhooks/abacatepay',
           payload: { data: { id: state.id } },
         })
       ).statusCode,
     ).toBe(401);
+    const correctReference = state.externalReference;
     state.externalReference = 'unknown-order-reference';
-    expect((await webhook(app, state.id)).statusCode).toBe(404);
-    state.externalReference = order.publicId;
+    expect((await webhook(app, state.id)).statusCode).toBe(503);
+    state.externalReference = correctReference;
     state.amountCents = 1;
-    expect((await webhook(app, state.id)).statusCode).toBe(400);
+    expect((await webhook(app, state.id)).statusCode).toBe(503);
     state.amountCents = 4990;
     state.currency = 'USD';
-    expect((await webhook(app, state.id)).statusCode).toBe(400);
+    expect((await webhook(app, state.id)).statusCode).toBe(503);
     expect(
       (
         await pool.query('select id from payment_webhook_events where external_event_id=$1', [
-          `${state.id}:approved`,
+          `event_${state.id}`,
         ])
       ).rowCount,
     ).toBe(0);
@@ -370,8 +430,20 @@ describe('launch commerce and money', () => {
         headers: order.headers,
       });
     await checkout();
-    expect((await webhook(app, state.id)).statusCode).toBe(200);
-    expect((await webhook(app, state.id)).json()).toMatchObject({ duplicate: true });
+    const pending = (await pool.query('select id from payments where order_id=$1', [order.id]))
+      .rows[0];
+    expect(
+      await reconcilePayment(
+        pool,
+        pending.id,
+        () => adapter,
+        { provider: 'openrouter', model: 'synthetic' },
+        { force: true },
+      ),
+    ).toBe('settled');
+    expect(
+      (await pool.query('select status from payments where id=$1', [pending.id])).rows[0].status,
+    ).toBe('rejected');
     expect(
       (await pool.query('select id from generation_jobs where order_id=$1', [order.id])).rowCount,
     ).toBe(0);
@@ -383,11 +455,24 @@ describe('launch commerce and money', () => {
 
 const deliveryFixture = async (app: FastifyInstance) => {
   const order = await orderWith(app, 'delivered');
-  const token = randomUUID() + randomUUID();
-  await pool.query('insert into deliveries(order_id,token_hash,delivered_at) values($1,$2,now())', [
+  await pool.query(
+    "insert into payments(order_id,provider,status,amount_cents,attempt,idempotency_key,external_reference) select id,'dev','approved',price_cents,1,gen_random_uuid()::text,gen_random_uuid()::text from orders where id=$1",
+    [order.id],
+  );
+  const production = await pool.query<{ id: string }>(
+    "insert into productions(order_id,number,lyric_version_id,status) select $1,1,id,'completed' from lyric_versions where order_id=$1 and number=1 returning id",
+    [order.id],
+  );
+  const productionId = production.rows[0]!.id;
+  await pool.query('update orders set current_production_id=$2 where id=$1', [
     order.id,
-    hashToken(token, env.CUSTOMER_ACCESS_TOKEN_PEPPER),
+    productionId,
   ]);
+  const token = randomUUID() + randomUUID();
+  await pool.query(
+    'insert into deliveries(order_id,token_hash,production_id,delivered_at) values($1,$2,(select current_production_id from orders where id=$1),now())',
+    [order.id, hashToken(token, env.CUSTOMER_ACCESS_TOKEN_PEPPER)],
+  );
   const assetId = randomUUID();
   const audioId = randomUUID();
   const key = `orders/${order.id}/test.wav`;
@@ -397,8 +482,12 @@ const deliveryFixture = async (app: FastifyInstance) => {
     [assetId, order.id, key, 'audio/wav', 13],
   );
   await pool.query(
-    "insert into audio_generations(id,order_id,variant,status,asset_id,provider) values($1,$2,1,'completed',$3,'test')",
+    "insert into audio_generations(id,order_id,production_id,variant,status,file_id,provider,selected,duration_ms) values($1,$2,(select current_production_id from orders where id=$2),1,'completed',$3,'test',true,12000)",
     [audioId, order.id, assetId],
+  );
+  await pool.query(
+    "insert into audio_generations(order_id,production_id,variant,status,file_id,provider,selected,duration_ms) values($1,$2,2,'completed',$3,'test',true,12000)",
+    [order.id, productionId, assetId],
   );
   return { ...order, token, assetId, audioId };
 };
@@ -425,7 +514,23 @@ describe('private access, support and administrative operations', () => {
         })
       ).statusCode,
     ).toBe(404);
-    for (const status of ['review_required', 'revision_requested', 'refunded']) {
+    // A released version remains accessible while a revision is being prepared.
+    for (const status of ['audio_queued', 'review_required', 'revision_requested']) {
+      await pool.query('update orders set status=$1 where id=$2', [status, order.id]);
+      expect((await app.inject({ url, headers: order.headers })).body).toBe('private-audio');
+      expect((await app.inject(`/api/v1/deliveries/${order.token}/files/1/download`)).body).toBe(
+        'private-audio',
+      );
+    }
+    await pool.query("update productions set status='review_required' where order_id=$1", [
+      order.id,
+    ]);
+    expect((await app.inject({ url, headers: order.headers })).statusCode).toBe(404);
+    expect(
+      (await app.inject(`/api/v1/deliveries/${order.token}/files/1/download`)).statusCode,
+    ).toBe(404);
+    await pool.query("update productions set status='completed' where order_id=$1", [order.id]);
+    for (const status of ['refunded', 'cancelled']) {
       await pool.query('update orders set status=$1 where id=$2', [status, order.id]);
       expect((await app.inject({ url, headers: order.headers })).statusCode).toBe(404);
       expect(
@@ -433,9 +538,10 @@ describe('private access, support and administrative operations', () => {
       ).toBe(404);
     }
     await pool.query("update orders set status='delivered' where id=$1", [order.id]);
-    await pool.query("update audio_generations set status='processing' where id=$1", [
-      order.audioId,
-    ]);
+    await pool.query(
+      "update audio_generations set status='processing',selected=false where id=$1",
+      [order.audioId],
+    );
     expect((await app.inject({ url, headers: order.headers })).statusCode).toBe(404);
     expect(
       (await app.inject(`/api/v1/deliveries/${order.token}/files/1/download`)).statusCode,
@@ -541,17 +647,13 @@ describe('private access, support and administrative operations', () => {
     const order = await deliveryFixture(app);
     await pool.query("update orders set status='failed' where id=$1", [order.id]);
     await pool.query(
-      "insert into payments(order_id,provider,status,amount_cents) values($1,'dev','approved',4990)",
-      [order.id],
-    );
-    await pool.query(
-      "insert into lyric_versions(order_id,number,kind,content,approved_at) values($1,1,'approved','{}',now())",
+      "insert into lyric_versions(order_id,number,kind,content,approved_at) values($1,1,'approved','{}',now()) on conflict(order_id,number) do nothing",
       [order.id],
     );
     const admin = await adminFor(app);
     const jobId = randomUUID();
     await pool.query(
-      "insert into generation_jobs(id,order_id,type,payload,idempotency_key,status) values($1,$2,'generate_audio','{}',$3,'failed')",
+      "insert into generation_jobs(id,order_id,type,payload,idempotency_key,status) values($1,$2,'generate_audio',jsonb_build_object('productionId',(select current_production_id from orders where id=$2)),$3,'failed')",
       [jobId, order.id, randomUUID()],
     );
     const requests = [
@@ -600,7 +702,7 @@ describe('private access, support and administrative operations', () => {
           headers: admin,
         })
       ).statusCode,
-    ).toBe(404);
+    ).toBe(409);
     expect(
       (await app.inject({ method: 'DELETE', url: '/api/v1/admin/session', headers: admin }))
         .statusCode,
@@ -619,17 +721,13 @@ describe('private access, support and administrative operations', () => {
       const order = await deliveryFixture(app);
       await pool.query("update orders set status='failed' where id=$1", [order.id]);
       await pool.query(
-        "insert into payments(order_id,provider,status,amount_cents) values($1,'dev','approved',4990)",
-        [order.id],
-      );
-      await pool.query(
-        "insert into lyric_versions(order_id,number,kind,content,approved_at) values($1,1,'approved','{}',now())",
+        "insert into lyric_versions(order_id,number,kind,content,approved_at) values($1,1,'approved','{}',now()) on conflict(order_id,number) do nothing",
         [order.id],
       );
       const admin = await adminFor(app);
       const jobId = randomUUID();
       await pool.query(
-        "insert into generation_jobs(id,order_id,type,payload,idempotency_key,status,attempts,max_attempts,last_error) values($1,$2,'generate_audio','{}',$3,'failed',$4,$5,'synthetic failure')",
+        "insert into generation_jobs(id,order_id,type,payload,idempotency_key,status,attempts,max_attempts,last_error) values($1,$2,'generate_audio',jsonb_build_object('productionId',(select current_production_id from orders where id=$2)),$3,'failed',$4,$5,'synthetic failure')",
         [jobId, order.id, randomUUID(), attempts, maximum],
       );
       const url = `/api/v1/admin/jobs/${jobId}/retry`;

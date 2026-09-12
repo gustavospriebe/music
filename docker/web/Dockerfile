@@ -4,12 +4,14 @@ WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
 COPY apps/web/package.json apps/web/package.json
+COPY packages/contracts/package.json packages/contracts/package.json
 RUN pnpm install --frozen-lockfile
 
 FROM dependencies AS build
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
 COPY apps/web apps/web
+COPY packages/contracts packages/contracts
 RUN test -n "$VITE_API_URL" || (echo "VITE_API_URL is required for the production web image" >&2; exit 1)
 RUN pnpm --filter @resenha/web build
 

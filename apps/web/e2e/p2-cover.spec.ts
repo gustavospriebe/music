@@ -4,7 +4,7 @@ test.beforeEach(async ({ page }) => {
     route.fulfill({
       json: {
         generation: { lyricsAvailable: true },
-        commercial: { ready: false },
+        commercial: { ready: false, policyVersion: 'draft-v1', termsUrl: null, privacyUrl: null },
         payment: { label: 'AbacatePay' },
         supportEmail: null,
       },

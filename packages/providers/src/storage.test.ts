@@ -1,6 +1,8 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { Readable } from 'node:stream';
+import { buffer } from 'node:stream/consumers';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createLocalStorage, createS3Storage, readStorageConfig } from './storage.js';
 
@@ -50,6 +52,44 @@ describe('private asset storage', () => {
       ContentType: 'image/png',
     });
     expect(put.input).not.toHaveProperty('ACL');
+  });
+
+  it('streams the requested local byte interval and rejects traversal and malformed ranges', async () => {
+    localRoot = await mkdtemp(join(tmpdir(), 'resenha-provider-range-'));
+    const storage = createLocalStorage(localRoot);
+    await storage.put('private/song.wav', Buffer.from('private-audio'), 'audio/wav');
+    expect(await buffer(await storage.open('private/song.wav', { start: 2, end: 6 }))).toEqual(
+      Buffer.from('ivate'),
+    );
+    expect(await buffer(await storage.open('private/song.wav'))).toEqual(
+      Buffer.from('private-audio'),
+    );
+    await expect(storage.open('../escape')).rejects.toThrow('Invalid storage key');
+    await expect(storage.open('private/song.wav', { start: 6, end: 2 })).rejects.toThrow(
+      'Invalid storage range',
+    );
+  });
+
+  it('forwards a private S3 Range and returns its stream without buffering the complete object', async () => {
+    const body = Readable.from([Buffer.from('audio-interval')]);
+    const send = vi.fn(async (command: unknown) => {
+      void command;
+      return { Body: body };
+    });
+    const storage = createS3Storage(
+      { kind: 's3', bucket: 'private-bucket', region: 'us-east-1', forcePathStyle: false },
+      { send },
+    );
+    const stream = await storage.open('private/song.wav', { start: 10, end: 23 });
+    expect(stream).toBe(body);
+    expect(await buffer(stream)).toEqual(Buffer.from('audio-interval'));
+    expect(send.mock.calls[0]?.[0]).toMatchObject({
+      input: { Bucket: 'private-bucket', Key: 'private/song.wav', Range: 'bytes=10-23' },
+    });
+    await expect(storage.open('private/song.wav', { start: -1, end: 23 })).rejects.toThrow(
+      'Invalid storage range',
+    );
+    expect(send).toHaveBeenCalledTimes(1);
   });
 
   it('permits local storage only outside production and validates S3 settings', () => {

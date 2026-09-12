@@ -11,10 +11,12 @@ import {
 
 const fullEnv = {
   DATABASE_URL: 'postgresql://local/test',
+  PAYMENT_PROVIDER: 'disabled',
   EMAIL_FROM: 'test@example.test',
   CUSTOMER_ACCESS_TOKEN_PEPPER: 'a-local-token-pepper-with-more-than-32-chars',
   OPENROUTER_API_KEY: 'openrouter-key',
   OPENROUTER_MUSIC_MODEL: 'google/lyria-3-pro-preview',
+  OPENROUTER_TEXT_MODEL: 'test-text-model',
 };
 
 describe('worker config', () => {
@@ -27,7 +29,7 @@ describe('worker config', () => {
     });
     expect(readWorkerConfig(fullEnv).email.kind).toBe('local-log');
     expect(() => readWorkerConfig({ ...fullEnv, WORKER_CONCURRENCY: '0' })).toThrow();
-    expect(sanitizeError(new Error('first\nsecond'))).toBe('first second');
+    expect(sanitizeError(new Error('first\nsecond'))).toBe('Falha interna da operação.');
   });
 
   it('allows unconfigured local AI but requires credentials at production startup', () => {
@@ -83,6 +85,23 @@ describe('worker config', () => {
     });
     expect(config.storage).toMatchObject({ kind: 's3', bucket: 'private-bucket' });
     expect(config.email).toMatchObject({ kind: 'resend', apiKey: 'resend-key' });
+    expect(config.openRouterTextModel).toBe('test-text-model');
+  });
+
+  it('requires the OpenRouter text model in production', () => {
+    expect(() =>
+      readWorkerConfig({
+        ...fullEnv,
+        NODE_ENV: 'production',
+        OPENROUTER_TEXT_MODEL: '',
+        RESEND_API_KEY: 'resend-key',
+        OPENROUTER_COVER_TEXT_MODEL: 'cover-text',
+        OPENROUTER_COVER_REFERENCE_MODEL: 'cover-reference',
+        STORAGE_PROVIDER: 's3',
+        STORAGE_S3_BUCKET: 'private-bucket',
+        STORAGE_S3_REGION: 'us-east-1',
+      }),
+    ).toThrow('OPENROUTER_TEXT_MODEL is required');
   });
 
   it('selects Google Lyria with its default model without requiring OpenRouter locally', () => {
@@ -129,6 +148,7 @@ describe('worker logging', () => {
     const context = jobLogContext(
       {
         id: 'internal-job-id',
+        leaseToken: 'internal-lease-id',
         orderId: 'internal-order-id',
         type: 'generate_audio',
         attempts: 2,
@@ -145,7 +165,7 @@ describe('worker logging', () => {
       status: 'retry_scheduled',
       attempt: 2,
       durationMs: 47,
-      error: 'provider failed with detail',
+      error: 'Falha interna da operação.',
     });
     expect(JSON.stringify(context)).not.toContain('internal-job-id');
     expect(JSON.stringify(context)).not.toContain('internal-order-id');
@@ -208,7 +228,7 @@ describe('music sing parsing', () => {
     expect(outcome.usage.requestId).toBe('gen-blocked');
   });
 
-  it('encerra bloqueios do filtro após orçamento curto com erro terminal', async () => {
+  it('encerra bloqueio de conteúdo após uma chamada sem gasto repetido automático', async () => {
     const fetch = vi.fn<typeof globalThis.fetch>(async () =>
       sse([{ id: 'gen-blocked', error: { message: 'PROHIBITED_CONTENT' } }]),
     );
@@ -222,9 +242,9 @@ describe('music sing parsing', () => {
       () => null,
       (error: unknown) => error,
     );
-    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenCalledTimes(1);
     expect(failure).toMatchObject({ terminal: true });
-    expect((failure as { attempts?: unknown[] }).attempts).toHaveLength(2);
+    expect((failure as { attempts?: unknown[] }).attempts).toHaveLength(1);
   });
 
   it.each([400, 401, 402, 403, 404, 422])(
@@ -253,7 +273,7 @@ describe('music sing parsing', () => {
       expect((failure as { attempts: unknown[] }).attempts).toHaveLength(1);
       expect(sanitizeError(failure)).not.toContain('private-provider-detail');
       expect(sanitizeError(failure)).not.toContain('openrouter_key_limit');
-      if (status === 402) expect(sanitizeError(failure)).toContain('limite do provedor');
+      if (status === 402) expect(sanitizeError(failure)).toContain('AI_PAYMENT_LIMIT');
     },
   );
 
@@ -269,29 +289,32 @@ describe('music sing parsing', () => {
     );
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(failure).toMatchObject({ terminal: true });
-    expect(sanitizeError(failure)).toContain('limite do provedor');
+    expect(sanitizeError(failure)).toContain('AI_PAYMENT_LIMIT');
     expect(sanitizeError(failure)).not.toContain('PROHIBITED_CONTENT');
   });
 
-  it.each([408, 429, 500, 503])('preserves retry behavior for HTTP %i', async (status) => {
-    vi.useFakeTimers();
-    const fetch = vi.fn(async () => new Response('private-transient-detail', { status }));
-    vi.stubGlobal('fetch', fetch);
-    try {
-      const provider = (await import('./worker.js')).createOpenRouterMusicProvider(config);
-      const result = provider.generate('prompt').then(
-        () => null,
-        (error: unknown) => error,
-      );
-      await vi.runAllTimersAsync();
-      const failure = await result;
-      expect(fetch).toHaveBeenCalledTimes(5);
-      expect(failure).not.toHaveProperty('terminal', true);
-      expect((failure as { attempts: unknown[] }).attempts).toHaveLength(5);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
+  it.each([408, 429, 500, 503])(
+    'returns a single HTTP %i outcome; only 429 permits durable retry',
+    async (status) => {
+      vi.useFakeTimers();
+      const fetch = vi.fn(async () => new Response('private-transient-detail', { status }));
+      vi.stubGlobal('fetch', fetch);
+      try {
+        const provider = (await import('./worker.js')).createOpenRouterMusicProvider(config);
+        const result = provider.generate('prompt').then(
+          () => null,
+          (error: unknown) => error,
+        );
+        await vi.runAllTimersAsync();
+        const failure = await result;
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(failure).toHaveProperty('terminal', status !== 429);
+        expect((failure as { attempts: unknown[] }).attempts).toHaveLength(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
 
   it('converts transport failures into error outcomes', async () => {
     vi.stubGlobal(
@@ -303,7 +326,7 @@ describe('music sing parsing', () => {
     const outcome = await generateMusicOnce(config, 'prompt');
     expect(outcome.ok).toBe(false);
     if (outcome.ok) return;
-    expect(outcome.error.message).toContain('fetch failed');
+    expect(outcome.error.message).toBe('AI_RESULT_UNKNOWN');
     expect(outcome.usage.requestId).toBeNull();
   });
 });
@@ -362,7 +385,7 @@ describe('Google Lyria music adapter', () => {
   });
 
   it.each([408, 429, 500, 503])(
-    'keeps Google HTTP %i retryable without an internal retry',
+    'classifies Google HTTP %i without internal retry',
     async (status) => {
       const fetch = vi.fn<typeof globalThis.fetch>(
         async () => new Response('private-google-detail', { status }),
@@ -375,7 +398,7 @@ describe('Google Lyria music adapter', () => {
           (error: unknown) => error,
         );
       expect(fetch).toHaveBeenCalledTimes(1);
-      expect(failure).not.toHaveProperty('terminal', true);
+      expect(failure).toHaveProperty('terminal', status !== 429);
       expect(
         (failure as { attempts: Array<{ sample: { costUsd: string | null } }> }).attempts[0]?.sample
           .costUsd,
@@ -409,17 +432,20 @@ describe('Google Lyria music adapter', () => {
 
   it('treats safety refusal, no audio, and unsupported containers as terminal with unknown cost', async () => {
     const cases = [
-      { body: { id: 'safety-1', error: { message: 'SAFETY_REFUSAL' } }, error: 'safety' },
+      {
+        body: { id: 'safety-1', error: { message: 'SAFETY_REFUSAL' } },
+        error: 'AI_CONTENT_BLOCKED',
+      },
       {
         body: { id: 'no-audio-1', steps: [{ content: [{ type: 'text', data: 'not audio' }] }] },
-        error: 'no audio',
+        error: 'AI_INVALID_RESPONSE',
       },
       {
         body: {
           id: 'bad-container-1',
           output_audio: { data: Buffer.from('not audio').toString('base64') },
         },
-        error: 'unsupported audio',
+        error: 'AI_INVALID_AUDIO',
       },
     ];
     for (const testCase of cases) {
@@ -447,7 +473,7 @@ describe('Google Lyria music adapter', () => {
       createGoogleMusicProvider({ apiKey: '', model: 'lyria-3.5' }).generate('prompt'),
     ).rejects.toMatchObject({
       terminal: true,
-      message: 'Google music is unavailable: configure API key and model',
+      code: 'AI_CONFIGURATION_MISSING',
     });
     expect(fetch).not.toHaveBeenCalled();
   });
@@ -537,7 +563,7 @@ describe('unconfigured AI transport', () => {
         generateMusicOnce({ ...config, webUrl: 'http://local' }, 'prompt'),
       ).rejects.toMatchObject({
         terminal: true,
-        message: 'OpenRouter music is unavailable: configure API key and model',
+        code: 'AI_CONFIGURATION_MISSING',
       });
       await expect(
         generateCoverOnce(
@@ -546,7 +572,7 @@ describe('unconfigured AI transport', () => {
         ),
       ).rejects.toMatchObject({
         terminal: true,
-        message: 'OpenRouter cover is unavailable: configure API key and model',
+        code: 'AI_CONFIGURATION_MISSING',
       });
     }
     expect(fetch).not.toHaveBeenCalled();

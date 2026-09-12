@@ -17,12 +17,12 @@ describe('API client', () => {
     const creationKey = '11111111-1111-4111-8111-111111111111';
     server.use(
       http.post('http://localhost:3001/api/v1/orders', async ({ request }) => {
-        await expect(request.json()).resolves.toEqual({ productType: 'friend_roast', creationKey });
+        await expect(request.json()).resolves.toEqual({ productType: 'custom_song', creationKey });
         return HttpResponse.json({ publicId: 'public-order-123' }, { status: 201 });
       }),
     );
 
-    await expect(api.createOrder('friend_roast', creationKey)).resolves.toEqual({
+    await expect(api.createOrder('custom_song', creationKey)).resolves.toEqual({
       publicId: 'public-order-123',
     });
   });
@@ -36,13 +36,16 @@ describe('API client', () => {
             instructions: 'Refrão mais alegre',
             baseVersion: 2,
           });
-          return HttpResponse.json({ number: 3, kind: 'generated' });
+          return HttpResponse.json(
+            { accepted: true, status: 'lyrics_generating' },
+            { status: 202 },
+          );
         },
       ),
     );
     await expect(
       api.generateLyrics('refine-1', { instructions: 'Refrão mais alegre', baseVersion: 2 }),
-    ).resolves.toEqual({ number: 3, kind: 'generated' });
+    ).resolves.toEqual({ accepted: true, status: 'lyrics_generating' });
   });
 
   it('envia recuperação administrativa por endpoint específico e referência multipart com consentimento', async () => {
@@ -66,11 +69,13 @@ describe('API client', () => {
     await api.retryJob('cover-1', {
       file: new File(['photo'], 'cover.png', { type: 'image/png' }),
       consent: true,
+      policyVersion: 'draft-v1',
     });
     const init = fetch.mock.calls[0]?.[1];
     expect(init?.headers).not.toHaveProperty('content-type');
     const form = init?.body as FormData;
     expect(form.get('consent')).toBe('true');
+    expect(form.get('policyVersion')).toBe('draft-v1');
     expect((form.get('reference') as File).name).toBe('cover.png');
     expect(called).toEqual([
       '/api/v1/admin/orders/order-1/lyrics/generate',
@@ -90,7 +95,7 @@ describe('API client', () => {
     );
 
     await expect(
-      api.createOrder('friend_roast', '11111111-1111-4111-8111-111111111111'),
+      api.createOrder('custom_song', '11111111-1111-4111-8111-111111111111'),
     ).rejects.toMatchObject({
       name: 'Error',
       message: 'Revise os campos informados.',
@@ -130,12 +135,13 @@ describe('API client', () => {
     vi.stubGlobal('fetch', fetch);
 
     const reference = new File(['jpeg'], 'lembranca.jpg', { type: 'image/jpeg' });
-    await api.createCover('public-order-1', reference, true);
+    await api.createCover('public-order-1', reference, true, 'draft-v1');
     const init = fetch.mock.calls[0]?.[1];
     expect(init?.headers).not.toHaveProperty('content-type');
     const form = init?.body as FormData;
     expect(form).toBeInstanceOf(FormData);
     expect(form.get('consent')).toBe('true');
+    expect(form.get('policyVersion')).toBe('draft-v1');
     expect((form.get('reference') as File).name).toBe('lembranca.jpg');
   });
 
@@ -157,8 +163,11 @@ describe('API client', () => {
     await api.approveLyrics('public-order-1', 2, {
       title: 'Título',
       summary: 'resumo',
+      language: 'pt-BR',
       fullLyrics: 'letra atual',
       sections: [],
+      pronunciationNotes: [],
+      safetyNotes: [],
       musicalDirection: {
         genre: 'pagode',
         mood: 'animado',
@@ -225,9 +234,9 @@ describe('API client', () => {
       }),
     );
 
-    await api.createOrder('friend_roast', '11111111-1111-4111-8111-111111111111', 'anon-123');
+    await api.createOrder('custom_song', '11111111-1111-4111-8111-111111111111', 'anon-123');
     expect(orderBody).toEqual({
-      productType: 'friend_roast',
+      productType: 'custom_song',
       creationKey: '11111111-1111-4111-8111-111111111111',
     });
   });
@@ -237,7 +246,7 @@ describe('API client', () => {
     server.use(
       http.get('http://localhost:3001/api/v1/products', () =>
         HttpResponse.json([
-          { type: 'friend_roast', name: 'Música da Resenha', priceCents: 6789, active: true },
+          { type: 'custom_song', name: 'Sua música', priceCents: 6789, active: true },
         ]),
       ),
       http.post('http://localhost:3001/api/v1/orders/public-order-1/checkout', () =>
@@ -253,7 +262,7 @@ describe('API client', () => {
     );
 
     await expect(api.products()).resolves.toEqual([
-      { type: 'friend_roast', name: 'Música da Resenha', priceCents: 6789, active: true },
+      { type: 'custom_song', name: 'Sua música', priceCents: 6789, active: true },
     ]);
     await expect(api.checkout('public-order-1')).resolves.toEqual({
       checkoutUrl: '/pedido/public-order-1',

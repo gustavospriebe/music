@@ -1,5 +1,7 @@
 # P2 Readiness Specification
 
+> Registro histórico de um recorte anterior. O modelo vigente e a evidência atual estão em [docs/documentation-map.md](../../../docs/documentation-map.md) e [audit-remediation](../audit-remediation/spec.md). Este registro não autoriza publicação nem gasto com providers.
+
 ## Problem Statement
 
 O MVP funciona, mas ainda entrega JavaScript público pesado, não oferece uma capa presenteável e deixa cinco pré-requisitos operacionais no backlog. Esta feature fecha tudo que é localmente implementável e separa, sem ambiguidade, o que ainda depende de credenciais, infraestrutura, piloto pago ou aprovação jurídica.

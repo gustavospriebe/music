@@ -1,3 +1,5 @@
+> HISTÓRICO — documento anterior à remediação de 12/09/2026. Comandos, modelos, orçamento e alegações de prontidão abaixo podem estar superados e não autorizam nova execução. Use o [mapa vigente](documentation-map.md) para implementação e operação.
+
 # Modelos de música: limites, alternativas e custos
 
 Pesquisa de 07/09/2026, com três frentes independentes e consolidação contra o código atual. Fontes primárias, preços públicos e confirmação visual da tabela Mureka. Nenhuma geração paga, compra, instalação ou mudança de configuração. Disponibilidade documentada não equivale a teste de qualidade ou homologação da nossa conta.

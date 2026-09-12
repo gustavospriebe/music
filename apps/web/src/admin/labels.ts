@@ -23,6 +23,9 @@ export const statusPt = (status: string): string => {
 
 export const paymentStatusPt = (status: string): string => {
   const labels: Record<string, string> = {
+    creating: 'Criando cobrança',
+    unknown: 'Resultado desconhecido; requer conferência',
+    expired: 'Expirado',
     pending: 'Aguardando',
     approved: 'Aprovado',
     rejected: 'Recusado',
@@ -90,7 +93,7 @@ export function jobNamePt(type: string): string {
   const names: Record<string, string> = {
     generate_audio: 'Criação das versões de áudio',
     generate_cover: 'Criação da capa',
-    'deliver-notify': 'Entrega e aviso por e-mail',
+    deliver_notify: 'Entrega e aviso por e-mail',
     generate_lyrics: 'Criação da letra',
   };
   return names[type] ?? 'Processamento do pedido';

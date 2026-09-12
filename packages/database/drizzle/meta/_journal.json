@@ -64,6 +64,62 @@
       "when": 1788780000001,
       "tag": "0008_email_delivery_intent",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789210000000,
+      "tag": "0009_platform_foundation_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789220000000,
+      "tag": "0010_greenfield_cleanup",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1789224000000,
+      "tag": "0011_single_product",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1789260000000,
+      "tag": "0012_audit_remediation",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1789260000001,
+      "tag": "0013_lyrics_target_version",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1789260000002,
+      "tag": "0014_email_production",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1789260000003,
+      "tag": "0015_payment_environment",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1789260000004,
+      "tag": "0016_webhook_environment",
+      "breakpoints": true
     }
   ]
 }

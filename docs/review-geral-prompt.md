@@ -1,3 +1,5 @@
+> HISTÓRICO — leitura anterior à remediação de 12/09/2026. Alegações de schema, providers, status e prontidão abaixo podem estar superadas. Este documento não autoriza implementação, gastos ou publicação. Use o [modelo vigente](project-context.md) e sua validação.
+
 # Prompt — revisão geral da aplicação (nova sessão)
 
 Copie e cole na nova sessão:

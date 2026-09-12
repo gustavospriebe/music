@@ -7,10 +7,12 @@ const env = parseEnv({
   CUSTOMER_ACCESS_TOKEN_PEPPER: 'test-token-pepper-32-characters-long',
   ADMIN_EMAIL: 'test@example.test',
   ADMIN_PASSWORD: 'test-password',
+  PAYMENT_ENVIRONMENT: 'live',
   ABACATEPAY_API_KEY: 'private-key',
   ABACATEPAY_PRODUCT_ID: 'prod_test_123',
   ABACATEPAY_WEBHOOK_SECRET: 'private-webhook-secret',
   COMMERCIAL_READY: 'true',
+  POLICY_VERSION: '2026-09-v1',
   SUPPORT_EMAIL: 'support@example.test',
   DELIVERY_ESTIMATE: 'Prazo aprovado',
   REVISION_POLICY: 'Ajustes aprovados',
@@ -29,6 +31,7 @@ describe('commercial activation gates', () => {
     'USAGE_LICENSE',
     'TERMS_URL',
     'PRIVACY_URL',
+    'POLICY_VERSION',
   ] as const)('requires %s alongside the ready flag', (setting) => {
     const missing = { ...env, [setting]: undefined };
     expect(publicConfiguration(missing).commercial.ready).toBe(false);
@@ -56,5 +59,50 @@ describe('commercial activation gates', () => {
         4990,
       ),
     ).toMatchObject({ configured: false, devFallback: false, checkoutAllowed: false });
+  });
+
+  it('keeps real sandbox checkout closed publicly even with a complete commercial configuration', () => {
+    const sandbox = {
+      ...env,
+      NODE_ENV: 'production' as const,
+      PAYMENT_ENVIRONMENT: 'sandbox' as const,
+    };
+    expect(publicConfiguration(sandbox)).toMatchObject({
+      commercial: { ready: false },
+      payment: {
+        sandbox: true,
+        environment: 'sandbox',
+        label: 'AbacatePay — homologação sem cobrança',
+        devFallback: false,
+      },
+    });
+    expect(orderPaymentConfiguration(sandbox, 4990).checkoutAllowed).toBe(false);
+    expect(
+      orderPaymentConfiguration(sandbox, 4990, { administrativeSandbox: true }).checkoutAllowed,
+    ).toBe(true);
+  });
+
+  it('restricts the administrative exception to configured sandbox with a positive integer price', () => {
+    const administrativeSandbox = { administrativeSandbox: true };
+    const sandbox = {
+      ...env,
+      NODE_ENV: 'production' as const,
+      PAYMENT_ENVIRONMENT: 'sandbox' as const,
+    };
+    for (const price of [0, -1, 49.9, Number.NaN])
+      expect(orderPaymentConfiguration(sandbox, price, administrativeSandbox).checkoutAllowed).toBe(
+        false,
+      );
+    expect(
+      orderPaymentConfiguration(
+        { ...sandbox, ABACATEPAY_PRODUCT_ID: undefined },
+        4990,
+        administrativeSandbox,
+      ).checkoutAllowed,
+    ).toBe(false);
+    expect(
+      orderPaymentConfiguration({ ...env, COMMERCIAL_READY: 'false' }, 4990, administrativeSandbox)
+        .checkoutAllowed,
+    ).toBe(false);
   });
 });

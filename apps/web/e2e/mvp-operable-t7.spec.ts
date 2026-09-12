@@ -5,7 +5,7 @@ test.beforeEach(async ({ page }) => {
     route.fulfill({
       json: {
         generation: { lyricsAvailable: true },
-        commercial: { ready: false },
+        commercial: { ready: false, policyVersion: 'draft-v1', termsUrl: null, privacyUrl: null },
         payment: { label: 'AbacatePay' },
         supportEmail: null,
       },
@@ -299,7 +299,7 @@ test('captura os estados finais nos viewports da auditoria', async ({ page }) =>
     if (path.endsWith('/analytics/beacon')) return route.fulfill({ json: { accepted: true } });
     if (path.endsWith('/products'))
       return route.fulfill({
-        json: [{ type: 'friend_roast', name: 'Música da Resenha', priceCents: 4990, active: true }],
+        json: [{ type: 'custom_song', name: 'Sua música', priceCents: 4990, active: true }],
       });
     const publicId = path.match(/\/orders\/([^/]+)$/)?.[1];
     const order = publicId ? visualOrders[publicId as keyof typeof visualOrders] : undefined;

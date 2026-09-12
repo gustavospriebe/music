@@ -1,3 +1,5 @@
+> HISTÓRICO — leitura anterior à remediação de 12/09/2026. Alegações de schema, providers, status e prontidão abaixo podem estar superadas. Este documento não autoriza implementação, gastos ou publicação. Use o [modelo vigente](project-context.md) e sua validação.
+
 # Auditoria UI/UX — Música da Resenha
 
 **Data**: 2026-09-06  
@@ -22,7 +24,7 @@ Na administração, os dados existem, mas ainda são uma projeção técnica do 
 - A proposta de valor e o CTA primário aparecem antes da dobra.
 - A linguagem é brasileira, direta e consistente com o produto-presente.
 - O cartão “Áudio demonstrativo” não tem player, botão ou mídia; a promessa de prova social/qualidade não se concretiza. O código confirma que ele é apenas um `div` visual em `apps/web/src/pages/landing.tsx:30`.
-- O catálogo tem três produtos ativos, mas a landing seleciona somente `friend_roast` em `apps/web/src/pages/landing.tsx:10`.
+- O catálogo público tem um produto (`custom_song`). A remodelagem da jornada única está em `docs/ui-remodel-report.md`.
 
 ### 2. História e validação — funcional, com fricção
 

@@ -1,3 +1,5 @@
+> HISTÓRICO — leitura anterior à remediação de 12/09/2026. Alegações de schema, providers, status e prontidão abaixo podem estar superadas. Este documento não autoriza implementação, gastos ou publicação. Use o [modelo vigente](project-context.md) e sua validação.
+
 # Relatório pós-remodelagem UI/UX — 2026-09-06
 
 Baseline: `docs/ui-ux-audit.md` + `output/product-design/ui-ux-audit-2026-09-06/` (preservados).

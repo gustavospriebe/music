@@ -23,6 +23,40 @@ const env: Env = {
 };
 
 describe('HTTP foundation', () => {
+  it('never returns database parameters or unexpected exception messages', async () => {
+    const app = await buildApp(env);
+    app.get('/test-private-error', () => {
+      throw new Error(
+        'Failed query: insert into order_contacts(email) values ($1); params: private@example.test',
+      );
+    });
+    try {
+      const response = await app.inject('/test-private-error');
+      expect(response.statusCode).toBe(500);
+      expect(response.body).not.toMatch(/private@|Failed query|insert into|params/);
+      expect(response.json().error.message).toBe(
+        'Não foi possível concluir a solicitação. Tente novamente.',
+      );
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('rejects malformed JSON without echoing its personal contents', async () => {
+    const app = await buildApp(env);
+    try {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/v1/orders',
+        headers: { 'content-type': 'application/json' },
+        payload: '{"email":"private@example.test", BROKEN}',
+      });
+      expect(response.statusCode).toBe(400);
+      expect(response.body).not.toContain('private@example.test');
+    } finally {
+      await app.close();
+    }
+  });
   it('limits the HTTP completion context to route, status and duration', () => {
     expect(httpLogContext('/api/v1/orders/:publicId', 200, 12.6)).toEqual({
       route: '/api/v1/orders/:publicId',

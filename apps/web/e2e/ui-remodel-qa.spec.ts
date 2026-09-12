@@ -5,7 +5,7 @@ test.beforeEach(async ({ page }) => {
     route.fulfill({
       json: {
         generation: { lyricsAvailable: true },
-        commercial: { ready: false },
+        commercial: { ready: false, policyVersion: 'draft-v1', termsUrl: null, privacyUrl: null },
         payment: { label: 'AbacatePay' },
         supportEmail: null,
       },
@@ -42,7 +42,7 @@ const routes = async (page: import('@playwright/test').Page) => {
     if (path.endsWith('/analytics/beacon')) return route.fulfill({ json: { accepted: true } });
     if (path.endsWith('/products'))
       return route.fulfill({
-        json: [{ type: 'friend_roast', name: 'Música da Resenha', priceCents: 4990, active: true }],
+        json: [{ type: 'custom_song', name: 'Sua música', priceCents: 4990, active: true }],
       });
     if (path.endsWith('/orders/order-qa-story'))
       return route.fulfill({
@@ -107,7 +107,7 @@ const routes = async (page: import('@playwright/test').Page) => {
         json: {
           order: {
             id: 'qa-internal-1',
-            productType: 'friend_roast',
+            productType: 'custom_song',
             status: 'review_required',
             priceCents: 4990,
             createdAt: '2026-09-04T12:00:00.000Z',
@@ -136,7 +136,7 @@ const routes = async (page: import('@playwright/test').Page) => {
             {
               id: 'qa-internal-1',
               publicId: 'QA-PUBLIC-1',
-              productType: 'friend_roast',
+              productType: 'custom_song',
               status: 'failed',
               priceCents: 4990,
               createdAt: new Date().toISOString(),
@@ -174,7 +174,7 @@ test('QA remodel: jornada cliente desktop + mobile sem overflow', async ({ page 
   await page.goto('/criar/checkout?pedido=order-qa-approved');
   await expect(page.getByRole('list', { name: 'Jornada da música' })).toBeVisible();
   await expect(page.getByRole('heading', { name: /resumo do pedido/i })).toBeVisible();
-  await expect(page.getByText('Música da Resenha', { exact: true })).toBeVisible();
+  await expect(page.getByRole('definition').filter({ hasText: /^Sua música$/ })).toBeVisible();
   await expect(page.getByText('A Resenha da Bia')).toBeVisible();
   await expect(page.getByText(/R\$\s*49,90/)).toBeVisible();
   await expect(page.getByText(/duas versões de áudio e página privada/i)).toBeVisible();

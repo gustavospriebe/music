@@ -1,5 +1,7 @@
 # Railway Bootstrap Specification
 
+> Registro histórico de um recorte anterior. O modelo vigente e a evidência atual estão em [docs/documentation-map.md](../../../docs/documentation-map.md) e [audit-remediation](../audit-remediation/spec.md). Este registro não autoriza publicação nem gasto com providers.
+
 ## Problem Statement
 
 O repositório contém imagens e um guia de Railway, mas o CI remoto falha antes dos gates e não existe projeto Railway para a aplicação. O bootstrap precisa corrigir o gate, consolidar o contexto operacional e criar a estrutura externa sem confundir provisionamento com deploy, homologação ou produção comercial.

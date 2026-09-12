@@ -16,9 +16,9 @@
 - **Decision**: Operações síncronas com provider externo usam claim compare-and-set no PostgreSQL e só retomam claims sem atualização após timeout explícito.
 - **Reason**: O banco já é a fonte de verdade e evita uma segunda infraestrutura de lock/fila para a geração de letra.
 - **Trade-off**: Uma interrupção exige aguardar o timeout de recuperação; não há cancelamento imediato da chamada em curso.
-- **Scope**: API, worker e futuras operações externas cobradas.
+- **Scope**: API, worker e futuras operações externas cobradas. **Superseded for lyrics** by AD-013.
 - **Date**: 2026-09-04
-- **Status**: active
+- **Status**: superseded (letra); remaining sync I/O should prefer the job queue.
 
 ### AD-003
 
@@ -63,7 +63,7 @@
 - **Decision**: custom_song é aditivo; tema e briefing são inspiração criativa, sem cópia literal obrigatória. Fatos opcionais expressamente fornecidos continuam verificáveis; produtos anteriores preservam seu contrato.
 - **Reason**: Criação livre não deve inventar relações nem converter texto do cliente em versos obrigatórios.
 - **Scope**: contratos, domínio, API e estúdio do cliente.
-- **Status**: active
+- **Status**: superseded by AD-015/AD-016/AD-018 (2026-09-12)
 
 ### AD-008
 
@@ -85,7 +85,7 @@
 - **Reason**: O AbacatePay v2 unificou a consulta e requer suporte a headers nos webhooks nativos.
 - **Scope**: API, provedores de pagamento, contratos e checkout.
 - **Date**: 2026-09-11
-- **Status**: active
+- **Status**: superseded by AD-015/AD-016/AD-018 (2026-09-12)
 
 ### AD-011
 
@@ -93,7 +93,7 @@
 - **Reason**: Elimina o atrito do cliente voltar do banco e ver "Falta o pagamento" ou botão duplicado enquanto o webhook ainda trafega.
 - **Scope**: API, Web, Checkout, Jobs.
 - **Date**: 2026-09-11
-- **Status**: active
+- **Status**: superseded by AD-015/AD-016/AD-018 (2026-09-12)
 
 ### AD-012
 
@@ -103,18 +103,112 @@
 - **Date**: 2026-09-11
 - **Status**: active
 
-## Handoff
+### AD-013
 
-- **Feature**: MVP End-to-End Validation & Operations.
-- **Phase / Task**: Homologação completa de todos os fluxos críticos (Pagamento, Reconciliação, Capa de Álbum, Ajustes do Cliente, E-mail e Admin).
+- **Decision**: Letra entra na mesma fila PostgreSQL do áudio (`generate_lyrics`). HTTP valida e enfileira; o worker executa OpenRouter + `validateLyrics`. Stale claim usa `releaseStaleJobs`, não CAS de 5 minutos em `orders.updatedAt`. Idempotência `lyrics:{orderId}:{nextVersion}`. Primeira geração falha → `failed`; refinamento falho → `lyrics_ready`.
+- **Reason**: O request HTTP não deve segurar 3×60s; a UI já faz poll em `lyrics_generating`; uma política de lock só.
+- **Trade-off**: O cliente vê `accepted` antes da letra existir; depende do worker estar no ar (incluindo `PREVIEW_AI=lyrics`).
+- **Scope**: API, worker, contracts, admin recovery, preview.
+- **Date**: 2026-09-11
+- **Status**: active
+
+### AD-014
+
+- **Decision**: Contato do comprador vive em `order_contacts`. `story_sessions.data` guarda só briefing criativo. Catálogo, enum e contrato aceitam somente `custom_song`. Sem aliases Drizzle (`storySessions` / `lyricVersions` / `storedFiles`). Job de aviso é `deliver_notify`. Ponteiros de arquivo usam `file_id`.
+- **Reason**: Contato e aceites fora do JSONB enviado à IA; briefing ainda pode conter dados pessoais; um produto vivo; schema sem tabelas, enums ou nomes mortos.
+- **Scope**: contratos, domínio, API, worker, web, seed, migrations `0010` e `0011`.
+- **Date**: 2026-09-12
+- **Status**: active
+
+## Handoff anterior — substituído pela remediação abaixo
+
+- **Feature**: Greenfield cleanup.
+- **Phase / Task**: Um produto, um enum, nomes de arquivo/job alinhados ao schema vivo.
+- **Docs (2026-09-12)**: Spec em `.specs/features/greenfield-cleanup/`. Architecture, product, STATE e CI Postgres 18 atualizados. Sem deploy.
 - **Completed**:
-  - Correção e validação da reconciliação imediata do pagamento AbacatePay no retorno do usuário ao `/pedido/:publicId`.
-  - Configuração do remetente de e-mail no domínio verificado `renovagp.com`, validação de envio via Resend e entrega recebida no Gmail.
-  - Geração de capa de álbum com IA (`generate_cover`) via OpenRouter (`google/gemini-3.1-flash-lite-image`), testada com variantes e download em alta qualidade.
-  - Teste do fluxo completo de solicitação de ajuste pelo cliente ("Algo precisa de ajuste?"), envio do feedback e transição para `revision_requested`.
-  - Teste e homologação do painel administrativo (`/admin`), incluindo visão geral de métricas, custos de IA, listagem de pedidos, visualização do feedback de ajuste e re-geração isolada de variante de áudio com Lyria 3 Pro.
-  - `pnpm check` (Prettier, ESLint, TypeScript, Vitest e Build) 100% verde em todos os 10 pacotes do monorepo.
+  - Contato em `order_contacts`; briefing criativo em `story_sessions.data`.
+  - Enum, contrato e catálogo só `custom_song` (migration `0011`).
+  - Job de aviso `deliver_notify`; colunas `file_id` / `reference_file_id` / `cover_file_id`.
+  - Pacote `@resenha/config` removido; CI `postgres:18-alpine`.
 - **Next step**:
-  - Configurar e sincronizar no Railway as variáveis de produção `EMAIL_FROM=Música da Resenha <contato@renovagp.com>` e fazer o deploy da versão atualizada com a reconciliação do pagamento.
-  - Definir se em produção o `AUDIO_REVIEW_MODE` será `automatic` (entrega imediata em ~2 min) ou `manual` (curadoria prévia no `/admin`).
+  - Revisar o working tree e abrir PR quando quiser; sem deploy nesta fatia.
+  - Aplicar `0011` em preview/produção antes de publicar.
+  - Volume local continua Postgres 16: deixe como está. `docker compose down -v` só se for alinhar a 18 e aceitar perder o dado local.
+  - No worker Railway, garantir `OPENROUTER_TEXT_MODEL` (obrigatório em produção) — sem deploy nesta fatia.
+  - Definir se em produção o `AUDIO_REVIEW_MODE` será `automatic` ou `manual`.
   - Realizar teste final de compra com PIX real quando as credenciais de produção do AbacatePay forem ativadas.
+
+## Remediação independente (2026-09-12)
+
+### AD-015
+
+- **Decision**: Pagamento usa porta genérica e tentativa persistida antes da rede. Estado financeiro pertence a payments; liquidação única confere provider/ID/referência/centavos/BRL. Unknown impede novo POST; refunds não são ignorados nem regressivos.
+- **Reason**: Trocar gateway não deve remodelar o pedido nem duplicar dinheiro quando a rede é incerta. AbacatePay é um adapter, não escolha final obrigatória.
+- **Scope**: domínio, providers, database/payment-settlement, API/webhook e reconciliação periódica do worker.
+- **Status**: active
+
+### AD-016
+
+- **Decision**: Uma produção fixa uma versão imutável da letra. Tentativas de áudio/arquivos são históricas, com seleção explícita por variante. Cada produção tem aviso de entrega próprio; um link estável por pedido aponta a produção liberada vigente.
+- **Reason**: Falha parcial, edição administrativa ou regeneração não pode misturar letras, apagar histórico nem impedir aviso da revisão.
+- **Scope**: productions, audio_generations, deliveries, email_deliveries, API e worker.
+- **Status**: active
+
+### AD-017
+
+- **Decision**: Jobs usam lease renovável e fencing. ai_calls é persistida antes da rede; resultado desconhecido exige conferência explícita. ai_usage distingue custo informado/estimado/desconhecido. É permitido completar um custo antes desconhecido mediante observação da mesma chamada e evento; valor já conhecido nunca é reprecificado.
+- **Reason**: Uma queda não prova que a chamada foi gratuita, e o retorno tardio não autoriza o worker antigo a publicar artefatos.
+- **Scope**: fila, providers, worker, custos e recuperação administrativa.
+- **Status**: active
+
+### AD-018
+
+- **Decision**: Aceites são evidência versionada/datada em order_consents. Leitura sem evidência permanece desconhecida. FullLyrics é o texto canônico; se uma edição divergir da estrutura gerada, seções antigas são removidas. A saída IA mantém validação estrutural própria.
+- **Reason**: Não fabricar consentimento nem manter duas versões contraditórias da letra. Criatividade pode conter dados pessoais; contato de cobrança/entrega não vai ao modelo.
+- **Scope**: contratos, domínio, API, UI e migrations.
+- **Status**: active
+
+### AD-019
+
+- **Decision**: Revisão manual é o padrão. automatic_release exige opt-in e só valida arquivo decodificável com duração mínima técnica; não simula avaliação artística automática.
+- **Reason**: Arquivo válido não garante uma música aceitável ou fiel à letra.
+- **Scope**: configuração, worker, admin e operação comercial.
+- **Status**: active
+
+## Encerramento da remediação local (antes da ativação externa)
+
+- **Feature**: audit-remediation. Implementação e validação locais concluídas em 12/09/2026; [parecer independente](features/audit-remediation/validation.md): PASS local. Não publicado.
+- **Preservação**: WIP anterior preservado; snapshot externo ao repo antes das mudanças. Sem commit, push, PR, deploy ou chamada paga nesta execução.
+- **Banco da implementação**: PostgreSQL 18 isolado na porta 5444, com bancos separados por frente. O PostgreSQL 16 da porta 5433 e seus dados não foram migrados.
+- **Git reconfirmado no encerramento**: main e origin/main em `62b571ec251e52009383f0c6aa36d88b882468c8`; código novo estava local e não publicado.
+- **CI observado**: run 34573614874 de `62b571e` passou. Esse CI não cobre este WIP nem as migrations novas.
+- **Railway observado**: projeto `musica`; web em `62b571e`, API/worker em `3b9ef69`. `/products` ainda expunha quatro produtos. Journal/schema remoto não foi lido (SSH sem chave registrada); não está comprovado que 0011 ou migrations posteriores estejam aplicadas.
+- **Configuração remota observada**: EMAIL_FROM existe no worker; OPENROUTER_TEXT_MODEL faltava. Não foi validado envio real por esta revisão. Valores secretos não foram registrados.
+- **Pendente fora da execução local**: promoção coerente com worker antigo parado; preço e políticas reais; decisão de gateway/revisão; PIX de produção; e-mail recebido da revisão publicada; backup/restore real dos objetos.
+
+### Evidências do encerramento local
+
+- `pnpm check` em Node 22.22.2/PostgreSQL 18.6: format, lint, typecheck, 430 testes Vitest sem skips, um teste operacional e build PASS. Playwright: 48/48; responses controladas, sem providers reais.
+- Docker: web/API/worker construídos em linux/arm64, processos sem root; FFmpeg/FFprobe presentes no worker. Não é prova de imagem AMD64 ou Railway.
+- Migrations `0000`–`0014`: instalação limpa e upgrade têm o mesmo catálogo, 15 entradas no journal; snapshots e constraints reais conferidos. 30 invariantes negativas e dois cenários positivos permanecem na suíte do banco.
+- Verificação independente: sete mutações financeiras detectadas, controle intacto; revisões de produção, posse de jobs, custos desconhecidos e consentimentos confrontados com assertions.
+- Restore conjunto sintético: PostgreSQL + dois objetos restaurados; bytes/hashes, acesso privado, Range e revogação comprovados via API isolada. Não foi restaurado o bucket Railway.
+- Documentos e mapas antigos têm indicação de histórico. Rotas admin foram divididas por assunto; worker e providers têm módulos próprios sem nova infraestrutura.
+
+## Ativação externa autorizada em 12/09/2026
+
+### AD-020
+
+- **Decision**: Ambiente de pagamento é explícito e persistido: live, sandbox ou local. NODE_ENV continua controlando segurança do servidor. Checkout sandbox real exige sessão admin e capability do pedido; receita comercial inclui apenas pagamentos live. Cobranças e eventos têm namespace por ambiente. Histórico sem prova permanece NULL e bloqueia reconciliação automática, sem inventar procedência.
+- **Reason**: Homologar no Railway não pode aceitar dinheiro fictício como receita, desativar cookies seguros nem reinterpretar pagamentos antigos ao trocar a chave.
+- **Scope**: domínio, schema/migrations 0015–0016, gateway, checkout, webhook, worker e relatórios administrativos.
+- **Status**: active
+
+- **Execução atual**: [external-activation](features/external-activation/spec.md), em andamento; [evidências](features/external-activation/validation.md).
+- **Git**: branch `codex/operational-activation`; WIP original e remediação preservados. Publicação/CI do novo SHA ainda em andamento.
+- **Railway comprovado**: PostgreSQL 18.6, journal 0000–0008 com hashes iguais ao repo; quatro pedidos e nenhum arquivo. Dump privado restaurado e cópia atualizada até 0016, sem aplicar ainda no remoto.
+- **Pré-publicação**: CI obrigatório nos três triggers; web observa packages; configuração da próxima implantação corrigida para revisão manual, letra/reconciliação no worker, sandbox e comércio fechado.
+- **Gates locais do delta**: Node 22, `pnpm check` PASS: 484 Vitest + um teste operacional, format/lint/types/build; E2E 48/48; React Doctor 85/100, uma recomendação de complexidade, sem erro. Nenhum desses resultados comprova entrega externa.
+- **Providers**: Resend confirma domínio do remetente; AbacatePay confirma produto sandbox 4.990 centavos e webhook novo V2 cadastrado; OpenRouter confirma chave/modelos. Provas de geração, envio e recebimento ainda pendentes.
+- **Autorização de teste**: dono confirmou prosseguir após solicitação de teto US$ 3 em IA e envio ao ADMIN_EMAIL. Não autoriza PIX de produção, aumento de plano nem ativação comercial.
+- **Backup**: recurso nativo/PITR exige plano Pro, confirmado no painel; não houve upgrade. Dump privado restaurável protege a promoção; rotina externa de backup ainda precisa solução operacional.

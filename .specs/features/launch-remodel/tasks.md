@@ -1,5 +1,7 @@
 # Launch Remodel Tasks
 
+> Registro histórico de um recorte anterior. O modelo vigente e a evidência atual estão em [docs/documentation-map.md](../../../docs/documentation-map.md) e [audit-remediation](../audit-remediation/spec.md). Este registro não autoriza publicação nem gasto com providers.
+
 **Status**: Done
 
 Autorização: pedido do usuário de executar geral local. Sem commits/push/deploy. Ownership exclusivo conforme design. Cada entrega inclui seus testes co-localizados.

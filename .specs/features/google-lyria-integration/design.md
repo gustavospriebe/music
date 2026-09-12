@@ -1,5 +1,7 @@
 # Google Lyria 3.5 Integration Design
 
+> Registro histórico de um recorte anterior. O modelo vigente e a evidência atual estão em [docs/documentation-map.md](../../../docs/documentation-map.md) e [audit-remediation](../audit-remediation/spec.md). Este registro não autoriza publicação nem gasto com providers.
+
 **Spec**: `.specs/features/google-lyria-integration/spec.md`
 **Status**: Implemented; live technical evidence captured; human listening pending
 

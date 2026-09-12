@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { GeneratedLyrics, Story } from '@resenha/contracts';
 import {
   assertTransition,
-  calculatePriceCents,
+  canonicalizeLyrics,
   createAccessToken,
   evaluateContent,
   hashToken,
@@ -12,6 +12,8 @@ import {
   stableDeliveryToken,
   validateLyrics,
   verifyToken,
+  mergeStoryContact,
+  splitStoryContact,
 } from './index.js';
 
 const story: Story = {
@@ -25,14 +27,11 @@ const story: Story = {
   catchphrases: [],
   prohibitedTopics: ['política'],
   termsAccepted: true,
+  policyVersion: 'draft-v1',
   marketingAccepted: false,
-  productType: 'friend_roast',
-  relationship: 'Amiga',
-  traits: ['Engraçada'],
-  biggestStory: 'A viagem para a praia',
-  insideJokes: [],
-  mentions: [],
-  roastLevel: 'light',
+  productType: 'custom_song',
+  intention: 'amizade',
+  brief: 'Uma canção de aniversário para a Bia, com a turma toda cantando junto.',
   safetyConfirmed: true,
 };
 const lyrics: GeneratedLyrics = {
@@ -92,13 +91,20 @@ describe('lyrics and generation rules', () => {
   });
   it('makes a bounded retry delay and a safe music prompt', () => {
     expect(retryDelayMs(3, 1_000, 60_000, () => 0)).toBe(3_000);
-    expect(calculatePriceCents(4_990, [500, 250])).toBe(5_740);
     expect(makeMusicPrompt(lyrics)).toContain('100% original');
   });
-  it('sanitizes provider errors to a single capped line', () => {
-    expect(sanitizeAiError(new Error('a\nb'))).toBe('a b');
-    expect(sanitizeAiError('x'.repeat(600)).length).toBeLessThanOrEqual(500);
-    expect(sanitizeAiError(null)).toBe('unknown provider error');
+  it('exposes only local operation codes and never arbitrary provider messages', () => {
+    expect(sanitizeAiError(new Error('SQL params: private@example.test\na token'))).toBe(
+      'Falha interna da operação.',
+    );
+    expect(sanitizeAiError('x'.repeat(600))).toBe('Falha interna da operação.');
+    expect(sanitizeAiError(null)).toBe('Falha interna da operação.');
+    expect(
+      sanitizeAiError(
+        Object.assign(new Error('private upstream detail'), { code: 'AI_RESULT_UNKNOWN' }),
+      ),
+    ).toBe('AI_RESULT_UNKNOWN');
+    expect(sanitizeAiError({ code: 'AI_PRIVATE_DATA' })).toBe('Falha interna da operação.');
   });
 });
 
@@ -124,6 +130,7 @@ it('lets a custom song interpret the brief without copying it into lyrics', () =
     catchphrases: [],
     prohibitedTopics: [],
     termsAccepted: true,
+    policyVersion: 'draft-v1',
     marketingAccepted: false,
     safetyConfirmed: true,
     brief: 'Uma reflexão sobre a vida na estrada e as diferentes estações do ano. '.repeat(8),
@@ -146,6 +153,7 @@ it('requires even a two-character explicit custom fact while keeping brief inter
     catchphrases: [],
     prohibitedTopics: [],
     termsAccepted: true,
+    policyVersion: 'draft-v1',
     marketingAccepted: false,
     safetyConfirmed: true,
     brief: 'Uma canção para começar o dia',
@@ -163,4 +171,58 @@ it('allows administrative restoration to customer lyrics review without bypassin
     expect(() => assertTransition(status, 'lyrics_ready')).not.toThrow();
   expect(() => assertTransition('payment_pending', 'lyrics_ready')).toThrow();
   expect(() => assertTransition('lyrics_ready', 'audio_queued')).toThrow();
+});
+
+it('keeps buyer contact out of the persisted creative story', () => {
+  const { creative, contact } = splitStoryContact(story);
+  expect(contact).toEqual({
+    email: 'cliente@example.com',
+    name: null,
+    marketingAccepted: false,
+  });
+  expect(creative).not.toHaveProperty('buyerEmail');
+  expect(creative).not.toHaveProperty('buyerName');
+  expect(creative).not.toHaveProperty('termsAccepted');
+  expect(creative).not.toHaveProperty('marketingAccepted');
+  expect(creative).not.toHaveProperty('safetyConfirmed');
+  expect(creative).not.toHaveProperty('policyVersion');
+  const read = mergeStoryContact(creative, contact);
+  expect(read.buyerEmail).toBe('cliente@example.com');
+  expect(read).not.toHaveProperty('termsAccepted');
+  expect(read).not.toHaveProperty('marketingKnown');
+  expect(
+    mergeStoryContact(creative, contact, {
+      termsAccepted: true,
+      policyVersion: 'draft-v1',
+      marketingKnown: true,
+    }),
+  ).toMatchObject({ termsAccepted: true, policyVersion: 'draft-v1', marketingKnown: true });
+});
+
+it('keeps the accepted text authoritative and discards divergent structural metadata', () => {
+  expect(canonicalizeLyrics(lyrics).sections).toEqual(lyrics.sections);
+  const edited = { ...lyrics, fullLyrics: 'Uma edição livre\nCom a mesma voz' };
+  const canonical = canonicalizeLyrics(edited);
+  expect(canonical.fullLyrics).toBe(edited.fullLyrics);
+  expect(canonical.sections).toEqual([]);
+  expect(edited.sections).toEqual(lyrics.sections);
+  expect(validateLyrics(canonical, { ...splitStoryContact(story).creative, facts: [] })).toEqual(
+    [],
+  );
+});
+
+it('allows a confirmed refund to terminate every paid production stage', () => {
+  for (const state of [
+    'payment_pending',
+    'paid',
+    'audio_queued',
+    'audio_generating',
+    'review_required',
+    'delivered',
+    'revision_requested',
+    'failed',
+  ] as const)
+    expect(() => assertTransition(state, 'refunded')).not.toThrow();
+  expect(() => assertTransition('cancelled', 'refunded')).toThrow('Invalid order transition');
+  expect(() => assertTransition('refunded', 'audio_queued')).toThrow('Invalid order transition');
 });

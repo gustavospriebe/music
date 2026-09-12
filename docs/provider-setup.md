@@ -1,55 +1,74 @@
 # Configuração de providers e ativação comercial
 
-A aplicação funciona localmente com pagamento simulado e e-mail em arquivo. Geração de letra e capa usa OpenRouter; o áudio pode usar o OpenRouter ou o adapter direto do Google Lyria 3.5. A seleção de pagamento e e-mail é independente da interface; trocar de empresa exige um adapter implementado e homologado, não basta colar uma chave de outro fornecedor.
+Este guia descreve configuração do código local; não certifica provider, versão implantada ou cobrança em produção. A disponibilidade dos modelos e os contratos externos devem ser revalidados no [mapa de providers](providers.md) antes de uma chamada autorizada. Comece pelo `.env.example`; não copie valores secretos para Git, frontend, logs ou mensagens.
 
-Comece pelo `.env.example`. Faça backup do `.env` existente e altere somente as variáveis necessárias; nunca grave chaves no frontend, no Git ou em mensagens. API e worker precisam reiniciar após mudar configuração. `VITE_API_URL` é incorporada no build da web e exige rebuild.
+API/worker precisam reiniciar quando sua configuração muda. `VITE_API_URL` entra no build da web. Alterar apenas o env da API não configura automaticamente o worker.
 
-## Preparar sem escolher pagamento
+## Preparação sem cobrança
 
-Use `PAYMENT_PROVIDER=disabled` e `COMMERCIAL_READY=false`. Fora de produção, o checkout informa a simulação local; produção não oferece essa confirmação. `GET /api/v1/configuration` expõe um DTO público com marca, suporte, políticas e disponibilidade, sem credenciais.
+`PAYMENT_PROVIDER=disabled` e `COMMERCIAL_READY=false` permitem preparar o ambiente sem habilitar PIX real. Fora de produção, ausência de provider configurado permite confirmação local explicitamente identificada; em produção não há fallback de pagamento. E-mail local grava em arquivo. Não há geração sintética de letra/áudio/capa apresentada como provider real.
 
-O catálogo é a fonte do preço em centavos. O pedido guarda o preço no momento de sua criação. Para a criação livre, `SONG_PRICE_CENTS=0` significa preço ainda não definido; não é uma música gratuita. Ao decidir, configure centavos inteiros e execute o seed inicial: ele preenche somente o produto `custom_song` que continua sem preço. Reexecutar o seed não reprecifica produtos existentes nem pedidos antigos. Uma mudança posterior de preço deve ser deliberada no catálogo.
+O catálogo define o preço, com snapshot no pedido. `SONG_PRICE_CENTS` aceita centavos inteiros; zero deixa cobrança real indisponível. O seed cria `custom_song` e pode preencher preço ainda zero; não muda preço já definido nem pedidos antigos. Seed é ativação controlada, separado de migration.
 
-Checkout real exige preço positivo, provider configurado e condições publicadas. Preencha `SUPPORT_EMAIL`, `DELIVERY_ESTIMATE`, `REVISION_POLICY`, `REFUND_POLICY`, `USAGE_LICENSE`, `TERMS_URL` e `PRIVACY_URL`; só marque `COMMERCIAL_READY=true` depois de aprovar e publicar esses conteúdos. A aplicação não define prazo, licença, reembolso ou preço por você.
+Para ativar comercialmente, definir e publicar `SUPPORT_EMAIL`, `DELIVERY_ESTIMATE`, `REVISION_POLICY`, `REFUND_POLICY`, `USAGE_LICENSE`, `TERMS_URL`, `PRIVACY_URL` e `POLICY_VERSION`. URLs de política devem ser distintas, HTTPS e específicas; versão iniciada por `draft` não habilita checkout real. `COMMERCIAL_READY=true` só expressa uma decisão após esse trabalho. A aplicação não verifica juridicamente o texto nem comprova que as páginas foram publicadas.
 
-## Pagamento
+## Contrato de pagamento
 
-O adapter atual é AbacatePay Checkout hospedado. Para escolhê-lo, defina `PAYMENT_PROVIDER=abacatepay`, `ABACATEPAY_API_KEY`, `ABACATEPAY_PRODUCT_ID`, `ABACATEPAY_WEBHOOK_SECRET` e `ABACATEPAY_WEBHOOK_URL`. A URL de notificação é `https://SUA_API/api/v1/webhooks/abacate-pay?webhookSecret=SEU_SECRET`. O valor cobrado vem do produto cadastrado no dashboard; o adapter recusa se `amount` divergir do pedido.
+O adapter atual é AbacatePay; a escolha comercial definitiva continua do dono. Selecionar outro nome no env não cria suporte a outro gateway. O port em `packages/providers/src/payment.ts` oferece `createCheckout`, `getPayment` e `findPayment`. O domínio normaliza identidade, referência, centavos, BRL e estados; o settlement em `packages/database` é compartilhado por webhook e reconciliação.
 
-O retorno do navegador não confirma pagamento. O webhook valida o secret da query, consulta o billing na API e confere referência, moeda e valor. Checkout e confirmação são serializados no PostgreSQL; reenvios concluídos não repetem crédito/produção e falhas permitem nova tentativa.
+Um segundo gateway PIX precisa cumprir:
 
-Para outro gateway, implemente o contrato em `apps/api/src/payment.ts`, normalize checkout/consulta e adicione sua rota de webhook com autenticação e testes de valor, moeda, duplicação e retry. Só então habilite o valor correspondente em configuração. Não há suporte implícito a Mercado Pago, Stripe, Asaas ou outro fornecedor ainda não implementado.
+- Criação ligada à tentativa persistida e referência opaca; valor corresponde ao snapshot do pedido.
+- Resultado normalizado com ID e referência inequívocos, moeda, valor e estado financeiro, incluindo expiração e reembolso integral.
+- Webhook autenticado sobre o conteúdo exigido pelo fornecedor, deduplicação por evento e consulta da cobrança na origem.
+- Idempotência externa documentada ou uma busca inequívoca que permita recuperar criação incerta sem repetir cobrança.
+- Reconciliação por ID/referência e resolução pelo provider registrado na tentativa histórica, mesmo após trocar a configuração padrão.
+- Testes de divergência, concorrência, timeout após aceite remoto, duplicação, observações fora de ordem e reembolso.
+
+A chave local única evita duplicação no banco; sozinha não garante idempotência do gateway. `creating` vira `unknown` quando o resultado não é conhecido. Essa tentativa permanece ativa e impede novo POST automático. Uma busca que não encontrou resultado ainda não comprova que a criação nunca ocorreu. `approved` não regride por um evento atrasado de expiração; `refunded` é preservado.
+
+### Adapter AbacatePay
+
+Configurar `PAYMENT_PROVIDER=abacatepay`, `PAYMENT_ENVIRONMENT=sandbox|live`, `ABACATEPAY_API_KEY`, `ABACATEPAY_PRODUCT_ID` e `ABACATEPAY_WEBHOOK_SECRET`. No cadastro do webhook V2, informar o endpoint limpo `https://SUA_API/api/v1/webhooks/abacatepay`, secret separado e eventos `checkout.completed`/`checkout.refunded`. O fornecedor acrescenta `?webhookSecret=<segredo>` ao callback. Não registrar a URL preenchida. O identificador persistido do adapter é `abacatepay`; a rota canônica usa a mesma grafia, sem alias antigo.
+
+Homologação no Railway mantém `NODE_ENV=production`, cookies seguros e `ABACATEPAY_REQUIRE_WEBHOOK_SIGNATURE=true`; usa `PAYMENT_ENVIRONMENT=sandbox`, `COMMERCIAL_READY=false`, chave V2 de Devmode e produto/webhook também Devmode. A API rejeita respostas e notificações com ambiente divergente, inclusive uma chave live acidental no sandbox. O default quando `PAYMENT_ENVIRONMENT` está ausente é live em runtime de produção e sandbox fora dele; configure explicitamente nos dois serviços.
+
+Para criar checkout de homologação, autenticar em `POST /api/v1/admin/session` e conservar tanto o cookie administrativo quanto a capability do pedido. Usar a rota existente `POST /api/v1/orders/:publicId/checkout` com ambos os cookies e uma letra já aprovada. A sessão administrativa permite o ensaio sem publicar condições comerciais; o preço inteiro positivo e a configuração do provider continuam obrigatórios. Apenas capability, apenas admin ou flags enviadas no corpo/query não liberam checkout. A configuração pública informa homologação e mantém o checkout indisponível. A tentativa guarda `environment=sandbox`, um evento específico e uma nota administrativa.
+
+Criar produto de teste via `POST /v2/products/create` com `externalId`, `name`, `price` em centavos e `currency=BRL`; conferir preço igual ao snapshot do pedido e `devMode=true`. Registrar webhook via `POST /v2/webhooks/create` e conferir `devMode=true`/V2. O checkout hospedado é criado por `POST /v2/checkouts/create` com `items`, `methods=["PIX"]`, `externalId`, `returnUrl` e `completionUrl`. A chave define o ambiente; não enviar flag `devMode`. Referências: [produto](https://docs.abacatepay.com/pages/products/create), [webhook](https://docs.abacatepay.com/pages/webhooks/create), [checkout](https://docs.abacatepay.com/pages/payment/create).
+
+O simulador REST documentado é `POST /v2/transparents/simulate-payment?id=<checkout-transparente>`, não um simulador comprovado de checkout hospedado. Não enviar um ID hospedado a esse endpoint por suposição nem apresentar um webhook fabricado como entrega do fornecedor. Após uma simulação oficial confirmada para o hospedado, verificar o webhook real com secret e HMAC, consulta `PAID` com `paidAmount=amount`, uma única liquidação e um único job. Esse job pode consumir IA real mesmo com pagamento sandbox: manter o worker controlado até autorização de orçamento. A [documentação de segurança](https://docs.abacatepay.com/pages/webhooks/security) define HMAC SHA256/base64 dos bytes brutos com a chave pública publicada; o secret configurado autentica separadamente a URL.
+
+O adapter exige valor do produto remoto igual ao snapshot. Autenticação do callback usa segredo configurado e verifica assinatura do corpo conforme configuração; `ABACATEPAY_REQUIRE_WEBHOOK_SIGNATURE` é verdadeiro por padrão em produção. A assinatura publicada pelo fornecedor não substitui o segredo privado. A consulta remota confirma identidade/valor/ambiente antes do settlement; retorno do navegador não comprova pagamento.
+
+API e worker precisam da configuração necessária às consultas financeiras: o worker reconcilia tentativas pendentes e pagamentos aprovados. O resolver recusa um ambiente diferente daquele da credencial configurada antes de acessar a rede; mudar somente `PAYMENT_ENVIRONMENT` não reclassifica tentativas antigas. Encerrar/conferir pendências sandbox antes de promover a chave live. Tentativas históricas com ambiente `NULL` ficam bloqueadas até evidência oficial permitir classificação; não inferir pelo nome do provider, prefixo de ID ou runtime. Não remover credencial de um gateway com tentativas ainda não resolvidas ao testar outro. Leia [providers.md](providers.md) para contrato e limites específicos; nenhuma validação local substitui homologação e PIX de produção.
 
 ## E-mail
 
-`EMAIL_PROVIDER=local-log` grava mensagens em `LOCAL_EMAIL_PATH` (default `./var/emails`), mesmo se uma chave Resend estiver presente. Use caminho absoluto se quiser definir onde o worker grava. Arquivos têm permissões restritas e contêm links privados; não os versione.
+`EMAIL_PROVIDER=local-log` grava em `LOCAL_EMAIL_PATH` (default `./var/emails`); use caminho absoluto para evitar ambiguidade de diretório. Esses arquivos contêm links privados e requerem proteção/limpeza.
 
-Para Resend, selecione `EMAIL_PROVIDER=resend`, preencha `RESEND_API_KEY` e `EMAIL_FROM` com remetente de domínio verificado. Fora de produção, ausência de chave usa registro local. Em produção, ausência de chave/remetente válido ou seleção local-log impede a inicialização. O adapter e a configuração ficam em `packages/providers/src/email.ts`.
+Para Resend, configurar `EMAIL_PROVIDER=resend`, `RESEND_API_KEY` e `EMAIL_FROM` com remetente permitido no domínio verificado. Configurar no worker, onde o envio acontece. Em produção, provider local ou credencial/remetente obrigatório ausente impede inicialização. Ausência de chave fora de produção permite fallback local documentado.
 
-O worker persiste a intenção antes do envio e reutiliza destinatário, remetente, conteúdo e link no retry. Não troca silenciosamente o token depois de um envio aceito. A deduplicação externa tem janela limitada; não há promessa de envio exatamente uma vez. Para outro serviço de e-mail, implemente o contrato `EmailProvider` e teste transporte, falha e retry antes de habilitá-lo.
+`email_deliveries` persiste intenção por produção/template antes do envio: destinatário, remetente, conteúdo e link são estáveis no retry. Isso reduz duplicação, mas não garante exatamente um e-mail quando o transporte aceita e a resposta se perde. A janela externa de idempotência é um limite operacional. Confirmar recebimento real, remetente e link no Railway é gate externo.
 
-## OpenRouter
+## IA e gasto
 
-Defina `OPENROUTER_API_KEY`, `OPENROUTER_TEXT_MODEL` e `OPENROUTER_MUSIC_MODEL`. Capa opcional usa `OPENROUTER_COVER_TEXT_MODEL` e `OPENROUTER_COVER_REFERENCE_MODEL`. Os nomes em `.env.example` são a configuração histórica do projeto, não uma nova homologação de disponibilidade/modelo nesta entrega.
+Letra usa OpenRouter no worker: `OPENROUTER_API_KEY`, `OPENROUTER_TEXT_MODEL`, `OPENROUTER_TEXT_MAX_TOKENS`. O limite de tokens não é um teto monetário. Até três respostas recusadas pela validação podem gerar novas chamadas dentro do fluxo; cada tentativa precisa de histórico de consumo.
 
-Sem chave, a interface continua navegável e os erros de geração são explícitos. O worker local inicia sem credencial, mas falha antes de fazer rede quando uma tarefa exigir o provider. Produção mantém configuração obrigatória. Não há áudio ou letra sintéticos apresentados como geração real.
+Áudio usa `MUSIC_PROVIDER=openrouter` com `OPENROUTER_MUSIC_MODEL`, ou `MUSIC_PROVIDER=google` com `GOOGLE_API_KEY`/`GOOGLE_MUSIC_MODEL`. Capa usa `OPENROUTER_COVER_TEXT_MODEL` e `OPENROUTER_COVER_REFERENCE_MODEL`. Nomes/defaults no repositório são configuração, não prova de disponibilidade nem recomendação de preço atual. Não inferir custo real do Google por constante estimada do adapter.
 
-`OPENROUTER_TEXT_MAX_TOKENS` limita a resposta da letra (default 8192, inteiro de 1 a 65536). O limite deve respeitar o modelo escolhido e não representa um teto monetário da conta. Tentativas de validação e de áudio também podem consumir créditos.
+Produção exige as credenciais/modelos das capacidades utilizadas. Fora de produção, ausência de chave deve falhar explicitamente antes da rede. Antes de iniciar qualquer worker com credenciais reais, conferir jobs elegíveis no banco e uma autorização de gasto válida para a rodada; autorizações históricas não se transferem automaticamente.
 
-O preview isolado permite opt-in `PREVIEW_AI=lyrics`, `PREVIEW_AI=lyrics-audio` ou `PREVIEW_AI=all`; veja o README. Ele carrega seletivamente as credenciais existentes; capas só entram em `all`, pagamento e email real ficam desligados. Antes de ativar um worker com IA, confira os jobs elegíveis no banco para não executar pedidos antigos inadvertidamente. Autorize uma rodada limitada, acompanhe `ai_usage` e confira custos desconhecidos no provider; não trate `cost_usd=null` como zero.
+`ai_calls` registra a intenção antes da rede. Timeout/resposta perdida pode representar uma chamada cobrada: `unknown` bloqueia nova chamada automática do mesmo tipo no pedido. O admin investiga e registra a liberação de recuperação reconhecendo possível custo duplicado. Esse procedimento preserva o custo desconhecido no ledger, sem declará-lo zero.
 
-Erros HTTP permanentes de áudio, incluindo 402 por saldo/limite da chave, encerram o job e deixam o pedido visível para intervenção. HTTP 408, 429 e 5xx preservam retry; o filtro de conteúdo mantém sua política limitada. Não aumente o limite financeiro da chave automaticamente: confira a reserva exigida pelo provider e retome administrativamente depois de corrigir a causa.
+`ai_usage` distingue `reported`, `estimated`, `unknown`; uma soma conhecida incompleta não é margem comercial comprovada. HTTP transitório só permite retry quando o adapter classifica a situação com segurança. Falha de autenticação, saldo ou conteúdo não deve ser resolvida aumentando automaticamente tentativas/limite da chave. Validar áudio tecnicamente e ouvir as duas faixas continua necessário.
 
-## Google Lyria 3.5
+`AUDIO_REVIEW_MODE=manual` é default; `automatic_release` requer decisão explícita de liberar sem audição. `automatic` não é valor aceito. Revisão artística não é executada por esse flag.
 
-Para selecionar o áudio direto do Google, defina `MUSIC_PROVIDER=google`, `GOOGLE_API_KEY` e, opcionalmente, `GOOGLE_MUSIC_MODEL=lyria-3.5`. A chave é lida somente pela API/worker; nunca a exponha no frontend, em payload de job, em logs ou no repositório. O adapter usa a Interactions API, registra o modelo selecionado e não faz retry interno.
+## Storage e promoção
 
-O preço documentado do Lyria 3.5 é US$0,08 por música completa e não há free tier. Antes de uma chamada real, confira o orçamento compartilhado e faça primeiro o `--dry-run` do comparador. O ensaio desta feature limita-se a quatro chamadas (duas letras fictícias por dois modelos), com teto nominal de US$0,32, sem retry. Resultado técnico não substitui a escuta humana nem homologação de provider.
+Desenvolvimento: `STORAGE_PROVIDER=local` e `LOCAL_STORAGE_PATH` absoluto compartilhado por API/worker. Produção: S3 privado, `STORAGE_S3_*` nos dois processos. API verifica acesso e transmite arquivos; o bucket não deve publicar URLs de objetos.
 
-O OpenRouter continua sendo a configuração histórica (`MUSIC_PROVIDER=openrouter`, `OPENROUTER_MUSIC_MODEL=google/lyria-3-pro-preview`). Jobs antigos sem seleção explícita permanecem compatíveis com OpenRouter; jobs novos carregam somente provider/model não secretos. Erros de conteúdo, autenticação, saldo e ausência de áudio devem continuar visíveis para recuperação administrativa, sem apresentar um áudio sintético como geração real.
+Backup de banco não protege bytes do storage. Preparar export/backup de objetos, retenção e restore em destino isolado; arquivos gerados têm identidades próprias e devem permanecer associados ao manifest/banco restaurado. Um script existente não comprova recuperação.
 
-## Storage e testes externos
-
-Use `STORAGE_PROVIDER=local` e `LOCAL_STORAGE_PATH` absoluto compartilhado em desenvolvimento. Produção exige S3 privado. Preencha bucket, região, endpoint e credenciais de `STORAGE_S3_*`; API e worker usam o mesmo storage. Downloads continuam mediados pela API.
-
-Execute o [runbook externo](external-activation-runbook.md) com autorização e orçamento antes do lançamento. Testes locais usam PostgreSQL real, transportes controlados e dados sintéticos; não provam pagamento, e-mail, geração ou S3 reais. O [checklist de produção](production-checklist.md) inclui publicação dos textos, CI, infraestrutura e backup.
+Concluir [checklist de produção](production-checklist.md) e [runbook externo](external-activation-runbook.md) com autorização específica. Não registrar AbacatePay, OpenRouter, Google, Resend ou S3 como validados em produção por testes com transporte injetado.

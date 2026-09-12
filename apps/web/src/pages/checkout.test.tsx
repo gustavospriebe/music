@@ -8,6 +8,7 @@ const apiMock = vi.hoisted(() => ({
   getOrder: vi.fn(),
   checkout: vi.fn(),
   approveDevPayment: vi.fn(),
+  products: vi.fn(),
 }));
 vi.mock('../api', () => ({
   api: apiMock,
@@ -34,7 +35,12 @@ const renderCheckout = (publicId: string) => {
 };
 
 const baseOrder = {
-  order: { publicId: 'order-pay-1', status: 'lyrics_approved', priceCents: 4990 },
+  order: {
+    publicId: 'order-pay-1',
+    productType: 'custom_song',
+    status: 'lyrics_approved',
+    priceCents: 4990,
+  },
   story: { subjectName: 'Bia' },
   lyrics: [
     {
@@ -58,6 +64,9 @@ describe('checkout e confiança', () => {
     apiMock.getOrder.mockReset();
     apiMock.checkout.mockReset();
     apiMock.approveDevPayment.mockReset();
+    apiMock.products.mockResolvedValue([
+      { type: 'custom_song', name: 'Sua música', priceCents: 4990, active: true },
+    ]);
   });
 
   it('exibe resumo reconhecível com homenagem, preço e próxima etapa', async () => {
@@ -72,9 +81,9 @@ describe('checkout e confiança', () => {
     });
     renderCheckout('order-pay-1');
     expect(await screen.findByRole('heading', { name: /resumo do pedido/i })).toBeVisible();
-    expect(screen.getByText('Música da Resenha')).toBeVisible();
+    expect(screen.getByText('Produto').closest('div')).toHaveTextContent('Sua música');
     expect(screen.getByText('A Resenha da Bia')).toBeVisible();
-    expect(screen.getByText('Sua música', { exact: true })).toBeVisible();
+    expect(screen.getAllByText('Sua música', { exact: true }).length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText('Homenagem', { exact: true })).not.toBeInTheDocument();
     expect(screen.getByText(/R\$\s*49,90/)).toBeVisible();
     expect(screen.getByText(/duas versões de áudio e página privada/i)).toBeVisible();

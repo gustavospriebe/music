@@ -15,13 +15,12 @@ export OPENROUTER_TEXT_MAX_TOKENS=8192
 export OPENROUTER_API_KEY= OPENROUTER_TEXT_MODEL= OPENROUTER_MUSIC_MODEL=
 export MUSIC_PROVIDER=openrouter GOOGLE_API_KEY= GOOGLE_MUSIC_MODEL=lyria-3.5
 export OPENROUTER_COVER_TEXT_MODEL= OPENROUTER_COVER_REFERENCE_MODEL=
-export MERCADO_PAGO_ACCESS_TOKEN= MERCADO_PAGO_WEBHOOK_SECRET= MERCADO_PAGO_WEBHOOK_URL=
 export RESEND_API_KEY= EMAIL_FROM='Música da Resenha <preview@example.test>'
 export STORAGE_PROVIDER=local LOCAL_STORAGE_PATH="$PWD/output/launch-remodel/storage"
 export LOCAL_EMAIL_PATH="$PWD/output/launch-remodel/emails"
 export WORKER_ID=music-local-preview WORKER_POLL_INTERVAL_MS=2000
 # Requires explicit owner approval and a budget before starting either paid mode.
-# PREVIEW_AI=lyrics: API text only. PREVIEW_AI=lyrics-audio: API text + worker audio.
+# PREVIEW_AI=lyrics: API text + worker lyrics. PREVIEW_AI=lyrics-audio: text + worker audio.
 # PREVIEW_AI=all also enables covers in API + worker; web never receives credentials.
 # Payments and real email remain off. --check prints only availability booleans.
 exec node --input-type=module - "${1:-}" "${2:-}" <<'JS'
@@ -41,7 +40,7 @@ if (!Object.hasOwn(commands, service) || !['off', 'lyrics', 'lyrics-audio', 'all
   console.error('Usage: PREVIEW_AI=off|lyrics|lyrics-audio|all bash scripts/local-preview.sh api|web|worker [--check]');
   process.exit(2);
 }
-if (mode !== 'off' && (service === 'api' || (service === 'worker' && ['lyrics-audio', 'all'].includes(mode)))) {
+if (mode !== 'off' && (service === 'api' || (service === 'worker' && ['lyrics', 'lyrics-audio', 'all'].includes(mode)))) {
   const require = createRequire(`${process.cwd()}/apps/api/package.json`);
   let source;
   try { source = require('dotenv').parse(readFileSync('.env')); }
@@ -57,6 +56,8 @@ if (mode !== 'off' && (service === 'api' || (service === 'worker' && ['lyrics-au
     : [];
   const musicKey = provider === 'google' ? 'GOOGLE_API_KEY' : 'OPENROUTER_API_KEY';
   const musicModel = provider === 'google' ? 'GOOGLE_MUSIC_MODEL' : 'OPENROUTER_MUSIC_MODEL';
+  if (service === 'worker' && ['lyrics', 'lyrics-audio', 'all'].includes(mode))
+    selected.push('OPENROUTER_API_KEY', 'OPENROUTER_TEXT_MODEL');
   if (service === 'worker' && ['lyrics-audio', 'all'].includes(mode)) selected.push(musicKey);
   if (service === 'worker' && ['lyrics-audio', 'all'].includes(mode) && provider === 'openrouter')
     selected.push(musicModel);

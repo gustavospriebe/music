@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const apiMock = vi.hoisted(() => ({
+  configuration: vi.fn(),
   cover: vi.fn(),
   createCover: vi.fn(),
   coverDownloadUrl: vi.fn(() => '/owner-cover'),
@@ -23,6 +24,7 @@ const renderCard = (node: React.ReactNode) => {
 
 describe('capa da música', () => {
   beforeEach(() => {
+    apiMock.configuration.mockResolvedValue({ commercial: { policyVersion: 'draft-v1' } });
     apiMock.cover.mockReset();
     apiMock.createCover.mockReset();
     apiMock.deliveryCover.mockReset();
@@ -52,7 +54,7 @@ describe('capa da música', () => {
     await user.click(generate);
 
     await waitFor(() =>
-      expect(apiMock.createCover).toHaveBeenCalledWith('public-order-1', file, true),
+      expect(apiMock.createCover).toHaveBeenCalledWith('public-order-1', file, true, 'draft-v1'),
     );
     expect(await screen.findByRole('status')).toHaveTextContent(/criando sua capa/i);
   });

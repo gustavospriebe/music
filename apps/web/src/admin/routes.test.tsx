@@ -70,6 +70,18 @@ describe('cockpit administrativo', () => {
   it('prioriza alertas e usa totais do servidor, não da primeira página', async () => {
     apiMock.adminOverview.mockResolvedValue({
       totals: { orders: 120, paid: 40, revenueCents: 199600 },
+      financialEnvironments: [
+        { environment: 'live', attempts: 40, paid: 40, approvedCents: 199600, refundedCents: 0 },
+        { environment: 'sandbox', attempts: 3, paid: 2, approvedCents: 9000, refundedCents: 1000 },
+        { environment: 'local', attempts: 1, paid: 1, approvedCents: 4000, refundedCents: 0 },
+        {
+          environment: 'unclassified',
+          attempts: 2,
+          paid: 1,
+          approvedCents: 7000,
+          refundedCents: 0,
+        },
+      ],
       attention: { failed: 2, reviewRequired: 1, audioQueued: 3, lyricsGenerating: 1 },
     });
     apiMock.aiUsageSummary.mockResolvedValue({
@@ -97,6 +109,19 @@ describe('cockpit administrativo', () => {
     expect(screen.getByText(/120/)).toBeVisible();
     expect(screen.getByText(/R\$\s*1\.996,00/)).toBeVisible();
     expect(screen.getByText(/pagamento confirmado/i)).toBeVisible();
+    expect(screen.getByText('Receita real confirmada, descontados reembolsos')).toBeVisible();
+    expect(screen.getByText(/Homologação sem cobrança: 3 tentativas/)).toHaveTextContent(
+      'R$ 90,00 aprovados',
+    );
+    expect(screen.getByText(/Teste local: 1 tentativas/)).toBeVisible();
+    expect(
+      screen.getByText(/Ambiente desconhecido — conferir histórico: 2 tentativas/),
+    ).toBeVisible();
+    expect(
+      screen.getByText(/Custo IA conhecido no mês, todos os pedidos \(inclui homologação\)/),
+    ).toBeVisible();
+    expect(screen.getByText(/Inclui pedidos de teste e homologação/)).toBeVisible();
+    expect(screen.getByText(/Custo por entrega com pagamento real/)).toBeVisible();
     expect(screen.queryByText(/order_created/)).not.toBeInTheDocument();
   });
 
@@ -165,7 +190,7 @@ describe('cockpit administrativo', () => {
     apiMock.adminOrder.mockResolvedValue({
       order: {
         id: 'internal-id-1',
-        productType: 'friend_roast',
+        productType: 'custom_song',
         status: 'delivered',
         priceCents: 4990,
         createdAt: new Date().toISOString(),
@@ -234,7 +259,7 @@ describe('cockpit administrativo', () => {
         {
           id: 'internal-id-1',
           publicId: 'PUBLIC-1',
-          productType: 'friend_roast',
+          productType: 'custom_song',
           status: 'failed',
           priceCents: 4990,
           createdAt: new Date().toISOString(),
@@ -265,7 +290,7 @@ describe('cockpit administrativo', () => {
     apiMock.adminOrder.mockResolvedValue({
       order: {
         id: 'order-9',
-        productType: 'friend_roast',
+        productType: 'custom_song',
         status: 'review_required',
         priceCents: 4990,
         createdAt: new Date().toISOString(),
@@ -285,7 +310,10 @@ describe('cockpit administrativo', () => {
           content: { title: 'A Resenha da Bia', fullLyrics: 'Bia chegou' },
         },
       ],
-      payments: [{ id: 'pay-1', status: 'approved', amountCents: 4990 }],
+      payments: [
+        { id: 'pay-1', status: 'approved', amountCents: 4990, environment: 'sandbox' },
+        { id: 'pay-old', status: 'approved', amountCents: 4990, environment: null },
+      ],
       jobs: [
         {
           id: 'job-1',
@@ -301,7 +329,7 @@ describe('cockpit administrativo', () => {
         cover: { canRetry: false, requiresReference: false, jobId: null, reason: null },
         email: { canRetry: false, reason: null },
       },
-      audio: [{ id: 'audio-1', variant: 1, status: 'completed', assetId: 'asset-1' }],
+      audio: [{ id: 'audio-1', variant: 1, status: 'completed', fileId: 'file-1' }],
       notes: [],
       aiUsage: [],
       aiCost: {
@@ -323,6 +351,9 @@ describe('cockpit administrativo', () => {
     expect(screen.getByRole('heading', { name: /letra aprovada/i })).toBeVisible();
     expect(screen.getByRole('heading', { name: /pagamento/i })).toBeVisible();
     expect(screen.getByText(/aprovado/i)).toBeVisible();
+    expect(screen.getByText(/Homologação sem cobrança · Aprovado/)).toHaveTextContent(
+      'Ambiente desconhecido — conferir histórico · Aprovado',
+    );
     expect(screen.getByRole('heading', { name: /custo de ia/i })).toBeVisible();
     expect(screen.getByRole('heading', { name: /operação do pedido/i })).toBeVisible();
     expect(screen.getByRole('heading', { name: /áudios/i })).toBeVisible();
@@ -346,7 +377,7 @@ describe('cockpit administrativo', () => {
     apiMock.adminOrder.mockResolvedValueOnce({
       order: {
         id: 'order-9',
-        productType: 'friend_roast',
+        productType: 'custom_song',
         status: 'failed',
         priceCents: 4990,
         createdAt: new Date().toISOString(),

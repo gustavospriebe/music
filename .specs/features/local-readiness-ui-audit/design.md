@@ -1,5 +1,7 @@
 # Local Readiness and UI/UX Audit Design
 
+> Registro histórico de um recorte anterior. O modelo vigente e a evidência atual estão em [docs/documentation-map.md](../../../docs/documentation-map.md) e [audit-remediation](../audit-remediation/spec.md). Este registro não autoriza publicação nem gasto com providers.
+
 **Spec**: `.specs/features/local-readiness-ui-audit/spec.md`
 **Status**: Approved
 

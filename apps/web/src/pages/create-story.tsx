@@ -17,7 +17,7 @@ import { useForm, useWatch, type UseFormReturn } from 'react-hook-form';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { api, visitorId } from '../api';
+import { api, visitorId, type PublicConfiguration } from '../api';
 import { Footer, Header, JourneySteps } from '../components';
 import { clearDraft, readDraft, useDraft } from '../hooks/use-draft';
 import { rememberMyOrder } from '../my-orders';
@@ -136,11 +136,13 @@ function initialValues(intention: string | null): StoryForm {
       typeof stored[key] === typeof fallback ? [[key, stored[key]]] : [],
     ),
   );
-  if (!draft.brief && typeof stored.factsText === 'string') draft.brief = stored.factsText;
   const selected = intentions.find((item) => item.value === intention);
   return {
     ...defaults,
     ...draft,
+    termsAccepted: false,
+    safetyConfirmed: false,
+    marketingAccepted: false,
     genreSelection:
       draft.genreSelection ??
       (typeof draft.genre === 'string' && !genrePresets.includes(draft.genre) ? 'other' : 'preset'),
@@ -428,7 +430,9 @@ function SoundStep({ form }: { form: UseFormReturn<StoryForm> }) {
 function ReviewStep({
   form,
   onEdit,
+  configuration,
 }: {
+  configuration?: PublicConfiguration;
   form: UseFormReturn<StoryForm>;
   onEdit: (step: number) => void;
 }) {
@@ -488,13 +492,21 @@ function ReviewStep({
                 {name === 'termsAccepted' ? (
                   <>
                     Li e aceito os{' '}
-                    <Link to="/termos" target="_blank">
+                    <a
+                      href={configuration?.commercial.termsUrl ?? '/termos'}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
                       termos
-                    </Link>{' '}
+                    </a>{' '}
                     e a{' '}
-                    <Link to="/privacidade" target="_blank">
+                    <a
+                      href={configuration?.commercial.privacyUrl ?? '/privacidade'}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
                       privacidade
-                    </Link>
+                    </a>
                     .
                   </>
                 ) : name === 'safetyConfirmed' ? (
@@ -515,9 +527,10 @@ function ReviewStep({
     </>
   );
 }
-function saveStory(data: StoryForm): Story {
+function saveStory(data: StoryForm, policyVersion: string): Story {
   return {
     productType: 'custom_song',
+    policyVersion,
     buyerName: data.buyerName,
     buyerEmail: data.buyerEmail,
     subjectName: data.subjectName,
@@ -612,6 +625,11 @@ function CreationAvailability() {
 }
 export function CreateStory() {
   const navigate = useNavigate();
+  const configuration = useQuery({
+    queryKey: ['configuration'],
+    queryFn: api.configuration,
+    staleTime: 60_000,
+  });
   const client = useQueryClient();
   const [search] = useSearchParams();
   const [step, setStep] = useState(0);
@@ -635,6 +653,11 @@ export function CreateStory() {
   const goTo = (next: number) => setStep(next);
   const submit = useMutation({
     mutationFn: async (data: StoryForm) => {
+      const policyVersion = configuration.data?.commercial.policyVersion;
+      if (!policyVersion)
+        throw new Error(
+          'As condições de uso ainda não estão disponíveis. Tente novamente mais tarde.',
+        );
       const created = await api.createOrder('custom_song', creationKey(), visitorId());
       rememberMyOrder(created.publicId);
       try {
@@ -642,7 +665,7 @@ export function CreateStory() {
       } catch {
         /* Cookie remains the authority. */
       }
-      await api.saveStory(created.publicId, saveStory(data));
+      await api.saveStory(created.publicId, saveStory(data, policyVersion));
       return created.publicId;
     },
     onSuccess: (publicId) => {
@@ -700,7 +723,9 @@ export function CreateStory() {
               {step === 0 && <IdeaStep form={form} />}
               {step === 1 && <StoryStep form={form} />}
               {step === 2 && <SoundStep form={form} />}
-              {step === 3 && <ReviewStep form={form} onEdit={goTo} />}
+              {step === 3 && (
+                <ReviewStep form={form} onEdit={goTo} configuration={configuration.data} />
+              )}
               {submit.isError && (
                 <p className="error" role="alert">
                   {submit.error.message}

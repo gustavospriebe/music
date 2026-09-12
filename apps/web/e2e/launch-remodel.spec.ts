@@ -153,6 +153,7 @@ test('ajuste recebido aparece no acompanhamento e no admin, que pode revogar ace
   let revoked = false;
   await page.route('**/api/v1/**', (route) => {
     const path = new URL(route.request().url()).pathname;
+    if (path.endsWith('/configuration')) return route.fulfill({ json: publicConfiguration });
     if (path.endsWith('/access/revoke')) {
       revoked = true;
       return route.fulfill({ json: { revoked: true } });

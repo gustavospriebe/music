@@ -1,5 +1,7 @@
 # Local Readiness and UI/UX Audit Specification
 
+> Registro histórico de um recorte anterior. O modelo vigente e a evidência atual estão em [docs/documentation-map.md](../../../docs/documentation-map.md) e [audit-remediation](../audit-remediation/spec.md). Este registro não autoriza publicação nem gasto com providers.
+
 ## Problem Statement
 
 O repositório importado já aponta para pnpm 12 e o lockfile usa o formato oficial com um documento de ambiente seguido pelo grafo do projeto. A migração ainda precisa provar instalação congelada, política explícita de scripts e compatibilidade dos gates antes de a interface ser auditada e remodelada.

@@ -1,5 +1,7 @@
 # MVP Operável Validation
 
+> Registro histórico de um recorte anterior. O modelo vigente e a evidência atual estão em [docs/documentation-map.md](../../../docs/documentation-map.md) e [audit-remediation](../audit-remediation/spec.md). Este registro não autoriza publicação nem gasto com providers.
+
 **Verdict**: PASS ✅ — os 45/45 critérios de aceitação têm prova spec-anchored, o gate passa com 97 Vitest + 28 Playwright, o sensor P0-full matou 7/7 mutações válidas e a auditoria visual final cobre os 15 estados do baseline.
 **Date**: 2026-09-04
 **Spec**: `.specs/features/mvp-operavel/spec.md`

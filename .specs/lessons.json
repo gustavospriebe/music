@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 10,
+  "next_id": 11,
   "lessons": [
     {
       "id": "L-001",
@@ -130,6 +130,20 @@
       "evidence": ["SAFE-04 (observability)"],
       "created": "2026-09-04T22:59:04Z",
       "last_seen": "2026-09-04T22:59:04Z"
+    },
+    {
+      "id": "L-010",
+      "key": "gate_fail::serialize suites that claim the global postgresql queue and clear fixtures only inside an explicitly isolated local test database",
+      "text": "Serialize suites that claim the global PostgreSQL queue and clear fixtures only inside an explicitly isolated local test database.",
+      "signal": "gate_fail",
+      "scope": "postgres-tests",
+      "status": "candidate",
+      "features": ["audit-remediation"],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": ["VERIFY-01: .specs/features/audit-remediation/validation.md (postgres-tests)"],
+      "created": "2026-09-12T04:55:05Z",
+      "last_seen": "2026-09-12T04:55:05Z"
     }
   ]
 }

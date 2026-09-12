@@ -2,7 +2,8 @@ import { existsSync, mkdtempSync } from 'node:fs';
 import { mkdir, writeFile, readFile, readdir, rm } from 'node:fs/promises';
 import { hashToken, stableDeliveryToken } from '@resenha/domain';
 import { randomUUID } from 'node:crypto';
-import type { EmailMessage, EmailProvider } from '@resenha/providers';
+import { AiProviderError, type EmailMessage, type EmailProvider } from '@resenha/providers';
+import { testAudio } from './test-audio.js';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -26,7 +27,8 @@ const pool = new Pool({
 
 const flowStoragePath = mkdtempSync(join(tmpdir(), 'worker-flow-'));
 const config: WorkerConfig = {
-  databaseUrl: 'postgresql://resenha:resenha@localhost:5433/resenha_test',
+  databaseUrl:
+    process.env.DATABASE_URL_TEST ?? 'postgresql://resenha:resenha@localhost:5433/resenha_test',
   workerId: 'flow-test',
   pollIntervalMs: 1000,
   lockTimeoutMs: 300_000,
@@ -44,6 +46,8 @@ const config: WorkerConfig = {
   googleMusicModel: 'lyria-3.5',
   openRouterCoverTextModel: 'google/gemini-3.1-flash-lite-image',
   openRouterCoverReferenceModel: 'google/gemini-3.1-flash-image',
+  openRouterTextModel: 'test-text-model',
+  openRouterTextMaxTokens: 8192,
   email: {
     kind: 'local-log',
     from: 'test@example.test',
@@ -72,19 +76,91 @@ const approvedContent = {
   safetyNotes: [],
 };
 
-const mp3Bytes = Buffer.from([0x49, 0x44, 0x33, 0x04, 0x00, 0x00, 0x01, 0x02]);
+const persistStoryAndContact = async (orderId: string, data: Record<string, unknown>) => {
+  const email = typeof data.buyerEmail === 'string' ? data.buyerEmail : undefined;
+  if (!email) throw new Error('test story missing buyerEmail');
+  const creative = Object.fromEntries(
+    Object.entries(data).filter(
+      ([key]) => !['buyerEmail', 'buyerName', 'termsAccepted', 'marketingAccepted'].includes(key),
+    ),
+  );
+  await pool.query('insert into story_sessions(order_id,data) values($1,$2::jsonb)', [
+    orderId,
+    JSON.stringify(creative),
+  ]);
+  await pool.query(
+    'insert into order_contacts(order_id,email,name,marketing_accepted) values($1,$2,$3,$4)',
+    [
+      orderId,
+      email,
+      typeof data.buyerName === 'string' && data.buyerName ? data.buyerName : null,
+      Boolean(data.marketingAccepted),
+    ],
+  );
+};
 
-const okMusic = (requestId: string): MusicResult => ({
+const ensureProduction = async (orderId: string): Promise<string> => {
+  const existing = (
+    await pool.query<{ current_production_id: string | null }>(
+      'select current_production_id from orders where id=$1',
+      [orderId],
+    )
+  ).rows[0]?.current_production_id;
+  if (existing) return existing;
+  const result = await pool.query<{ id: string }>(
+    "insert into productions(order_id,number,lyric_version_id,status) select $1,1,id,'queued' from lyric_versions where order_id=$1 and approved_at is not null order by number desc limit 1 returning id",
+    [orderId],
+  );
+  const id = result.rows[0]?.id;
+  if (!id) throw new Error('Fixture requires an approved lyric');
+  await pool.query('update orders set current_production_id=$2 where id=$1', [orderId, id]);
+  return id;
+};
+
+const claimFixtureJob = async (input: Omit<ClaimedJob, 'leaseToken'>): Promise<ClaimedJob> => {
+  const productionId = await ensureProduction(input.orderId);
+  const payload =
+    input.type === 'generate_audio'
+      ? { productionId, ...(input.payload as object) }
+      : input.payload;
+  const leaseToken = randomUUID();
+  const result = await pool.query(
+    "update generation_jobs set type=$2,status='processing',attempts=attempts+1,lease_token=$3,lease_expires_at=now()+interval '5 minutes',locked_at=now(),locked_by='flow-test',payload=$4 where id=$1 and status='pending' and attempts<max_attempts returning attempts",
+    [input.id, input.type, leaseToken, JSON.stringify(payload)],
+  );
+  if (!result.rows[0]) throw new Error('Fixture job must be pending and claimable');
+  return { ...input, attempts: result.rows[0].attempts, leaseToken, payload };
+};
+
+const notificationJob = async (orderId: string): Promise<ClaimedJob> => {
+  const pending = await pool.query<{ id: string }>(
+    "insert into generation_jobs(type,order_id,payload,idempotency_key,max_attempts) values('deliver_notify',$1,'{}',$2,6) on conflict(idempotency_key) do update set status='pending' returning id",
+    [orderId, `notification:fixture:${orderId}`],
+  );
+  return claimFixtureJob({
+    id: pending.rows[0]!.id,
+    orderId,
+    type: 'deliver_notify',
+    payload: {},
+    attempts: 1,
+    maxAttempts: 6,
+  });
+};
+
+const audioBytes = testAudio();
+
+const okMusic = (requestId: string, model = 'test-music-model'): MusicResult => ({
   generation: {
-    bytes: mp3Bytes,
-    mime: 'audio/mpeg',
+    bytes: audioBytes,
+    mime: 'audio/wav',
     externalId: requestId,
     usage: {
       requestId,
-      model: 'test-music-model',
+      model,
       inputTokens: 50,
       outputTokens: 900,
       costUsd: '0.08',
+      costSource: 'reported' as const,
       latencyMs: 42,
     },
   },
@@ -92,10 +168,11 @@ const okMusic = (requestId: string): MusicResult => ({
     {
       sample: {
         requestId,
-        model: 'test-music-model',
+        model,
         inputTokens: 50,
         outputTokens: 900,
         costUsd: '0.08',
+        costSource: 'reported' as const,
         latencyMs: 42,
       },
       status: 'ok',
@@ -109,30 +186,24 @@ describe('processCoverJob persistence', () => {
     const publicId = 'cover-worker-1';
     const order = await pool.query<{ id: string }>(
       `insert into orders(public_id,product_type,status,price_cents,access_token_hash)
-       values($1,'friend_roast','audio_queued',4990,'hash') returning id`,
+       values($1,'custom_song','audio_queued',4990,'hash') returning id`,
       [publicId],
     );
     const orderId = order.rows[0]?.id as string;
-    await pool.query(`insert into story_sessions(order_id,data) values($1,$2)`, [
-      orderId,
-      JSON.stringify({
-        productType: 'friend_roast',
-        buyerEmail: 'ana@example.test',
-        subjectName: 'Bia',
-        occasion: 'Aniversário',
-        genre: 'pagode',
-        voice: 'female',
-        mood: 'animado',
-        facts: ['Fato um', 'Fato dois'],
-        relationship: 'Amiga',
-        traits: ['Leal'],
-        biggestStory: 'Fato um',
-        roastLevel: 'light',
-        safetyConfirmed: true,
-        termsAccepted: true,
-        marketingAccepted: false,
-      }),
-    ]);
+    await persistStoryAndContact(orderId, {
+      productType: 'custom_song',
+      buyerEmail: 'ana@example.test',
+      subjectName: 'Bia',
+      occasion: 'Aniversário',
+      genre: 'pagode',
+      voice: 'female',
+      mood: 'animado',
+      facts: ['Fato um', 'Fato dois'],
+      brief: 'Uma canção de aniversário para a Bia, com a turma toda junta.',
+      safetyConfirmed: true,
+      termsAccepted: true,
+      marketingAccepted: false,
+    });
     await pool.query(
       `insert into lyric_versions(order_id,number,kind,content,approved_at)
        values($1,1,'approved',$2,now())`,
@@ -148,7 +219,7 @@ describe('processCoverJob persistence', () => {
       [orderId, referenceKey, referenceBytes.length],
     );
     await pool.query(
-      `insert into album_covers(order_id,attempt,status,reference_asset_id,had_reference,model)
+      `insert into album_covers(order_id,attempt,status,reference_file_id,had_reference,model)
        values($1,1,'pending',$2,true,$3)`,
       [orderId, reference.rows[0]?.id, config.openRouterCoverReferenceModel],
     );
@@ -157,14 +228,14 @@ describe('processCoverJob persistence', () => {
        values('generate_cover',$1,'{"attempt":1}',$2,1) returning id`,
       [orderId, `cover:${orderId}:1`],
     );
-    const job: ClaimedJob = {
+    const job = await claimFixtureJob({
       id: insertedJob.rows[0]?.id as string,
       orderId,
       type: 'generate_cover',
       attempts: 1,
       maxAttempts: 1,
       payload: { attempt: 1 },
-    };
+    });
     const png = Buffer.from(
       'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
       'base64',
@@ -182,6 +253,7 @@ describe('processCoverJob persistence', () => {
             inputTokens: 35,
             outputTokens: 1120,
             costUsd: '0.067',
+            costSource: 'reported' as const,
             latencyMs: 90,
           },
         };
@@ -192,7 +264,12 @@ describe('processCoverJob persistence', () => {
       [orderId],
     );
     expect(
-      await cleanupExpiredCoverReferences(pool, { put: vi.fn(), get: vi.fn(), delete: vi.fn() }),
+      await cleanupExpiredCoverReferences(pool, {
+        put: vi.fn(),
+        get: vi.fn(),
+        open: vi.fn(),
+        delete: vi.fn(async () => undefined),
+      }),
     ).toBe(0);
     await processCoverJob(pool, job, config, provider);
     await processCoverJob(pool, job, config, provider);
@@ -203,14 +280,14 @@ describe('processCoverJob persistence', () => {
     });
     expect(calls[0]?.prompt).toContain('Bia');
     const cover = await pool.query(
-      `select c.status,c.reference_asset_id,c.had_reference,f.mime_type,f.storage_key
-       from album_covers c join stored_files f on f.id=c.cover_asset_id
+      `select c.status,c.reference_file_id,c.had_reference,f.mime_type,f.storage_key
+       from album_covers c join stored_files f on f.id=c.cover_file_id
        where c.order_id=$1`,
       [orderId],
     );
     expect(cover.rows[0]).toMatchObject({
       status: 'completed',
-      reference_asset_id: null,
+      reference_file_id: null,
       had_reference: true,
       mime_type: 'image/png',
     });
@@ -235,30 +312,24 @@ describe('processCoverJob persistence', () => {
     const publicId = 'cover-worker-failed-1';
     const order = await pool.query<{ id: string }>(
       `insert into orders(public_id,product_type,status,price_cents,access_token_hash)
-       values($1,'friend_roast','audio_queued',4990,'hash') returning id`,
+       values($1,'custom_song','audio_queued',4990,'hash') returning id`,
       [publicId],
     );
     const orderId = order.rows[0]?.id as string;
-    await pool.query('insert into story_sessions(order_id,data) values($1,$2)', [
-      orderId,
-      JSON.stringify({
-        productType: 'friend_roast',
-        buyerEmail: 'ana@example.test',
-        subjectName: 'Bia',
-        occasion: 'Aniversário',
-        genre: 'pagode',
-        voice: 'female',
-        mood: 'animado',
-        facts: ['Fato um', 'Fato dois'],
-        relationship: 'Amiga',
-        traits: ['Leal'],
-        biggestStory: 'Fato um',
-        roastLevel: 'light',
-        safetyConfirmed: true,
-        termsAccepted: true,
-        marketingAccepted: false,
-      }),
-    ]);
+    await persistStoryAndContact(orderId, {
+      productType: 'custom_song',
+      buyerEmail: 'ana@example.test',
+      subjectName: 'Bia',
+      occasion: 'Aniversário',
+      genre: 'pagode',
+      voice: 'female',
+      mood: 'animado',
+      facts: ['Fato um', 'Fato dois'],
+      brief: 'Uma canção de aniversário para a Bia, com a turma toda junta.',
+      safetyConfirmed: true,
+      termsAccepted: true,
+      marketingAccepted: false,
+    });
     await pool.query(
       `insert into lyric_versions(order_id,number,kind,content,approved_at)
        values($1,1,'approved',$2,now())`,
@@ -273,7 +344,7 @@ describe('processCoverJob persistence', () => {
       [orderId, referenceKey],
     );
     await pool.query(
-      `insert into album_covers(order_id,attempt,status,reference_asset_id,had_reference,model)
+      `insert into album_covers(order_id,attempt,status,reference_file_id,had_reference,model)
        values($1,1,'pending',$2,true,$3)`,
       [orderId, reference.rows[0]?.id, config.openRouterCoverReferenceModel],
     );
@@ -282,37 +353,38 @@ describe('processCoverJob persistence', () => {
        values('generate_cover',$1,'{"attempt":1}',$2,1) returning id`,
       [orderId, `cover:${orderId}:1`],
     );
-    const job: ClaimedJob = {
+    const job = await claimFixtureJob({
       id: insertedJob.rows[0]?.id as string,
       orderId,
       type: 'generate_cover',
       attempts: 1,
       maxAttempts: 1,
       payload: { attempt: 1 },
-    };
+    });
     const usage = {
       requestId: null,
       model: config.openRouterCoverReferenceModel as string,
       inputTokens: 0,
       outputTokens: 0,
       costUsd: null,
+      costSource: 'unknown' as const,
       latencyMs: 12,
     };
     await expect(
       processCoverJob(pool, job, config, {
         generate: async () => {
-          throw Object.assign(new Error('provider rejected image'), { usage });
+          throw new AiProviderError('AI_REQUEST_REJECTED', usage, 'failed');
         },
       }),
     ).rejects.toMatchObject({ terminal: true });
     const cover = await pool.query(
-      'select status,reference_asset_id,last_error from album_covers where order_id=$1',
+      'select status,reference_file_id,last_error from album_covers where order_id=$1',
       [orderId],
     );
     expect(cover.rows[0]).toMatchObject({
       status: 'failed',
-      reference_asset_id: null,
-      last_error: 'provider rejected image',
+      reference_file_id: null,
+      last_error: 'AI_REQUEST_REJECTED',
     });
     expect(existsSync(join(config.storagePath, referenceKey))).toBe(false);
     const usageRows = await pool.query('select kind,status,error from ai_usage where order_id=$1', [
@@ -321,14 +393,14 @@ describe('processCoverJob persistence', () => {
     expect(usageRows.rows[0]).toMatchObject({
       kind: 'album_cover',
       status: 'error',
-      error: 'provider rejected image',
+      error: 'AI_REQUEST_REJECTED',
     });
   });
 
   it('removes abandoned reference objects after seven days', async () => {
     const order = await pool.query<{ id: string }>(
       `insert into orders(public_id,product_type,status,price_cents,access_token_hash)
-       values('cover-expired-ref-1','friend_roast','paid',4990,'hash') returning id`,
+       values('cover-expired-ref-1','custom_song','paid',4990,'hash') returning id`,
     );
     const orderId = order.rows[0]?.id as string;
     const reference = await pool.query<{ id: string }>(
@@ -337,7 +409,7 @@ describe('processCoverJob persistence', () => {
       [orderId],
     );
     await pool.query(
-      `insert into album_covers(order_id,attempt,status,reference_asset_id,had_reference,model,created_at)
+      `insert into album_covers(order_id,attempt,status,reference_file_id,had_reference,model,created_at)
        values($1,1,'pending',$2,true,'cover-model',now()-interval '8 days')`,
       [orderId, reference.rows[0]?.id],
     );
@@ -350,15 +422,16 @@ describe('processCoverJob persistence', () => {
       cleanupExpiredCoverReferences(pool, {
         put: vi.fn(),
         get: vi.fn(),
+        open: vi.fn(),
         delete: remove,
       }),
     ).resolves.toBe(1);
     expect(remove).toHaveBeenCalledWith('orders/cover-expired-ref-1/references/ref.jpg');
     const cover = await pool.query(
-      'select reference_asset_id,had_reference from album_covers where order_id=$1',
+      'select reference_file_id,had_reference from album_covers where order_id=$1',
       [orderId],
     );
-    expect(cover.rows[0]).toMatchObject({ reference_asset_id: null, had_reference: true });
+    expect(cover.rows[0]).toMatchObject({ reference_file_id: null, had_reference: true });
     const asset = await pool.query('select 1 from stored_files where id=$1', [
       reference.rows[0]?.id,
     ]);
@@ -368,29 +441,23 @@ describe('processCoverJob persistence', () => {
   it('records provider cost without recalling it when cover storage fails', async () => {
     const order = await pool.query<{ id: string }>(
       `insert into orders(public_id,product_type,status,price_cents,access_token_hash)
-       values('cover-storage-failure-1','friend_roast','audio_queued',4990,'hash') returning id`,
+       values('cover-storage-failure-1','custom_song','audio_queued',4990,'hash') returning id`,
     );
     const orderId = order.rows[0]?.id as string;
-    await pool.query('insert into story_sessions(order_id,data) values($1,$2)', [
-      orderId,
-      JSON.stringify({
-        productType: 'friend_roast',
-        buyerEmail: 'ana@example.test',
-        subjectName: 'Bia',
-        occasion: 'Aniversário',
-        genre: 'pagode',
-        voice: 'female',
-        mood: 'animado',
-        facts: ['Fato um', 'Fato dois'],
-        relationship: 'Amiga',
-        traits: ['Leal'],
-        biggestStory: 'Fato um',
-        roastLevel: 'light',
-        safetyConfirmed: true,
-        termsAccepted: true,
-        marketingAccepted: false,
-      }),
-    ]);
+    await persistStoryAndContact(orderId, {
+      productType: 'custom_song',
+      buyerEmail: 'ana@example.test',
+      subjectName: 'Bia',
+      occasion: 'Aniversário',
+      genre: 'pagode',
+      voice: 'female',
+      mood: 'animado',
+      facts: ['Fato um', 'Fato dois'],
+      brief: 'Uma canção de aniversário para a Bia, com a turma toda junta.',
+      safetyConfirmed: true,
+      termsAccepted: true,
+      marketingAccepted: false,
+    });
     await pool.query(
       `insert into lyric_versions(order_id,number,kind,content,approved_at)
        values($1,1,'approved',$2,now())`,
@@ -406,14 +473,14 @@ describe('processCoverJob persistence', () => {
        values('generate_cover',$1,'{"attempt":1}',$2,1) returning id`,
       [orderId, `cover:${orderId}:1`],
     );
-    const job: ClaimedJob = {
+    const job = await claimFixtureJob({
       id: insertedJob.rows[0]?.id as string,
       orderId,
       type: 'generate_cover',
       attempts: 1,
       maxAttempts: 1,
       payload: { attempt: 1 },
-    };
+    });
     const generate = vi.fn(async () => ({
       bytes: Buffer.from([0xff, 0xd8, 0xff]),
       mime: 'image/jpeg' as const,
@@ -423,6 +490,7 @@ describe('processCoverJob persistence', () => {
         inputTokens: 10,
         outputTokens: 100,
         costUsd: '0.0336',
+        costSource: 'reported' as const,
         latencyMs: 15,
       },
     }));
@@ -437,18 +505,19 @@ describe('processCoverJob persistence', () => {
             throw new Error('storage unavailable');
           },
           get: vi.fn(),
-          delete: vi.fn(),
+          open: vi.fn(),
+          delete: vi.fn(async () => undefined),
         },
       ),
-    ).rejects.toMatchObject({ terminal: true });
+    ).rejects.toThrow('storage unavailable');
     expect(generate).toHaveBeenCalledTimes(1);
     const usage = await pool.query('select status,cost_usd,error from ai_usage where order_id=$1', [
       orderId,
     ]);
     expect(usage.rows[0]).toMatchObject({
-      status: 'error',
+      status: 'ok',
       cost_usd: '0.033600',
-      error: 'storage unavailable',
+      error: null,
     });
   });
 });
@@ -456,25 +525,33 @@ describe('processCoverJob persistence', () => {
 const setupOrder = async (publicId: string, key: string) => {
   const order = await pool.query<{ id: string }>(
     `insert into orders(public_id,product_type,status,price_cents,access_token_hash)
-     values($1,'friend_roast','paid',4990,'hash') returning id`,
+     values($1,'custom_song','paid',4990,'hash') returning id`,
     [publicId],
   );
   const orderId = order.rows[0]?.id as string;
   await pool.query(
     `insert into lyric_versions(order_id,number,kind,content,approved_at)
-     values($1,1,'generated',$2,now())`,
+     values($1,1,'approved',$2,now())`,
     [orderId, JSON.stringify(approvedContent)],
   );
+  const productionId = await ensureProduction(orderId);
   const job = await pool.query<{ id: string }>(
     `insert into generation_jobs(type,order_id,payload,idempotency_key,max_attempts)
-     values('generate_audio',$1,'{}',$2,6) returning id`,
-    [orderId, key],
+     values('generate_audio',$1,$3,$2,6) returning id`,
+    [orderId, key, JSON.stringify({ productionId })],
   );
   const jobId = job.rows[0]?.id as string;
-  return { orderId, jobId };
+  return { orderId, jobId, productionId };
 };
 
 beforeAll(async () => {
+  const target = new URL(config.databaseUrl);
+  if (
+    !process.env.DATABASE_URL_TEST ||
+    !['localhost', '127.0.0.1'].includes(target.hostname) ||
+    !/(?:_test|_remediation_[a-z_]+)$/.test(target.pathname)
+  )
+    throw new Error('Requires an explicitly isolated local test database');
   await pool.query('truncate table analytics_events, orders cascade');
 });
 
@@ -486,14 +563,14 @@ afterAll(async () => {
 describe('processAudioJob cost persistence', () => {
   it('persists processing before provider I/O, preserves completed audio and resumes only the failed variant', async () => {
     const { orderId, jobId } = await setupOrder('audio-progress-1', 'audio:progress-1');
-    const job: ClaimedJob = {
+    const job = await claimFixtureJob({
       id: jobId,
       orderId,
       type: 'generate_audio',
       attempts: 1,
       maxAttempts: 6,
       payload: {},
-    };
+    });
     let enteredFirst!: () => void;
     let enteredSecond!: () => void;
     let finishFirst!: () => void;
@@ -520,14 +597,14 @@ describe('processAudioJob cost persistence', () => {
       .mockImplementationOnce(async () => {
         enteredSecond();
         await secondGate;
-        throw Object.assign(new Error('synthetic terminal'), { terminal: true });
+        throw Object.assign(new Error('synthetic terminal'), { terminal: true, outcome: 'failed' });
       });
     const running = processAudioJob(pool, job, config, { generate });
     const rejected = expect(running).rejects.toMatchObject({ terminal: true });
     const read = async () =>
       (
         await pool.query(
-          'select variant,status,asset_id,attempt from audio_generations where order_id=$1 order by variant',
+          'select variant,status,file_id,attempt from audio_generations where order_id=$1 order by variant,attempt',
           [orderId],
         )
       ).rows;
@@ -535,29 +612,32 @@ describe('processAudioJob cost persistence', () => {
     try {
       await first;
       expect(await read()).toEqual([
-        { variant: 1, status: 'processing', asset_id: null, attempt: 1 },
+        { variant: 1, status: 'processing', file_id: null, attempt: 1 },
       ]);
       finishFirst();
       await second;
       const progress = await read();
       expect(progress).toHaveLength(2);
       expect(progress[0]).toMatchObject({ variant: 1, status: 'completed', attempt: 1 });
-      expect(progress[0].asset_id).toEqual(expect.any(String));
-      expect(progress[1]).toEqual({ variant: 2, status: 'processing', asset_id: null, attempt: 1 });
+      expect(progress[0].file_id).toEqual(expect.any(String));
+      expect(progress[1]).toEqual({ variant: 2, status: 'processing', file_id: null, attempt: 1 });
       completedFirst = progress[0];
     } finally {
       finishFirst();
       finishSecond();
       await rejected;
     }
-    expect((await read())[1]).toEqual({ variant: 2, status: 'failed', asset_id: null, attempt: 1 });
+    expect((await read())[1]).toEqual({ variant: 2, status: 'failed', file_id: null, attempt: 1 });
     const retry = vi.fn(async () => okMusic('progress-resumed'));
-    await processAudioJob(pool, { ...job, attempts: 2 }, config, { generate: retry });
+    await pool.query("update generation_jobs set status='pending' where id=$1", [job.id]);
+    const resumed = await claimFixtureJob({ ...job, attempts: 2 });
+    await processAudioJob(pool, resumed, config, { generate: retry });
     expect(retry).toHaveBeenCalledTimes(1);
     const finished = await read();
     expect(finished[0]).toEqual(completedFirst);
-    expect(finished[1]).toMatchObject({ variant: 2, status: 'completed', attempt: 2 });
-    expect(finished[1].asset_id).toEqual(expect.any(String));
+    expect(finished[1]).toMatchObject({ variant: 2, status: 'failed', attempt: 1 });
+    expect(finished[2]).toMatchObject({ variant: 2, status: 'completed', attempt: 2 });
+    expect(finished[2].file_id).toEqual(expect.any(String));
     expect(
       (await pool.query('select status from orders where id=$1', [orderId])).rows[0].status,
     ).toBe('review_required');
@@ -565,19 +645,20 @@ describe('processAudioJob cost persistence', () => {
 
   it('marks the variant failed when storing successful provider audio fails', async () => {
     const { orderId, jobId } = await setupOrder('audio-storage-progress', 'audio:storage-progress');
-    const job: ClaimedJob = {
+    const job = await claimFixtureJob({
       id: jobId,
       orderId,
       type: 'generate_audio',
       attempts: 1,
       maxAttempts: 6,
       payload: {},
-    };
+    });
     const storage = {
       put: vi.fn(async () => {
         throw new Error('synthetic storage failure');
       }),
       get: async () => Buffer.alloc(0),
+      open: vi.fn(),
       delete: async () => undefined,
     };
     await expect(
@@ -593,11 +674,11 @@ describe('processAudioJob cost persistence', () => {
     expect(
       (
         await pool.query(
-          'select variant,status,asset_id,attempt from audio_generations where order_id=$1',
+          'select variant,status,file_id,attempt from audio_generations where order_id=$1',
           [orderId],
         )
       ).rows,
-    ).toEqual([{ variant: 1, status: 'failed', asset_id: null, attempt: 1 }]);
+    ).toEqual([{ variant: 1, status: 'failed', file_id: null, attempt: 1 }]);
     expect(
       (await pool.query('select id from stored_files where order_id=$1', [orderId])).rows,
     ).toEqual([]);
@@ -608,14 +689,14 @@ describe('processAudioJob cost persistence', () => {
 
   it('persists one ok audio usage row per variant', async () => {
     const { orderId, jobId } = await setupOrder('audio-ok-1', 'audio:ok-1');
-    const job: ClaimedJob = {
+    const job = await claimFixtureJob({
       id: jobId,
       orderId,
       type: 'generate_audio',
       attempts: 1,
       maxAttempts: 6,
       payload: {},
-    };
+    });
     let calls = 0;
     await processAudioJob(pool, job, config, {
       generate: async () => {
@@ -624,7 +705,7 @@ describe('processAudioJob cost persistence', () => {
       },
     });
     const audio = await pool.query(
-      'select variant, status from audio_generations where order_id=$1 order by variant',
+      'select variant, status from audio_generations where order_id=$1 order by variant,attempt',
       [orderId],
     );
     expect(audio.rows).toHaveLength(2);
@@ -653,17 +734,23 @@ describe('processAudioJob cost persistence', () => {
 
   it('persists the selected Google provider and model while keeping the normal order transition', async () => {
     const { orderId, jobId } = await setupOrder('audio-google-selection', 'audio:google-selection');
-    const job: ClaimedJob = {
+    const job = await claimFixtureJob({
       id: jobId,
       orderId,
       type: 'generate_audio',
       attempts: 1,
       maxAttempts: 6,
       payload: { provider: 'google', model: 'lyria-3.5' },
-    };
-    await processAudioJob(pool, job, config, { generate: async () => okMusic('google-1') }, [1]);
+    });
+    await processAudioJob(
+      pool,
+      job,
+      config,
+      { generate: async () => okMusic('google-1', 'lyria-3.5') },
+      [1],
+    );
     const audio = await pool.query(
-      'select variant,status,provider,model,external_id from audio_generations where order_id=$1 order by variant',
+      'select variant,status,provider,model,external_id from audio_generations where order_id=$1 order by variant,attempt',
       [orderId],
     );
     expect(audio.rows).toEqual([
@@ -697,14 +784,14 @@ describe('processAudioJob cost persistence', () => {
 
   it('records a selected Google failure with sanitized metadata and no cost claim', async () => {
     const { orderId, jobId } = await setupOrder('audio-google-failure', 'audio:google-failure');
-    const job: ClaimedJob = {
+    const job = await claimFixtureJob({
       id: jobId,
       orderId,
       type: 'generate_audio',
       attempts: 1,
       maxAttempts: 6,
       payload: { provider: 'google', model: 'lyria-3.5' },
-    };
+    });
     const attempt = {
       sample: {
         requestId: 'google-failure-1',
@@ -712,6 +799,7 @@ describe('processAudioJob cost persistence', () => {
         inputTokens: 0,
         outputTokens: 0,
         costUsd: null,
+        costSource: 'unknown' as const,
         latencyMs: 31,
       },
       status: 'error' as const,
@@ -720,12 +808,14 @@ describe('processAudioJob cost persistence', () => {
     await expect(
       processAudioJob(pool, job, config, {
         generate: async () => {
-          throw Object.assign(new Error('Google music request failed without private payload'), {
-            attempts: [attempt],
-          });
+          throw new AiProviderError(
+            'AI_RESULT_UNKNOWN',
+            { ...attempt.sample, model: 'lyria-3.5' },
+            'unknown',
+          );
         },
       }),
-    ).rejects.toThrow('Google music request failed without private payload');
+    ).rejects.toThrow('AI_RESULT_UNKNOWN');
     const usage = await pool.query(
       'select provider,model,status,cost_usd,error from ai_usage where order_id=$1',
       [orderId],
@@ -736,7 +826,7 @@ describe('processAudioJob cost persistence', () => {
         model: 'lyria-3.5',
         status: 'error',
         cost_usd: null,
-        error: 'Google music request failed without private payload',
+        error: 'AI_RESULT_UNKNOWN',
       },
     ]);
     expect(
@@ -750,14 +840,14 @@ describe('processAudioJob cost persistence', () => {
 
   it('persists blocked sings before rethrowing', async () => {
     const { orderId, jobId } = await setupOrder('audio-blocked-1', 'audio:blocked-1');
-    const job: ClaimedJob = {
+    const job = await claimFixtureJob({
       id: jobId,
       orderId,
       type: 'generate_audio',
       attempts: 1,
       maxAttempts: 6,
       payload: {},
-    };
+    });
     const blocked = {
       sample: {
         requestId: 'gen-blocked-1',
@@ -765,6 +855,7 @@ describe('processAudioJob cost persistence', () => {
         inputTokens: 50,
         outputTokens: 0,
         costUsd: null,
+        costSource: 'unknown' as const,
         latencyMs: 30,
       },
       status: 'blocked' as const,
@@ -773,10 +864,10 @@ describe('processAudioJob cost persistence', () => {
     await expect(
       processAudioJob(pool, job, config, {
         generate: async () => {
-          throw Object.assign(new Error('PROHIBITED_CONTENT'), { attempts: [blocked] });
+          throw new AiProviderError('AI_CONTENT_BLOCKED', blocked.sample, 'rejected');
         },
       }),
-    ).rejects.toThrow('PROHIBITED_CONTENT');
+    ).rejects.toThrow('AI_CONTENT_BLOCKED');
     const usage = await pool.query(
       'select kind, status, external_id, error from ai_usage where order_id=$1',
       [orderId],
@@ -786,20 +877,20 @@ describe('processAudioJob cost persistence', () => {
       kind: 'audio',
       status: 'blocked',
       external_id: 'gen-blocked-1',
-      error: 'PROHIBITED_CONTENT',
+      error: 'AI_CONTENT_BLOCKED',
     });
   });
 
   it('persists transport errors with latency before rethrowing', async () => {
     const { orderId, jobId } = await setupOrder('audio-error-1', 'audio:error-1');
-    const job: ClaimedJob = {
+    const job = await claimFixtureJob({
       id: jobId,
       orderId,
       type: 'generate_audio',
       attempts: 1,
       maxAttempts: 6,
       payload: {},
-    };
+    });
     const failed = {
       sample: {
         requestId: null,
@@ -807,6 +898,7 @@ describe('processAudioJob cost persistence', () => {
         inputTokens: 0,
         outputTokens: 0,
         costUsd: null,
+        costSource: 'unknown' as const,
         latencyMs: 120,
       },
       status: 'error' as const,
@@ -815,10 +907,10 @@ describe('processAudioJob cost persistence', () => {
     await expect(
       processAudioJob(pool, job, config, {
         generate: async () => {
-          throw Object.assign(new Error('fetch failed'), { attempts: [failed] });
+          throw new AiProviderError('AI_RESULT_UNKNOWN', failed.sample, 'unknown');
         },
       }),
-    ).rejects.toThrow('fetch failed');
+    ).rejects.toThrow('AI_RESULT_UNKNOWN');
     const usage = await pool.query(
       'select kind, status, external_id, latency_ms, error from ai_usage where order_id=$1',
       [orderId],
@@ -829,20 +921,20 @@ describe('processAudioJob cost persistence', () => {
       status: 'error',
       external_id: null,
       latency_ms: 120,
-      error: 'fetch failed',
+      error: 'AI_RESULT_UNKNOWN',
     });
   });
 
   it('partial runs never deliver without both variants', async () => {
     const { orderId, jobId } = await setupOrder('audio-partial-1', 'audio:partial-1');
-    const job: ClaimedJob = {
+    const job = await claimFixtureJob({
       id: jobId,
       orderId,
       type: 'generate_audio',
       attempts: 1,
       maxAttempts: 6,
       payload: {},
-    };
+    });
     await processAudioJob(
       pool,
       job,
@@ -901,7 +993,7 @@ describe('processAudioJob cost persistence', () => {
         ])
       ).rows[0];
       expect(job).toMatchObject({ status: 'failed', attempts: 1 });
-      expect(job.last_error).toContain('limite do provedor');
+      expect(job.last_error).toBe('AI_PAYMENT_LIMIT');
       expect(job.last_error).not.toContain('private-provider-limit-payload');
       expect(
         (await pool.query('select status from orders where id=$1', [orderId])).rows[0].status,
@@ -910,7 +1002,7 @@ describe('processAudioJob cost persistence', () => {
         await pool.query('select status,error from ai_usage where order_id=$1', [orderId])
       ).rows;
       expect(usage).toHaveLength(1);
-      expect(usage[0].status).toBe('error');
+      expect(usage[0].status).toBe('rejected');
       expect(usage[0].error).not.toContain('private-provider-limit-payload');
       await worker.tick();
       expect(fetch).toHaveBeenCalledTimes(1);
@@ -921,7 +1013,7 @@ describe('processAudioJob cost persistence', () => {
         [jobId],
       );
       let generation = 0;
-      const audio = Buffer.from([0x49, 0x44, 0x33, 0x04, 0x00, 0x00]).toString('base64');
+      const audio = audioBytes.toString('base64');
       fetch.mockImplementation(
         async () =>
           new Response(
@@ -1002,7 +1094,19 @@ describe('processAudioJob cost persistence', () => {
 describe('delivery notification intent', () => {
   const deliveredOrder = async (publicId: string) => {
     const result = await setupOrder(publicId, `audio:${publicId}`);
+    const job = await claimFixtureJob({
+      id: result.jobId,
+      orderId: result.orderId,
+      type: 'generate_audio',
+      attempts: 1,
+      maxAttempts: 6,
+      payload: {},
+    });
+    await processAudioJob(pool, job, config, { generate: async () => okMusic(randomUUID()) });
     await pool.query("update orders set status='delivered' where id=$1", [result.orderId]);
+    await pool.query("update productions set status='completed' where id=$1", [
+      result.productionId,
+    ]);
     return result;
   };
   const tokenOf = (text: string) => text.match(/\/entrega\/([A-Za-z0-9_-]+)/)?.[1] as string;
@@ -1015,23 +1119,23 @@ describe('delivery notification intent', () => {
 
   it('delivers two versions and writes one usable private local email without regenerating on retry', async () => {
     const { orderId, jobId } = await setupOrder('mail-auto', 'audio:mail-auto');
-    await pool.query('insert into story_sessions(order_id,data) values($1,$2)', [
-      orderId,
-      JSON.stringify({ buyerEmail: 'ana@example.test' }),
-    ]);
-    const job = {
+    await persistStoryAndContact(orderId, { buyerEmail: 'ana@example.test' });
+    const job = await claimFixtureJob({
       id: jobId,
       orderId,
       type: 'generate_audio',
       attempts: 1,
       maxAttempts: 6,
       payload: {},
-    };
+    });
     let count = 0;
     const music = { generate: vi.fn(async () => okMusic(`auto-${++count}`)) };
-    const automatic = { ...config, reviewMode: 'automatic' as const };
+    const automatic = { ...config, reviewMode: 'automatic_release' as const };
     await processAudioJob(pool, job, automatic, music);
     await processAudioJob(pool, job, automatic, music);
+    const notify = await notificationJob(orderId);
+    await processNotificationJob(pool, notify, automatic);
+    await processNotificationJob(pool, notify, automatic);
     const intent = (await pool.query('select * from email_deliveries where order_id=$1', [orderId]))
       .rows;
     expect(intent).toHaveLength(1);
@@ -1066,19 +1170,16 @@ describe('delivery notification intent', () => {
 
   it('preserves the API link after manual audio approval without generating again', async () => {
     const { orderId, jobId } = await setupOrder('mail-manual', 'audio:mail-manual');
-    await pool.query('insert into story_sessions(order_id,data) values($1,$2)', [
-      orderId,
-      JSON.stringify({ buyerEmail: 'manual@example.test' }),
-    ]);
-    const job = {
+    await persistStoryAndContact(orderId, { buyerEmail: 'manual@example.test' });
+    const job = await claimFixtureJob({
       id: jobId,
       orderId,
       type: 'generate_audio',
       attempts: 1,
       maxAttempts: 6,
       payload: {},
-    };
-    const music = { generate: vi.fn(async () => okMusic('manual-audio')) };
+    });
+    const music = { generate: vi.fn(async () => okMusic(randomUUID())) };
     await processAudioJob(pool, job, config, music);
     expect(
       (await pool.query('select status from orders where id=$1', [orderId])).rows[0].status,
@@ -1088,15 +1189,16 @@ describe('delivery notification intent', () => {
         .rows[0].n,
     ).toBe(0);
     await pool.query("update orders set status='delivered' where id=$1", [orderId]);
+    await pool.query("update productions set status='completed' where order_id=$1", [orderId]);
     const deliveryId = randomUUID();
     const approvedToken = stableDeliveryToken(deliveryId, config.tokenPepper);
     const approvedHash = hashToken(approvedToken, config.tokenPepper);
-    await pool.query('insert into deliveries(id,order_id,token_hash) values($1,$2,$3)', [
-      deliveryId,
-      orderId,
-      approvedHash,
-    ]);
+    await pool.query(
+      'insert into deliveries(id,order_id,token_hash,production_id) values($1,$2,$3,(select current_production_id from orders where id=$2))',
+      [deliveryId, orderId, approvedHash],
+    );
     await processAudioJob(pool, job, config, music);
+    await processNotificationJob(pool, await notificationJob(orderId), config);
     expect(
       (await pool.query('select token_hash from deliveries where order_id=$1', [orderId])).rows[0]
         .token_hash,
@@ -1204,10 +1306,10 @@ describe('delivery notification intent', () => {
   it('preserves existing legacy links and never guesses whether an old email was sent', async () => {
     const { orderId } = await deliveredOrder('mail-legacy');
     const oldHash = hashToken('old-private-token', config.tokenPepper);
-    await pool.query('insert into deliveries(order_id,token_hash) values($1,$2)', [
-      orderId,
-      oldHash,
-    ]);
+    await pool.query(
+      'insert into deliveries(order_id,token_hash,production_id) values($1,$2,(select current_production_id from orders where id=$1))',
+      [orderId, oldHash],
+    );
     const provider: EmailProvider = { kind: 'resend', send: vi.fn() };
     await expect(
       deliveryEmail(pool, config, orderId, 'buyer@example.test', provider),
@@ -1216,7 +1318,10 @@ describe('delivery notification intent', () => {
       "insert into email_deliveries(order_id,template,recipient,provider,status) values($1,'music_delivered','buyer@example.test','resend','sent')",
       [orderId],
     );
-    await deliveryEmail(pool, config, orderId, 'buyer@example.test', provider);
+    // A legacy send without production identity does not prove this production was notified.
+    await expect(
+      deliveryEmail(pool, config, orderId, 'buyer@example.test', provider),
+    ).rejects.toThrow('Legacy delivery notification requires review');
     expect(provider.send).not.toHaveBeenCalled();
     expect(
       (await pool.query('select token_hash from deliveries where order_id=$1', [orderId])).rows[0]
@@ -1270,20 +1375,17 @@ describe('delivery notification intent', () => {
 describe('administrative recovery worker boundaries', () => {
   it('rejects an expected reference that was removed before calling the cover provider', async () => {
     const { orderId, jobId } = await setupOrder('cover-missing-ref', 'cover:missing-ref');
-    await pool.query('insert into story_sessions(order_id,data) values($1,$2)', [
-      orderId,
-      JSON.stringify({
-        productType: 'custom_song',
-        buyerEmail: 'client@example.test',
-        subjectName: 'Uma viagem',
-        genre: 'MPB',
-        mood: 'Calmo',
-        voice: 'either',
-        brief: 'Uma viagem para recordar',
-        safetyConfirmed: true,
-        termsAccepted: true,
-      }),
-    ]);
+    await persistStoryAndContact(orderId, {
+      productType: 'custom_song',
+      buyerEmail: 'client@example.test',
+      subjectName: 'Uma viagem',
+      genre: 'MPB',
+      mood: 'Calmo',
+      voice: 'either',
+      brief: 'Uma viagem para recordar',
+      safetyConfirmed: true,
+      termsAccepted: true,
+    });
     await pool.query(
       "insert into album_covers(order_id,attempt,status,had_reference,model) values($1,1,'pending',true,'synthetic')",
       [orderId],
@@ -1292,14 +1394,14 @@ describe('administrative recovery worker boundaries', () => {
     await expect(
       processCoverJob(
         pool,
-        {
+        await claimFixtureJob({
           id: jobId,
           orderId,
           type: 'generate_cover',
           attempts: 1,
           maxAttempts: 1,
           payload: { attempt: 1 },
-        },
+        }),
         config,
         { generate },
       ),
@@ -1312,18 +1414,15 @@ describe('administrative recovery worker boundaries', () => {
   });
   it('replays only the delivery intent and refuses incomplete audio or changed order state', async () => {
     const { orderId, jobId } = await setupOrder('notification-only', 'notification:only');
-    await pool.query('insert into story_sessions(order_id,data) values($1,$2)', [
-      orderId,
-      JSON.stringify({ buyerEmail: 'private@example.test' }),
-    ]);
-    const job: ClaimedJob = {
+    await persistStoryAndContact(orderId, { buyerEmail: 'private@example.test' });
+    const job = await claimFixtureJob({
       id: jobId,
       orderId,
-      type: 'deliver-notify',
+      type: 'deliver_notify',
       attempts: 1,
       maxAttempts: 1,
       payload: {},
-    };
+    });
     const send = vi.fn(async () => ({ externalId: 'synthetic-notification' }));
     const provider: EmailProvider = { kind: 'local-log', send };
     await pool.query("update orders set status='delivered' where id=$1", [orderId]);
@@ -1332,23 +1431,35 @@ describe('administrative recovery worker boundaries', () => {
     });
     expect(send).not.toHaveBeenCalled();
     await pool.query("update orders set status='paid' where id=$1", [orderId]);
-    await processAudioJob(pool, { ...job, type: 'generate_audio' }, config, {
-      generate: async () => okMusic(randomUUID()),
-    });
+    await processAudioJob(
+      pool,
+      {
+        ...job,
+        type: 'generate_audio',
+        payload: { productionId: await ensureProduction(orderId) },
+      },
+      config,
+      {
+        generate: async () => okMusic(randomUUID()),
+      },
+    );
     const audio = (
-      await pool.query('select * from audio_generations where order_id=$1 order by variant', [
-        orderId,
-      ])
+      await pool.query(
+        'select * from audio_generations where order_id=$1 order by variant,attempt',
+        [orderId],
+      )
     ).rows;
     await pool.query("update orders set status='delivered' where id=$1", [orderId]);
+    await pool.query("update productions set status='completed' where order_id=$1", [orderId]);
     await processNotificationJob(pool, job, config, provider);
     await processNotificationJob(pool, job, config, provider);
     expect(send).toHaveBeenCalledTimes(1);
     expect(
       (
-        await pool.query('select * from audio_generations where order_id=$1 order by variant', [
-          orderId,
-        ])
+        await pool.query(
+          'select * from audio_generations where order_id=$1 order by variant,attempt',
+          [orderId],
+        )
       ).rows,
     ).toEqual(audio);
     await pool.query("update orders set status='revision_requested' where id=$1", [orderId]);
@@ -1359,41 +1470,61 @@ describe('administrative recovery worker boundaries', () => {
   });
   it('dispatches a selected variant without replacing its completed partner', async () => {
     const { orderId, jobId } = await setupOrder('variant-admin-recovery', 'variant:admin-recovery');
-    const job: ClaimedJob = {
+    const job = await claimFixtureJob({
       id: jobId,
       orderId,
       type: 'generate_audio',
       attempts: 1,
       maxAttempts: 6,
       payload: {},
-    };
+    });
     await processAudioJob(pool, job, config, { generate: async () => okMusic(randomUUID()) });
     const partner = (
       await pool.query('select * from audio_generations where order_id=$1 and variant=2', [orderId])
     ).rows[0];
-    await pool.query('delete from audio_generations where order_id=$1 and variant=1', [orderId]);
+    const oldFirst = (
+      await pool.query(
+        'select id from audio_generations where order_id=$1 and variant=1 and selected',
+        [orderId],
+      )
+    ).rows[0];
+    await pool.query('update audio_generations set selected=false where id=$1', [oldFirst.id]);
     await pool.query("update orders set status='audio_queued' where id=$1", [orderId]);
     await pool.query("update generation_jobs set run_at=now()+interval '1 hour' where id!=$1", [
       jobId,
     ]);
     await pool.query(
       "update generation_jobs set status='pending',run_at=now(),payload=$2 where id=$1",
-      [jobId, JSON.stringify({ variant: 1 })],
+      [jobId, JSON.stringify({ productionId: await ensureProduction(orderId), variant: 1 })],
     );
     const fetch = vi.fn(
       async () =>
         new Response(
-          `data: ${JSON.stringify({ id: 'synthetic-variant-dispatch', choices: [{ delta: { audio: { data: mp3Bytes.toString('base64') } } }] })}\n\ndata: [DONE]\n\n`,
+          `data: ${JSON.stringify({ id: 'synthetic-variant-dispatch', choices: [{ delta: { audio: { data: audioBytes.toString('base64') } } }] })}\n\ndata: [DONE]\n\n`,
           { headers: { 'content-type': 'text/event-stream' } },
         ),
     );
     vi.stubGlobal('fetch', fetch);
     try {
-      await (await import('./worker.js')).createWorker({ pool, config }).tick();
+      const worker = (await import('./worker.js')).createWorker({ pool, config });
+      await worker.tick();
+      await worker.waitForIdle();
     } finally {
       vi.unstubAllGlobals();
     }
     expect(fetch).toHaveBeenCalledTimes(1);
+    expect(
+      (await pool.query('select status,selected from audio_generations where id=$1', [oldFirst.id]))
+        .rows[0],
+    ).toEqual({ status: 'completed', selected: false });
+    expect(
+      (
+        await pool.query(
+          'select attempt from audio_generations where order_id=$1 and variant=1 and selected',
+          [orderId],
+        )
+      ).rows,
+    ).toEqual([{ attempt: 2 }]);
     expect(
       (
         await pool.query('select * from audio_generations where order_id=$1 and variant=2', [

@@ -1,28 +1,40 @@
-# Providers e variáveis
+# Providers e contratos externos
 
-| Provider  | Implementação                           | Produção                   | Status                                                  |
-| --------- | --------------------------------------- | -------------------------- | ------------------------------------------------------- |
-| Lyrics    | OpenRouter chat completions (JSON)      | `openrouter`               | validado com chamada real (gemini-3-flash-preview)      |
-| Música    | OpenRouter SSE áudio (2 versões)        | OpenRouter Lyria           | validado com chamada real (lyria-3-pro, US$ 0,08/faixa) |
-| Pagamento | AbacatePay Checkout hospedado + webhook | AbacatePay                 | implementado, sem homologação real ainda                |
-| E-mail    | Resend com link privado de entrega      | Resend                     | implementado, sem credenciais (dev usa fallback local)  |
-| Capa      | OpenRouter Images API                   | Gemini Flash Image         | implementado; sem chamada paga de validação             |
-| Arquivos  | local dev / adapter S3 compatível       | bucket privado obrigatório | testado localmente; infraestrutura externa bloqueada    |
+Implementação vigente em `packages/providers/src/`. Nenhuma chamada externa foi executada para validar a remediação da auditoria. Ensaios anteriores não comprovam esta revisão, seu deploy nem aceitação comercial/artística.
 
-## OpenRouter
+| Função   | Adapter existente                          | Evidência necessária fora do gate local                              |
+| -------- | ------------------------------------------ | -------------------------------------------------------------------- |
+| Letra    | OpenRouter, JSON validado por Zod          | Resposta autorizada, conteúdo e custo efetivos                       |
+| Áudio    | OpenRouter ou Google Lyria                 | Arquivo decodificável, qualidade ouvida, fidelidade da letra e custo |
+| Capa     | OpenRouter Images                          | Imagem privada, qualidade e consentimento de referência              |
+| PIX      | AbacatePay v2                              | PIX real, webhook autenticado, consulta e refund/reconciliação       |
+| E-mail   | Resend; arquivo local em desenvolvimento   | Remetente autenticado e mensagem recebida                            |
+| Arquivos | S3 privado; disco local em desenvolvimento | Acesso direto negado e backup/restore de objetos                     |
 
-Chat Completions: `POST https://openrouter.ai/api/v1/chat/completions`, Bearer `OPENROUTER_API_KEY`. Texto usa `OPENROUTER_TEXT_MODEL` e `response_format: {type:json_object}`; a letra deve preencher `generatedLyricsSchema` e incluir `subjectName` e todos os `facts`. Áudio (validado com `google/lyria-3-pro-preview`, US$ 0,08/faixa): requisição com `modalities:["text","audio"]`, `audio:{format:"wav"}` e `stream:true`; os bytes chegam em `choices[0].delta.audio.data` (base64, concatenar chunks). O Lyria devolve na prática MP3 com carimbo C2PA — o worker detecta o contêiner real pelos bytes, não confia no `format` pedido. Referências: [quickstart](https://openrouter.ai/docs/quickstart), [áudio](https://openrouter.ai/docs/guides/overview/multimodal/audio.md), [Lyria pro](https://openrouter.ai/google/lyria-3-pro-preview).
+## Pagamento genérico
 
-Filtro de conteúdo de áudio é probabilístico: a mesma letra pode retornar `PROHIBITED_CONTENT`. Manter a instrução de variante ANTES da letra reduz falsos positivos; o worker ainda tenta várias vezes e marca o job como `failed` se persistir. `GEMINI_API_KEY` não substitui `OPENROUTER_API_KEY`. Qualquer chave compartilhada em conversa deve ser tratada como exposta e rotacionada.
+`PaymentProvider` oferece `name`, `createCheckout`, `getPayment(id)` e `findPayment(externalReference)`. `PaymentDetails` deve conter provider, ambiente financeiro (`live`, `sandbox` ou fallback `local`), ID, referência, estado financeiro, centavos inteiros e BRL. Criação e consulta precisam identificar a mesma cobrança e ambiente. Webhook apenas notifica; a liquidação consulta o provider com credencial e aplica as invariantes no banco. Tentativa histórica sem ambiente comprovado permanece `NULL` e exige conferência; nenhuma promoção de configuração transforma teste em receita.
 
-Capas usam `POST https://openrouter.ai/api/v1/images`, 1K e proporção 1:1. Sem foto, `OPENROUTER_COVER_TEXT_MODEL` recomenda `google/gemini-3.1-flash-lite-image` (~US$ 0,0336 por saída 1K); com foto, `OPENROUTER_COVER_REFERENCE_MODEL` recomenda `google/gemini-3.1-flash-image` (~US$ 0,067). O pior caso incluído (duas capas com referência) é ~US$ 0,134 de saída, antes de entrada, impostos, câmbio e storage. Estes preços são públicos, consultados em 04/09/2026; nenhuma chamada paga de capa foi feita. Referências: [OpenRouter Images API](https://openrouter.ai/docs/api-reference/images/generate-images), [modelos de imagem](https://openrouter.ai/api/v1/images/models) e [preços Gemini](https://ai.google.dev/gemini-api/docs/pricing).
+O AbacatePay recebe o produto do dashboard em `POST /v2/checkouts/create` e uma referência por tentativa. O preço retornado deve coincidir com o snapshot do pedido, inclusive `paidAmount` quando pago. Não há garantia de idempotência externa assumida: `externalId` é uma referência. O sistema faz um único POST por tentativa persistida; timeout/resultado desconhecido só permite consultar por ID/referência, sem criar outra cobrança automaticamente.
 
-## AbacatePay
+A consulta `/v2/checkouts/list` exige correspondência exata, nunca o primeiro item da lista. Paginação/ambiguidade não pode virar confirmação. O caminho interno é `/api/v1/webhooks/abacatepay`. O envelope v2 identifica evento por `id`, cobrança por `data.checkout.id` e ambiente por `devMode`. Secret é obrigatório; produção exige HMAC dos bytes brutos por padrão (`ABACATEPAY_REQUIRE_WEBHOOK_SIGNATURE`). A chave pública de HMAC, isoladamente, não autentica o remetente. Eventos duplicados e atrasados não regridem pagamentos, e refund revoga entrega e interrompe trabalhos.
 
-Checkout hospedado cria cobrança em `POST /v2/checkouts/create` com o `id` do produto do dashboard, `externalId` do pedido e URLs de retorno. O adapter confere `amount` em centavos contra o total do pedido. Webhook em `POST /api/v1/webhooks/abacate-pay?webhookSecret=...`: validar o secret, buscar o billing em `GET /v2/checkouts/one` e conferir valor, moeda, pedido e status `PAID` antes de marcar pago. A deduplicação é obrigatória. [Checkout](https://docs.abacatepay.com/pages/payment/create), [webhooks](https://docs.abacatepay.com/pages/webhooks).
+`PAYMENT_ENVIRONMENT=sandbox|live` é independente de `NODE_ENV`: a configuração ausente assume `live` no runtime de produção e `sandbox` fora dele. API e worker exigem `devMode=true` no sandbox e `false` no live, inclusive nas consultas e webhooks. A chave V2 criada em Devmode define o sandbox no próprio fornecedor; não há campo `devMode` para forçar uma chave live a operar em teste. URL base é a mesma. Confira a [autenticação oficial](https://docs.abacatepay.com/pages/authentication).
 
-## Resend e S3
+No sandbox real, o comércio público fica fechado mesmo com `COMMERCIAL_READY=true`. A rota de checkout existente exige a capability do pedido e uma sessão administrativa válida; apenas essa combinação dispensa a publicação das condições comerciais para uma homologação sem cobrança. Preço positivo e letra aprovada continuam obrigatórios. A reserva registra `sandbox_checkout_requested` e uma nota administrativa. Não existe flag HTTP de bypass nem confirmação fictícia AbacatePay.
 
-Resend envia `POST https://api.resend.com/emails` com `RESEND_API_KEY`, `EMAIL_FROM` e `Idempotency-Key`. O adapter S3 usa `PutObject`, `GetObject` e `DeleteObject`, sem ACL pública; downloads continuam mediados pelas capabilities da API. Endpoint e credenciais são opcionais quando a infraestrutura fornece IAM. [Resend](https://resend.com/docs/api-reference/emails/send-email), [AWS S3 SDK](https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/s3/).
+O endpoint oficial `POST /v2/transparents/simulate-payment?id=...` simula **checkout transparente PIX**. O adapter deste produto usa **checkout hospedado** (`/v2/checkouts/create`): a documentação consultada não comprova que o ID hospedado possa ser usado nesse simulador. Confirmar a opção oficial de simulação no checkout Devmode ou com o fornecedor antes de declarar PIX hospedado homologado. Veja [simulação PIX](https://docs.abacatepay.com/pages/transparents/simulate-payment) e [Devmode](https://docs.abacatepay.com/pages/devmode).
 
-As variáveis completas estão em `.env.example`; produção falha ao iniciar sem modelos de capa, AbacatePay/Resend e storage S3 explícito. Estado externo atual: **EXTERNAL BLOCKED** até homologação com credenciais e infraestrutura autorizadas.
+Referências oficiais consultadas: [criação](https://docs.abacatepay.com/pages/payment/create), [consulta](https://docs.abacatepay.com/pages/payment/list), [refund](https://docs.abacatepay.com/pages/payment/refund), [segurança do webhook](https://docs.abacatepay.com/pages/webhooks/security), [evento de checkout](https://docs.abacatepay.com/pages/webhooks/events/checkout). Reconfira esses contratos antes de homologar: o fornecedor pode mudá-los.
+
+Um segundo gateway precisa cumprir toda a porta e seus testes: PIX BR, valor/referência exatos, webhook autenticado, idempotência documentada ou tratamento seguro de resultado desconhecido, consulta/reconciliação e refund. Preserve o provider das tentativas históricas. Não adicione outro adapter parcialmente funcional nem um alias Mercado Pago para contornar isso.
+
+## IA, e-mail e arquivos
+
+IA usa `fetch` pontual, Zod e fila. Não requer framework de agentes. `ai_calls` existe antes da rede; `ai_usage` conserva custo e falhas de validação. Um custo Google estimado não é promovido a custo informado pelo provider. Timeout ou resposta indeterminada pode ter custo e exige conferência. Recusa definitiva e limite de taxa são diferentes de resultado desconhecido.
+
+O texto canônico é `fullLyrics`. Se uma edição divergir das seções retornadas pela IA, essas seções deixam de ser apresentadas como estrutura válida. Contato/consentimento não entram nos prompts; nomes, histórias, fatos e imagem consentida ainda são dados pessoais compartilhados conforme finalidade.
+
+Resend mantém a intenção antes do envio e usa chave estável por mensagem. Retomada após a janela de idempotência exige conferência operacional; não há garantia fictícia de exactly-once por tempo ilimitado. Cada produção tem seu aviso; o link privado do pedido aponta para a produção vigente.
+
+S3 não recebe ACL pública. A API autoriza antes de abrir o objeto, transmite em streaming e suporta um intervalo de bytes. Backup de banco não contém os arquivos do bucket. Consulte [backup/restore](backup-and-restore.md).

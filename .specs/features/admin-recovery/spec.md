@@ -1,5 +1,7 @@
 # Operação e recuperação de pedidos
 
+> Registro histórico de um recorte anterior. O modelo vigente e a evidência atual estão em [docs/documentation-map.md](../../../docs/documentation-map.md) e [audit-remediation](../audit-remediation/spec.md). Este registro não autoriza publicação nem gasto com providers.
+
 ## Problem Statement
 
 O administrador identifica falhas e resolve letra, áudio, capa e aviso de entrega pelo painel. Ações disponíveis refletem regras do servidor e não dependem de alterações manuais no banco. Escopo autorizado pelo pedido do usuário; trabalho local, sem commit/push/deploy ou chamadas pagas de teste nesta entrega.

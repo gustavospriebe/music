@@ -1,3 +1,5 @@
+> HISTÓRICO — leitura anterior à remediação de 12/09/2026. Alegações de schema, providers, status e prontidão abaixo podem estar superadas. Este documento não autoriza implementação, gastos ou publicação. Use o [modelo vigente](project-context.md) e sua validação.
+
 # Especificação completa do MVP "Música da Resenha" — Fase 2 (aderência total)
 
 > Documento histórico congelado em 2026-08-02. Menções a providers mock/fake descrevem a meta original e não o comportamento atual. Consulte `README.md`, `ARCHITECTURE.md` e `docs/provider-setup.md`: o modo fake foi removido; testes usam adapters controlados por injeção.

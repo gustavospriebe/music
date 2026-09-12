@@ -10,8 +10,6 @@ import {
 } from 'lucide-react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
-import type { ProductType } from './types';
-import { products } from './types';
 
 export function Header({ hidePrimaryAction = false }: { hidePrimaryAction?: boolean }) {
   const [open, setOpen] = useState(false);
@@ -144,9 +142,7 @@ export function Footer() {
     </footer>
   );
 }
-export function ProductPill({ type }: { type: ProductType }) {
-  return <span className={`product-pill ${products[type].accent}`}>{products[type].title}</span>;
-}
+
 export function TrustLine() {
   return (
     <div className="trust-line">

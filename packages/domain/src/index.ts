@@ -1,5 +1,16 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import type { GeneratedLyrics, OrderStatus, Story } from '@resenha/contracts';
+export * from './payment.js';
+import {
+  creativeBriefSchema,
+  readStorySchema,
+  lyricsContentSchema,
+  type CreativeBrief,
+  type ConsentEvidence,
+  type LyricsContent,
+  type OrderStatus,
+  type ReadStory,
+  type Story,
+} from '@resenha/contracts';
 
 const transitions: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
   draft: ['story_completed', 'cancelled'],
@@ -7,14 +18,14 @@ const transitions: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
   lyrics_generating: ['lyrics_ready', 'failed'],
   lyrics_ready: ['lyrics_generating', 'lyrics_approved', 'cancelled'],
   lyrics_approved: ['lyrics_ready', 'payment_pending', 'cancelled'],
-  payment_pending: ['paid', 'cancelled'],
-  paid: ['audio_queued'],
-  audio_queued: ['audio_generating'],
-  audio_generating: ['review_required', 'delivered', 'failed'],
-  review_required: ['delivered', 'failed'],
+  payment_pending: ['paid', 'cancelled', 'refunded'],
+  paid: ['audio_queued', 'refunded'],
+  audio_queued: ['audio_generating', 'refunded'],
+  audio_generating: ['review_required', 'delivered', 'failed', 'refunded'],
+  review_required: ['delivered', 'failed', 'refunded'],
   delivered: ['revision_requested', 'refunded'],
-  revision_requested: ['audio_queued', 'cancelled'],
-  failed: ['lyrics_generating', 'lyrics_ready', 'audio_queued', 'cancelled'],
+  revision_requested: ['audio_queued', 'cancelled', 'refunded'],
+  failed: ['lyrics_generating', 'lyrics_ready', 'audio_queued', 'cancelled', 'refunded'],
   refunded: [],
   cancelled: [],
 };
@@ -31,20 +42,33 @@ export const assertTransition = (from: OrderStatus, to: OrderStatus): void => {
   if (!canTransition(from, to)) throw new InvalidOrderTransitionError(from, to);
 };
 
-export const basePriceCents = 4_990;
-export const calculatePriceCents = (
-  baseCents: number,
-  additionsCents: readonly number[] = [],
-): number => {
-  if (
-    !Number.isSafeInteger(baseCents) ||
-    baseCents < 0 ||
-    additionsCents.some((value) => !Number.isSafeInteger(value) || value < 0)
-  ) {
-    throw new Error('Price must use non-negative integer cents.');
-  }
-  return additionsCents.reduce((total, value) => total + value, baseCents);
+export type OrderContact = {
+  email: string;
+  name: string | null;
+  marketingAccepted: boolean;
 };
+export const splitStoryContact = (
+  story: Story,
+): { creative: CreativeBrief; contact: OrderContact } => ({
+  contact: {
+    email: story.buyerEmail,
+    name: story.buyerName?.trim() ? story.buyerName.trim() : null,
+    marketingAccepted: story.marketingAccepted,
+  },
+  creative: creativeBriefSchema.parse(story),
+});
+export const mergeStoryContact = (
+  creative: unknown,
+  contact: OrderContact,
+  evidence: ConsentEvidence = {},
+): ReadStory =>
+  readStorySchema.parse({
+    ...creativeBriefSchema.parse(creative),
+    buyerEmail: contact.email,
+    ...(contact.name ? { buyerName: contact.name } : {}),
+    marketingAccepted: contact.marketingAccepted,
+    ...evidence,
+  });
 
 export const hashToken = (token: string, pepper: string): string =>
   createHash('sha256').update(`${pepper}:${token}`).digest('hex');
@@ -142,31 +166,29 @@ const isRepresented = (text: string, value: string): boolean => {
   if (normalizedValue.length < 3) return true;
   return text.includes(normalizedValue);
 };
-export const validateLyrics = (lyrics: GeneratedLyrics, story: Story): string[] => {
+/** fullLyrics is authoritative; stale structural metadata is discarded without rewriting text. */
+export const canonicalizeLyrics = (value: unknown): LyricsContent => {
+  const lyrics = lyricsContentSchema.parse(value);
+  const text = (value: string) => value.replace(/\r\n/g, '\n').replace(/\s+/g, ' ').trim();
+  const represented =
+    text(lyrics.sections.map((section) => section.lyrics).join('\n')) === text(lyrics.fullLyrics);
+  return { ...lyrics, sections: represented ? lyrics.sections : [] };
+};
+
+export const validateLyrics = (lyrics: LyricsContent, story: CreativeBrief): string[] => {
   const errors: string[] = [];
   const fullLyrics = normalize(lyrics.fullLyrics);
   if (!fullLyrics) errors.push('A letra não pode estar vazia.');
-  if (story.productType !== 'custom_song' && !isRepresented(fullLyrics, story.subjectName))
-    errors.push('O nome principal não aparece na letra.');
-  if (!lyrics.sections.some((section) => section.type === 'chorus'))
-    errors.push('A letra precisa de refrão.');
-  if (lyrics.sections.length < 3) errors.push('A letra precisa ter pelo menos três seções.');
   if (lyrics.fullLyrics.length > 7_000)
     errors.push('A letra ultrapassa o tamanho máximo permitido.');
-  if (
-    story.facts.some((fact) =>
-      story.productType === 'custom_song'
-        ? !fullLyrics.includes(normalize(fact))
-        : !isRepresented(fullLyrics, fact),
-    )
-  )
+  if (story.facts.some((fact) => !fullLyrics.includes(normalize(fact))))
     errors.push('A letra não representa todos os fatos obrigatórios.');
   if (story.prohibitedTopics.some((term) => isRepresented(fullLyrics, term)))
     errors.push('A letra contém um assunto proibido.');
   return errors;
 };
 
-export const makeMusicPrompt = (lyrics: GeneratedLyrics): string => {
+export const makeMusicPrompt = (lyrics: LyricsContent): string => {
   // Sem linhas extras de contexto: o classificador de segurança de áudio do provedor é
   // probabilístico e instruções como notas de pronúncia disparam falsos positivos
   // de PROHIBITED_CONTENT. A pronúncia fica apenas na letra (que o modelo lê em pt-BR).
@@ -190,12 +212,36 @@ export type AiUsageSample = {
   outputTokens: number;
   /** Decimal USD string as reported by the provider (`usage.cost`); never converted. */
   costUsd: string | null;
+  costSource: 'reported' | 'estimated' | 'unknown';
   latencyMs: number;
 };
-export const sanitizeAiError = (error: unknown): string =>
-  (error instanceof Error ? error.message : 'unknown provider error')
-    .replace(/[\r\n]+/g, ' ')
-    .slice(0, 500);
+const safeOperationCodes = new Set([
+  'AI_CONFIGURATION_MISSING',
+  'AI_RATE_LIMITED',
+  'AI_AUTHORIZATION_FAILED',
+  'AI_PAYMENT_LIMIT',
+  'AI_REQUEST_REJECTED',
+  'AI_RESULT_UNKNOWN',
+  'AI_INVALID_RESPONSE',
+  'AI_INVALID_AUDIO',
+  'AI_AUDIO_TOO_SHORT',
+  'AI_CONTENT_BLOCKED',
+  'AI_STORAGE_FAILED',
+  'AI_VALIDATION_REJECTED',
+  'JOB_LEASE_LOST',
+  'JOB_ATTEMPTS_EXHAUSTED',
+  'JOB_PAYLOAD_INVALID',
+  'JOB_PRECONDITION_FAILED',
+  'JOB_LEGACY_PROVENANCE',
+  'JOB_EMAIL_REVIEW_REQUIRED',
+]);
+export const sanitizeAiError = (error: unknown): string => {
+  const code =
+    typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
+  return typeof code === 'string' && safeOperationCodes.has(code)
+    ? code
+    : 'Falha interna da operação.';
+};
 
 export const retryDelayMs = (
   attempt: number,

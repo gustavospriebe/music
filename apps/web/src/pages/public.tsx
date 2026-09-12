@@ -457,6 +457,7 @@ function CheckoutReady({
   pending,
   errorMessage,
   onPay,
+  productName,
 }: {
   configuration?: PublicConfiguration;
   detail: OrderDetail;
@@ -464,6 +465,7 @@ function CheckoutReady({
   pending: boolean;
   errorMessage: string | undefined;
   onPay: () => void;
+  productName: string;
 }) {
   const paymentState = detail.payment;
   const localCheckout = Boolean(paymentState?.devFallback) && !paymentState?.configured;
@@ -477,7 +479,7 @@ function CheckoutReady({
         <dl className="summary-list">
           <div>
             <dt>Produto</dt>
-            <dd>Música da Resenha</dd>
+            <dd>{productName}</dd>
           </div>
           <div>
             <dt>Sua música</dt>
@@ -544,6 +546,11 @@ function CheckoutContent({ publicId }: { publicId: string }) {
     queryFn: () => api.getOrder(publicId),
     enabled: Boolean(publicId),
   });
+  const catalog = useQuery({
+    queryKey: ['products'],
+    queryFn: api.products,
+    staleTime: 60_000,
+  });
   const payment = useMutation({
     mutationFn: async () => {
       const checkout = await api.checkout(publicId);
@@ -570,6 +577,10 @@ function CheckoutContent({ publicId }: { publicId: string }) {
       pending={payment.isPending}
       errorMessage={payment.isError ? payment.error.message : undefined}
       onPay={() => payment.mutate()}
+      productName={
+        catalog.data?.find((product) => product.type === view.detail.order.productType)?.name ??
+        'Sua música'
+      }
     />
   );
 }
