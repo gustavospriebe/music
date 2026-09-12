@@ -26,6 +26,9 @@ O dono confirmou prosseguir após a solicitação de limite US$ 3 em IA e e-mail
 
 ## Limites externos observados
 
+- O CI de `e22b030` expôs duração imprecisa no FFmpeg 6.1: fixture de 12 segundos reportava 11.776 ms, apesar de decodificar 192.000 bytes PCM mono/8 kHz/16 bits. A medição passou a contar amostras completas. Testes incluem a fronteira 10 s/9,999 s. Worker 81/81 local; CI de `a43b180` passou.
+- Configuração remota web continha `VITE_API_URL=https://api.railway.internal`, inacessível ao navegador. Os domínios `*.up.railway.app` também são sites distintos na Public Suffix List. A web agora usa a própria origem; Nginx encaminha `/api` ao `API_UPSTREAM` interno em runtime. Web 106/106, typecheck/lint e imagem local passaram; sensor Docker confirmou cookies, query, Range, upload maior que 1 MB, 404 da API e navegação SPA. React Doctor 85/100, sem erro novo. Promoção ainda pendente.
+
 - Backup nativo Railway rejeitado por API. O painel esclarece: backups/PITR exigem plano Pro. Não houve mudança de plano; o dump externo privado acima protege esta operação, mas não é rotina automática de recuperação.
 - Checkout hospedado e PIX transparente têm contratos diferentes; o endpoint documentado de simulação transparente não será usado por tentativa num ID de checkout hospedado.
 - Venda real, política comercial e qualidade artística continuam sem comprovação nesta etapa até execução/aceite explícitos.

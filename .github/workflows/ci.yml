@@ -43,5 +43,7 @@ jobs:
       - run: pnpm exec turbo run test --concurrency=1
       - run: pnpm test:ops
       - run: pnpm build
+      - run: docker build -f docker/web/Dockerfile -t music-web:ci .
+      - run: node scripts/test-web-proxy.mjs music-web:ci
       - run: pnpm --filter @resenha/web exec playwright install --with-deps chromium
       - run: pnpm test:e2e

@@ -72,7 +72,7 @@ Sele variáveis secretas no painel depois de validá-las. Alterações em variá
 ### `web`
 
 ```dotenv
-VITE_API_URL=https://${{api.RAILWAY_PUBLIC_DOMAIN}}
+API_UPSTREAM=http://${{api.RAILWAY_PRIVATE_DOMAIN}}:3001
 ```
 
 O valor é incorporado pelo Vite durante o build; mudar a URL exige novo deploy do web.
@@ -128,7 +128,7 @@ O worker é contínuo: não configure cron, domínio público ou healthcheck HTT
 2. Configurar referências e secrets em `api`/`worker` sem publicar valores em logs.
 3. Em serviço existente, executar a manutenção e drenagem da API/worker antigos descritas no runbook. Configurar o pre-deploy único da API e aplicar migration contra o banco Railway somente após backup e preflight dos dados.
 4. Executar o seed apenas na ativação inicial, de forma controlada, e provar que o catálogo não está vazio.
-5. Configurar os domínios, `WEB_URL` e `VITE_API_URL`; publicar API/web/worker do mesmo SHA com CI aprovado, mantendo consumo suspenso até confirmar schema e configuração.
+5. Configurar os domínios, `WEB_URL` e `API_UPSTREAM`; publicar API/web/worker do mesmo SHA com CI aprovado, mantendo consumo suspenso até confirmar schema e configuração.
 6. Confirmar callbacks e remetente, ambiente monetário e bloqueio público de sandbox antes de reabrir tráfego e worker.
 7. Executar o runbook de ativação externa e só então liberar pedidos reais mediante os aceites comerciais.
 

@@ -16,6 +16,7 @@ Publicar uma revisão coerente do produto único e comprovar o que os ambientes 
 - **EXT-06**: Totais de receita, pagamentos e reembolsos comerciais devem contar somente live. Testes e histórico não classificado devem permanecer identificáveis. Custo de IA inclui consumo real em testes e não representa lucro.
 - **EXT-07**: Homologação deve distinguir consulta de credenciais, checkout de teste criado, simulação no gateway, webhook autenticado, reconciliação e produção. Nenhuma etapa é PASS sem execução correspondente. PIX sandbox não é venda ou PIX real.
 - **EXT-08**: Entrega externa exige envio efetivo, observação do resultado, arquivos privados e restauração de objeto. Uma listagem vazia do bucket ou domínio verificado não satisfaz essa prova.
+- **EXT-09**: O navegador deve acessar a API na mesma origem da web; URLs internas do Railway não podem entrar no bundle. O proxy de produção deve preservar caminho/query, cookies, uploads e Range, sem converter erros HTTP da API em HTML da SPA.
 
 ## Limites
 

@@ -2,7 +2,7 @@
 
 Este guia descreve configuração do código local; não certifica provider, versão implantada ou cobrança em produção. A disponibilidade dos modelos e os contratos externos devem ser revalidados no [mapa de providers](providers.md) antes de uma chamada autorizada. Comece pelo `.env.example`; não copie valores secretos para Git, frontend, logs ou mensagens.
 
-API/worker precisam reiniciar quando sua configuração muda. `VITE_API_URL` entra no build da web. Alterar apenas o env da API não configura automaticamente o worker.
+API/worker precisam reiniciar quando sua configuração muda. A web chama `/api` na sua própria origem; `API_UPSTREAM` configura o proxy Nginx em runtime (no Railway, `http://api.railway.internal:3001`). Não use domínios separados do Railway para cookies de cliente. Alterar apenas o env da API não configura automaticamente o worker.
 
 ## Preparação sem cobrança
 

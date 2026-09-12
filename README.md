@@ -53,3 +53,5 @@ Pagamento é uma porta genérica com criação, consulta exata e busca por refer
 `AUDIO_REVIEW_MODE=manual` é o padrão. `automatic_release` libera após validação técnica de arquivo/duração e não avalia qualidade artística ou fidelidade da interpretação. Chamadas sem resultado exigem conferência no admin antes de permitir nova execução; custo desconhecido continua desconhecido.
 
 Antes de vender, complete [o checklist](docs/production-checklist.md), [ativação externa](docs/external-activation-runbook.md) e [backup/restore](docs/backup-and-restore.md). É necessário preço, condições comerciais reais/versionadas, um PIX de produção autorizado, entrega recebida e restore dos objetos. Nada disso é substituído por `pnpm check`.
+
+A web acessa a API na mesma origem (`/api`), preservando cookies privados. O proxy Nginx de produção exige `API_UPSTREAM` com a origem HTTP(S) da API; no Railway use `http://api.railway.internal:3001`. Esse endereço pertence ao servidor web, nunca ao JavaScript enviado ao navegador.

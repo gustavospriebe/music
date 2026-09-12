@@ -32,8 +32,8 @@ export default defineConfig({
     },
   },
   test: {
-    env: { VITE_API_URL: 'http://localhost:3001' },
     environment: 'jsdom',
+    environmentOptions: { jsdom: { url: 'http://localhost:3001/' } },
     setupFiles: './src/test/setup.ts',
     globals: true,
     exclude: ['e2e/**', '**/node_modules/**', '**/dist/**'],

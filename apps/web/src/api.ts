@@ -11,10 +11,8 @@ import type {
   Story,
 } from './types';
 
-/** Em dev, usa URL relativa e o proxy do Vite (funciona via Tailscale/IP). Produção exige VITE_API_URL no build. */
-const baseUrl =
-  import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? '' : 'http://localhost:3001');
-const url = (path: string) => `${baseUrl}/api/v1${path}`;
+/** A mesma origem preserva cookies privados no Vite e no proxy de produção. */
+const url = (path: string) => new URL(`/api/v1${path}`, window.location.origin).href;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** UUID v4 sem depender de `crypto.randomUUID` (ausente em HTTP não-seguro). */
