@@ -1,25 +1,25 @@
 # Preocupações atuais do código
 
-Referência: 2026-09-12, entrega local `audit-remediation`. Cada item abaixo distingue desenho/código de prova externa. Gate final e publicação ficam em [STATE](../STATE.md); critérios verificáveis em [audit-remediation/spec.md](../features/audit-remediation/spec.md). Este arquivo substitui recomendações antigas de persistir contato em `leads`, mover letra ainda síncrona ou adicionar índices que já existem.
+Referência: 2026-09-12, remediação e ativação externa. Cada item abaixo distingue desenho/código de prova externa. Gate final e publicação ficam em [STATE](../STATE.md); critérios verificáveis em [audit-remediation/spec.md](../features/audit-remediation/spec.md). Este arquivo substitui recomendações antigas de persistir contato em `leads`, mover letra ainda síncrona ou adicionar índices que já existem.
 
 ## Riscos de lançamento, não motivo para reescrever arquitetura
 
-| Risco                                                            | Impacto / probabilidade / esforço                 | Evidência que falta                                                                            |
-| ---------------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| PIX de produção, refund e reconciliação externa não demonstrados | Alto / relevante até homologação / médio          | Transação real autorizada e estado externo/interno correspondente; testes injetados não bastam |
-| Schema/versão do Railway atrás do WIP                            | Alto / observado no catálogo remoto / médio       | Ref implantada, journal e constraints live; `0012`–`0014` não presumidas aplicadas             |
-| Preço/textos comerciais ainda não aceitos                        | Alto / conhecido / decisão do dono                | Preço positivo, políticas publicadas/versionadas e aceite antes de `COMMERCIAL_READY`          |
-| Backup de objetos sem restore comprovado                         | Alto / impacto em incidente / médio               | Restore banco + bytes + referências em destino isolado                                         |
-| Remetente/e-mail do worker no Railway não revalidado             | Alto para entrega / relevante / baixo             | Mensagem realmente recebida e link privado correto                                             |
-| Qualidade musical não provada por arquivo válido                 | Alto / inerente ao provider / operação recorrente | Audição das duas versões, letra correta; default `manual`                                      |
+| Risco                                                   | Impacto / probabilidade / esforço                 | Evidência que falta                                                                                                              |
+| ------------------------------------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| PIX de produção e refund real não demonstrados          | Alto / conhecido / médio                          | Homologação sandbox e reconciliação passaram; falta transação real autorizada e refund real                                      |
+| Promoções futuras misturarem revisões                   | Alto / controlado por processo / baixo            | Conferir CI e três SHAs; promoção inicial conjunta e journal0000–0016 já comprovados                                             |
+| Preço/textos comerciais ainda não aceitos               | Alto / conhecido / decisão do dono                | Preço positivo, políticas publicadas/versionadas e aceite antes de `COMMERCIAL_READY`                                            |
+| Backup recorrente independente sem retenção configurada | Alto / incidente / médio                          | Restore pontual banco + três objetos passou; falta recorrência e destino independente                                            |
+| Bounce não reconciliado automaticamente pelo app        | Alto para entrega / observado / operação inicial  | Resend confirmou delivered após correção do destinatário; monitorar devoluções no painel. Sent significa aceite, não recebimento |
+| Qualidade musical não provada por arquivo válido        | Alto / inerente ao provider / operação recorrente | Audição das duas versões, letra correta; default `manual`                                                                        |
 
-## Mudanças locais a confrontar com os testes finais
+## Fronteiras implementadas e cobertas
 
 - **Financeiro:** `packages/domain/src/payment.ts`, `packages/providers/src/payment.ts`, `packages/database/src/payment-settlement.ts`, `apps/api/src/routes/payment.ts`. Tentativa/identidade completas, uma ativa por pedido, resultado desconhecido sem recriação e settlement compartilhado. Não declarar um segundo gateway implementado sem seus quatro caminhos: criar, autenticar evento, consultar e reconciliar.
 - **Produção:** `packages/database/src/schema.ts`, `apps/worker/src/audio.ts`, `apps/api/src/routes/admin-production.ts`. Produções fixam letra, áudios preservam tentativas/arquivos, seleção é por produção/variante. Legado `legacy_unverified` não comprova origem.
 - **Fila e custo:** `packages/database/src/jobs.ts`, `apps/worker/src/ai-call.ts`, `apps/worker/src/lyrics.ts`. Lease/heartbeat/fencing e chamada durável antes da rede; `unknown` bloqueia repetição automática. `ai_usage` distingue informado, estimado e desconhecido. A fila não oferece exatamente uma cobrança externa.
 - **Entrada e privacidade:** `packages/contracts/src/index.ts`, `packages/domain/src/index.ts`, `apps/api/src/routes/orders.ts`. Briefing criativo separado de comprador/aceites; consentimento ausente permanece desconhecido. `fullLyrics` é canônico e edição/aprovação validam conteúdo. Separação de contato não anonimiza texto livre.
-- **Schema:** migrations `0012_audit_remediation.sql`, `0013_lyrics_target_version.sql` e `0014_email_production.sql`, snapshots e schema. Upgrade não inventa origem de áudio, paidAt ou consentimento. Backfill de alvo de letra exige prova da chave histórica; trabalho ativo sem prova é bloqueado para revisão. E-mail tem intenção por produção, para uma revisão não herdar indevidamente o aviso enviado anteriormente.
+- **Schema:** migrations `0012_audit_remediation.sql`, `0013_lyrics_target_version.sql` `0014_email_production.sql`, `0015_payment_environment.sql` e `0016_webhook_environment.sql`, snapshots e schema. Upgrade não inventa origem de áudio, paidAt ou consentimento. Backfill de alvo de letra exige prova da chave histórica; trabalho ativo sem prova é bloqueado para revisão. E-mail tem intenção por produção, para uma revisão não herdar indevidamente o aviso enviado anteriormente.
 - **HTTP/admin:** `apps/api/src/app.ts` e `apps/api/src/routes/admin-*.ts`. Erro interno deve ser genérico com requestId; módulos administrativos agora separam autenticação, leitura, recuperação, produção, acesso e relatórios. DTO público e log não recebem parâmetros SQL, secrets ou PII.
 
 ## Limites persistentes e caminho de evolução

@@ -35,7 +35,7 @@ Comece em `AUDIO_REVIEW_MODE=manual`. Ouça as duas faixas: palavras, pronúncia
 
 Verifique domínio e `EMAIL_FROM` no worker. Receba o e-mail, abra o link em outro navegador, teste visualização/stream/download privado e negue acesso após revogação. Faça uma revisão de produção: ela deve gerar novo aviso com intenção própria, preservando o link do pedido e o histórico anterior.
 
-Em erro de envio, conserve intenção e chave. Após a janela de idempotência do Resend, confira o envio no provider antes de tomar uma decisão manual: repetir uma chamada fora da janela pode duplicar e-mail.
+O status `sent` indica aceite pelo transporte; consulte `last_event` e bounce no Resend para confirmar entrega. Um domínio inválido em ADMIN_EMAIL foi identificado na homologação: credencial de admin não comprova que a caixa existe. Corrigir o destinatário exige nova intenção explícita; não mude destinatário/mensagem de uma tentativa já enviada. Em erro de envio, conserve intenção e chave. Após a janela de idempotência do Resend, confira o envio no provider antes de tomar uma decisão manual: repetir uma chamada fora da janela pode duplicar e-mail.
 
 ## Backup/restore e decisão final
 

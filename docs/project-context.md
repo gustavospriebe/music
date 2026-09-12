@@ -1,6 +1,6 @@
 # Contexto canônico — Música da Resenha
 
-Data de referência: 2026-09-12. Este documento descreve o desenho do código local em correção pela entrega `audit-remediation`; não certifica publicação, produção ou aceite comercial. Consulte [.specs/STATE.md](../.specs/STATE.md) para refs, execuções e evidências datadas. Uma spec ou este documento é uma alegação a conferir no código e no ambiente.
+Data de referência: 2026-09-12. Este documento descreve o produto único após `audit-remediation` e sua ativação técnica no Railway. A homologação usa pagamento sandbox; não há aceite comercial nem PIX de produção. Consulte [.specs/STATE.md](../.specs/STATE.md) para refs, execuções e evidências datadas. Uma spec ou este documento é uma alegação a conferir no código e no ambiente.
 
 ## Produto
 
@@ -35,17 +35,17 @@ Não há Redis, framework de agentes nem fila externa. PostgreSQL guarda dados e
 
 ## Código local, Git e Railway são provas diferentes
 
-A auditoria encontrou trabalho local não publicado e catálogo remoto ainda incompatível com produto único. O projeto Railway conhecido é **`musica`**, com `web`, `api`, `worker`, `Postgres` e `Bucket`. Não usar o nome histórico `musica-da-resenha` como alvo de operação.
+A auditoria encontrou trabalho local não publicado e catálogo remoto incompatível; a ativação externa corrigiu esse descompasso com backup, drenagem e promoção conjunta. O projeto Railway conhecido é **`musica`**, com `web`, `api`, `worker`, `Postgres` e `Bucket`. Não usar o nome histórico `musica-da-resenha` como alvo de operação.
 
-A leitura do banco local existente confirmou PostgreSQL 16.11 e migrations até `0011`; trocar a imagem do compose não atualiza um volume existente. A entrega usa PostgreSQL 18 isolado para validar as migrations `0012` a `0014`. Isso não aplica migrations ao banco existente nem ao Railway. O schema remoto não foi comprovado nesta auditoria; disponibilidade HTTP e catálogo não substituem inspeção do journal/schema.
+A leitura do banco local existente confirmou PostgreSQL 16.11 e migrations até `0011`; trocar a imagem do compose não atualiza um volume existente. A ativação validou instalação limpa e atualização em PostgreSQL 18 isolado. O Railway foi inspecionado por SQL: PostgreSQL 18.6, migrations `0000`–`0016` com os 17 hashes versionados, catálogo somente `custom_song`. O volume local 16 não foi alterado. Disponibilidade HTTP e catálogo não substituem essa inspeção.
 
-`0012` registra produção, tentativas financeiras, consentimentos, leases e chamadas de IA. Histórico sem origem comprovável recebe `legacy_unverified`, sem adivinhar letra ou aceite. `0013` recupera o alvo de jobs de letra apenas quando a chave histórica comprova a versão; jobs ativos sem prova ficam bloqueados. `0014` vincula a intenção de e-mail à produção para permitir avisos de uma revisão sem repetir o aviso anterior. Migrations já aplicadas são imutáveis.
+`0012` registra produção, tentativas financeiras, consentimentos, leases e chamadas de IA. Histórico sem origem comprovável recebe `legacy_unverified`, sem adivinhar letra ou aceite. `0013` recupera o alvo de jobs de letra apenas quando a chave histórica comprova a versão; jobs ativos sem prova ficam bloqueados. `0014` vincula a intenção de e-mail à produção para permitir avisos de uma revisão sem repetir o aviso anterior. `0015` e `0016` separam ambientes financeiros e de webhook; histórico sem prova conserva NULL. Migrations já aplicadas são imutáveis.
 
 ## Evidência e operação
 
 `pnpm check` reúne format, lint, typecheck, testes e build; E2E é um gate separado. Só um resultado executado na revisão correspondente comprova o gate. O contrato de runtime é Node 22 e pnpm 12.3.4; CI e testes de banco devem usar PostgreSQL 18. Gates finais desta entrega ficam na sua validação, não presumidos aqui.
 
-Nenhum teste sintético comprova PIX real, envio no Railway, qualidade artística, custo integral de produção ou restore do bucket de produção. A aplicação deve continuar comercialmente indisponível até os aceites externos. Não herdar autorizações antigas de crédito, publicação ou deploy de handoffs.
+Testes sintéticos e provas externas estão separados na [validação de ativação](../.specs/features/external-activation/validation.md): houve checkout e pagamento simulado no gateway, reconciliação, webhook real, quatro chamadas de IA e restore dos três objetos reais. Aceite de envio pelo Resend não equivale a recebimento; qualidade artística depende de escuta humana. A aplicação deve continuar comercialmente indisponível até os aceites externos. Não herdar autorizações antigas de crédito, publicação ou deploy de handoffs. A exceção de homologação exige admin e capability; o frontend acessa a API pela própria origem via proxy Nginx.
 
 ## Ordem de leitura
 

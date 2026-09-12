@@ -216,13 +216,14 @@ function EmailRecovery({
       {notifications.length ? (
         notifications.map((item) => (
           <p key={item.id}>
-            {item.status === 'sent' ? 'Enviado' : jobStatusPt(item.status)} ·{' '}
+            {item.status === 'sent' ? 'Aceito pelo provedor' : jobStatusPt(item.status)} ·{' '}
             {new Date(item.updatedAt).toLocaleString('pt-BR')}
           </p>
         ))
       ) : (
         <p>Nenhum envio registrado.</p>
       )}
+      <p>O aceite do envio não confirma recebimento. Consulte devoluções no provedor de e-mail.</p>
       <ConfirmOperation
         label="Reenviar aviso de entrega"
         impact="Envia novamente o aviso ao e-mail do cliente com acesso à entrega existente. Não gera áudio nem capa."

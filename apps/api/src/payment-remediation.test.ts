@@ -200,6 +200,90 @@ describe.skipIf(!databaseUrl)('durable payment settlement (isolated PostgreSQL)'
     expect(jobs.rows).toEqual([{ status: 'cancelled' }]);
   });
 
+  it('diagnoses an unconfirmed notification without settling it and safely accepts its approved replay', async () => {
+    const f = await fixture();
+    expect((await f.checkout()).statusCode).toBe(200);
+    const payment = await f.row();
+    const warn = vi.spyOn(f.app.log, 'warn').mockImplementation(() => undefined);
+    const eventId = randomUUID();
+    const pending = await webhook(f, 'completed', eventId);
+    expect(pending.statusCode).toBe(503);
+    expect((await f.row()).status).toBe('pending');
+    expect(
+      (await pool.query('select id from payment_webhook_events where payment_id=$1', [payment.id]))
+        .rows,
+    ).toHaveLength(0);
+    expect(
+      (await pool.query('select id from productions where order_id=$1', [f.orderId])).rows,
+    ).toHaveLength(0);
+    expect(
+      (await pool.query('select id from generation_jobs where order_id=$1', [f.orderId])).rows,
+    ).toHaveLength(0);
+    expect(warn.mock.calls).toEqual([
+      [
+        { stage: 'settlement', code: 'PAYMENT_WEBHOOK_SETTLEMENT_FAILED' },
+        'payment webhook processing failed',
+      ],
+    ]);
+
+    f.observe({ status: 'approved' });
+    const replay = await webhook(f, 'completed', eventId);
+    expect(replay.statusCode).toBe(200);
+    expect(replay.json()).toEqual({ processed: true });
+    const duplicate = await webhook(f, 'completed', eventId);
+    expect(duplicate.statusCode).toBe(200);
+    expect(duplicate.json()).toEqual({ duplicate: true });
+    expect((await f.row()).status).toBe('approved');
+    expect(
+      (await pool.query('select id from payment_webhook_events where payment_id=$1', [payment.id]))
+        .rows,
+    ).toHaveLength(1);
+    expect(
+      (await pool.query('select id from productions where order_id=$1', [f.orderId])).rows,
+    ).toHaveLength(1);
+    expect(
+      (await pool.query('select id from generation_jobs where order_id=$1', [f.orderId])).rows,
+    ).toHaveLength(1);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('logs only the failed stage and a fixed code when provider errors contain private material', async () => {
+    const f = await fixture();
+    expect((await f.checkout()).statusCode).toBe(200);
+    const payment = await f.row();
+    const warn = vi.spyOn(f.app.log, 'warn').mockImplementation(() => undefined);
+    const privateError = [
+      'private-synthetic-error',
+      'customer@example.test',
+      `https://example.test/private?webhookSecret=${env.ABACATEPAY_WEBHOOK_SECRET}`,
+      f.orderId,
+      payment.external_payment_id,
+    ].join(' ');
+    vi.mocked(f.adapter.getPayment).mockRejectedValueOnce(new Error(privateError));
+    const failed = await webhook(f);
+    expect(failed.statusCode).toBe(503);
+    expect(warn.mock.calls).toEqual([
+      [
+        { stage: 'provider_lookup', code: 'PAYMENT_WEBHOOK_PROVIDER_LOOKUP_FAILED' },
+        'payment webhook processing failed',
+      ],
+    ]);
+    expect(failed.body).not.toContain(privateError);
+    expect((await f.row()).status).toBe('pending');
+    expect(
+      (await pool.query('select id from payment_webhook_events where payment_id=$1', [payment.id]))
+        .rows,
+    ).toHaveLength(0);
+
+    f.observe({ externalReference: randomUUID(), id: randomUUID() });
+    const missing = await webhook(f);
+    expect(missing.statusCode).toBe(503);
+    expect(warn.mock.calls[1]).toEqual([
+      { stage: 'payment_lookup', code: 'PAYMENT_WEBHOOK_PAYMENT_LOOKUP_FAILED' },
+      'payment webhook processing failed',
+    ]);
+  });
+
   it('keeps timeout unknown and reconciles by reference without issuing a second create', async () => {
     const f = await fixture();
     f.create.mockImplementationOnce(async (input) => {

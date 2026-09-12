@@ -4,7 +4,7 @@ Status: em execução. Autorização: pedido do dono em 12/09/2026 para avançar
 
 ## Resultado esperado
 
-Publicar uma revisão coerente do produto único e comprovar o que os ambientes conectados permitem. A venda pública permanece fechada enquanto preço, condições comerciais e pagamento de produção não forem aprovados. Chamadas pagas de IA e envio ao endereço de teste dependem do limite solicitado ao dono nesta etapa.
+Publicar uma revisão coerente do produto único e comprovar o que os ambientes conectados permitem. A venda pública permanece fechada enquanto preço, condições comerciais e pagamento de produção não forem aprovados. O dono autorizou até US$ 3 de IA e e-mail de teste; a execução e os resultados ficam na validação, sem presumir aceite comercial.
 
 ## Critérios de aceite
 

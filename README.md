@@ -44,7 +44,7 @@ corepack pnpm test:e2e
 
 `check` cobre formato, lint, tipos, testes, verificação de objetos restaurados com dados sintéticos e build. Os testes de integração exigem uma URL local explícita com banco terminado em `_test` (ou `_remediation_<nome>`), migrado e descartável; suítes da fila podem limpar suas fixtures e não devem rodar concorrentemente sobre o mesmo banco. O runner serializa esses arquivos e os pacotes. O worker também exige `ffmpeg`. O CI provisiona PostgreSQL 18, Node 22 e FFmpeg. Playwright cobre a experiência com respostas controladas: não é homologação de PIX, IA, S3 ou e-mail.
 
-A execução atual e seus limites estão em [.specs/features/audit-remediation/validation.md](.specs/features/audit-remediation/validation.md). Não use contagens de testes de relatórios históricos como evidência do checkout atual.
+As provas de código e de ambiente estão na [remediação local](.specs/features/audit-remediation/validation.md) e na [ativação externa](.specs/features/external-activation/validation.md). Em 12/09/2026 houve pagamento sandbox, IA, e-mail e restore de objetos reais; o comércio público permanece fechado. Não use contagens de testes de relatórios históricos como evidência do checkout atual.
 
 ## Operação
 

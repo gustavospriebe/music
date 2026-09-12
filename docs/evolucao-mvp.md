@@ -27,7 +27,7 @@ O [gate local consolidado](../.specs/features/audit-remediation/validation.md) p
 1. Integração e verificação independente local concluídas: 430 testes de código/banco, um operacional, 48 E2E, três imagens Docker e sensor financeiro. Use o relatório da revisão, preservando a distinção entre provas sintéticas e externas.
 2. Revisar publicação e promoção como ação separada: Git/CI/imagens/migrations/env, sem assumir que Railway acompanha WIP.
 3. Definir preço e condições, homologar o gateway escolhido e comprovar PIX de produção, reconciliação e refund. AbacatePay é adapter atual, não uma escolha comercial irreversível.
-4. Provar e-mail do worker no Railway, download privado, revisão humana e restauração conjunta de banco/objetos. Backup ainda não ensaiado é risco de lançamento.
+4. Provar e-mail do worker no Railway, download privado, revisão humana e restauração conjunta de banco/objetos. O restore pontual de banco e três objetos reais foi ensaiado em 12/09/2026; retenção e backup recorrente independente continuam como risco de lançamento.
 5. Medir fila e capacidade. Aumentar concorrência somente com demanda, limites de provider e tempo de revisão observados. Separar variantes em jobs ou priorizar filas apenas se a medição justificar.
 
 ## Dívida que continua sendo dívida

@@ -34,7 +34,7 @@ Execute o seed de forma controlada depois da primeira migration e confirme `/api
 
 ## Condições de promoção
 
-Esta lista é configuração recomendada para a próxima promoção autorizada; não comprova alteração no Railway. A observação de 12/09/2026 encontrou API/worker atrás do web, `checkSuites=false` e watch patterns do web sem os pacotes compartilhados.
+Na ativação de 12/09/2026, `checkSuites=true` foi confirmado nos três serviços e os watch patterns do web passaram a incluir os pacotes compartilhados. A API é owner único do pre-deploy. A revisão inicial da promoção e os hashes do schema estão na [evidência externa](../.specs/features/external-activation/validation.md); configurações recomendadas abaixo não substituem essa prova datada.
 
 - Ativar espera pelo CI na origem Git de cada serviço. Confirmar os checks do SHA exato antes de promover; os três serviços devem terminar no mesmo SHA.
 - Incluir `apps/<serviço>/**`, `packages/**`, `docker/<serviço>/**`, `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `turbo.json` e `tsconfig.base.json` nos watch patterns. O web importa contracts.
